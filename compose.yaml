@@ -1,0 +1,25 @@
+# Local development services for SentinelOps.
+# Start with:  docker compose up -d      Stop with:  docker compose down
+# Values wrapped in ${...} are read from the git-ignored .env file.
+services:
+  db:
+    image: postgres:17-alpine            # official Postgres image, small Alpine variant; major pinned
+    container_name: sentinelops-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"            # bind to localhost ONLY, not the whole network
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # named volume: data survives container removal
+    healthcheck:
+      # Postgres ships pg_isready; Compose uses this to know when the DB is truly ready.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

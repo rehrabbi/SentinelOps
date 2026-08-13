@@ -1,21 +1,42 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
 // main is the entry point of every Go program. It sets up the HTTP
 // server and starts listening for requests.
 func main() {
+	// Read the database connection string from the environment (12-factor
+	// config). We never hard-code credentials; if it's missing, fail loudly.
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL environment variable is required")
+	}
+
+	// Open the connection pool. This does NOT connect yet — it just prepares
+	// the pool; the first real connection happens on the first query/ping.
+	db, err := openDB(databaseURL)
+	if err != nil {
+		log.Fatalf("database setup failed: %v", err)
+	}
+	defer db.Close()
+
 	// A ServeMux ("multiplexer" / router) inspects each incoming
 	// request and decides which handler function should answer it.
 	mux := http.NewServeMux()
 
-	// Register our health-check handler. The "GET /healthz" pattern
-	// (Go 1.22+) matches ONLY GET requests to the /healthz path.
+	// Liveness — "is the process up?" Does NOT touch the database.
 	mux.HandleFunc("GET /healthz", healthHandler)
+
+	// Readiness — "can we serve real traffic?" Pings the database.
+	mux.HandleFunc("GET /readyz", readyHandler(db))
 
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
@@ -65,4 +86,24 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Encode a Go map as JSON and write it directly to the response.
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// readyHandler reports whether the service can serve real traffic. It takes
+// the DB pool and returns a handler (a closure) that pings the database on
+// each call: DB reachable -> 200 ready; DB unreachable -> 503 unavailable.
+func readyHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Bound the check with a timeout so a hung DB can't hang the request.
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := db.PingContext(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable) // 503
+			json.NewEncoder(w).Encode(map[string]string{"status": "unavailable"})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
+	}
 }

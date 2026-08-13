@@ -277,6 +277,56 @@ headers) around every request — the standard Go shape `func(next http.Handler)
 
 ---
 
+## Version Control — Published to GitHub
+
+**Published** to a **private** repository: https://github.com/rehrabbi/SentinelOps
+(remote `origin`, branch `main`, pushed via the `gh` CLI using existing auth — no tokens
+handled manually). Two commits pushed. Private = only invited collaborators can view; can be
+flipped to public later. Chose to keep the real commit email (acceptable on a private repo).
+
+**What I learned:** Local commits live only on my machine until `git push` sends them to a
+remote. `gh repo create --source . --remote origin --push` creates the repo, wires the
+remote, and pushes in one step. Repo visibility and commit-email privacy are deliberate
+choices to make *before* the first push.
+
+*(This log entry is uncommitted — it will be included in the next commit.)*
+
+---
+
+## Stage 6/12 — Database Rib: Postgres in Docker + Go connection
+
+**Built:**
+- `compose.yaml` runs **Postgres 17-alpine** locally: **localhost-only** port bind
+  (`127.0.0.1:5432`), a named volume `pgdata` for persistence, and a `pg_isready`
+  healthcheck. Credentials come from a **git-ignored `.env`**; `.env.example` is the
+  committed template.
+- `backend/db.go`: `openDB()` opens a `database/sql` connection **pool** using the **pgx**
+  driver (blank-imported to register it). Pool tuned (max open/idle conns, conn lifetime).
+- `backend/main.go`: reads `DATABASE_URL` from the environment (12-factor, fail-fast if
+  missing), opens the pool, and adds `GET /readyz` (readiness) that `PingContext`s the DB
+  with a 3s timeout — `200 ready` / `503 unavailable`. `/healthz` stays liveness-only.
+- Dependency added: `github.com/jackc/pgx/v5`.
+
+**Verified (the payoff):** with DB up, `/readyz` = ready. Stopped the DB container ->
+`/readyz` = 503 while `/healthz` stayed 200 (process alive, just not ready). Restarted ->
+`/readyz` = ready. Proves the liveness/readiness split.
+
+**Concepts learned:**
+- Docker: image vs container vs volume; Compose as declarative, version-controlled infra;
+  binding a DB port to localhost only (don't expose to the LAN); container healthchecks.
+- Secrets: git-ignored `.env` + committed `.env.example` template; never commit credentials,
+  never hard-code them; read config from the environment (12-factor).
+- Go + DB: a blank import registers a `database/sql` driver; `sql.Open` is lazy (prepares a
+  pool, connects on first use); connection pools reuse connections; `PingContext` bounded by
+  a `context` timeout; passing `db` into a handler via a closure (no globals).
+- Liveness (is the process up?) vs readiness (can it serve traffic / are deps reachable?) —
+  separate endpoints so a DB blip pauses traffic instead of forcing restarts.
+- Supply chain: `go.sum` + the checksum database verify dependency integrity on every fetch.
+
+*(This log entry is uncommitted — it and the previous entry go in the next commit.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
