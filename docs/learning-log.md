@@ -214,6 +214,69 @@ Go (`net/http`) backend · PostgreSQL (Docker) · npm + go modules · top-level 
 
 ---
 
+## Stage 6/7 — Backend Foundation (first rib of the walking skeleton)
+
+**Built:** a minimal Go `net/http` server (`backend/main.go`, module `sentinelops`) exposing
+a single `GET /healthz` endpoint that returns `{"status":"ok"}`. Compiles with `go build`;
+verified via `curl` and browser (200 OK, JSON). `POST /healthz` returns `405 Method Not
+Allowed` automatically — a free consequence of method-based routing.
+
+**Version control:** `git init` (branch `main`); `.gitignore` excludes secrets (`.env`),
+dependencies, and build output; first commit `ad2f220`. Confirmed `backend/bin/api.exe`
+(build output) is correctly ignored.
+
+**Concepts learned:**
+- `http.NewServeMux` = router; the `"GET /healthz"` pattern (Go 1.22+) matches only that
+  method+path, so wrong methods get `405` — an example of **least privilege / minimal
+  attack surface**.
+- Handler signature `(w http.ResponseWriter, r *http.Request)`; response write order is
+  headers → status → body.
+- `http.ListenAndServe` blocks forever; startup errors handled with `log.Fatalf`.
+- `/healthz` is a real production **liveness** pattern (used later by Docker/LB/AWS).
+- `.gitignore` is a security control (prevents accidental secret leakage).
+- Conventional Commits format (`type: description`).
+
+**Hardening deferred (on the radar, not yet fixed):**
+- No server read/write timeouts (Slowloris DoS risk) → will switch to a configured
+  `http.Server{}` later.
+- `json.Encode` error is ignored → adopt a proper error-handling pattern as handlers grow.
+- Line endings: add `.gitattributes` to normalize to LF (Linux containers/CI safety).
+
+---
+
+## Stage 10 — First Frontend<->Backend Interaction (the skeleton walks)
+
+**Built:** React+Vite+TS frontend (`frontend/`) scaffolded with Vite. Replaced the demo
+`App.tsx` with a health-check UI that fetches `GET /healthz` on load and renders three
+states: loading / ok / error. Added a least-privilege CORS middleware to the Go API that
+allows only `http://localhost:5173`.
+
+**The CORS lesson (learned by hitting the wall first):**
+- Browsers enforce the **Same-Origin Policy**: JS on origin A cannot READ responses from
+  origin B unless B opts in. Origin = scheme + host + **port**, so `:5173` vs `:8080` differ.
+- The browser blocked the call with "No 'Access-Control-Allow-Origin' header". Fix belongs on
+  the **server**: it declares `Access-Control-Allow-Origin`. We named the specific frontend
+  origin (least privilege), not `*`.
+- CORS is **browser-enforced and protects users** (stops evil.com from reading an API you're
+  logged into with your session). `curl` ignores CORS entirely — it only guards browsers.
+- **Deferred:** preflight (`OPTIONS`) handling — not needed until we send custom headers like
+  `Authorization`; will add alongside auth.
+
+**React concepts learned:**
+- Component = a function returning JSX; boot flow `index.html -> main.tsx -> <App/>` into `#root`.
+- `useState` = component memory; `useEffect(fn, [])` runs once after mount — the right place
+  for a fetch. State change -> automatic re-render.
+- A **discriminated union** (`loading | ok | error`, tagged by `kind`) makes illegal states
+  unrepresentable; TypeScript narrows the type per branch.
+- `fetch` resolves even on 4xx/5xx — must check `res.ok`; `.catch` handles network/CORS
+  failures. Always render an explicit error state.
+- React **StrictMode** double-invokes effects in dev (why we saw two requests) — dev-only.
+
+**Middleware concept:** a function that wraps a handler to run shared logic (here, CORS
+headers) around every request — the standard Go shape `func(next http.Handler) http.Handler`.
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

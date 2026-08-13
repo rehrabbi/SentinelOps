@@ -1,0 +1,15 @@
+# Normalize line endings: store text as LF in the repo AND check it out as
+# LF everywhere. This keeps Windows dev consistent with our Linux containers
+# and CI, where CRLF line endings can break shell scripts and tooling.
+* text=auto eol=lf
+
+# Treat these as binary — never apply line-ending or text conversion.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.exe  binary
+*.woff  binary
+*.woff2 binary

@@ -1,0 +1,37 @@
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 56px 24px;
+  text-align: center;
+}
+
+.subtitle {
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.health-card {
+  margin-top: 40px;
+  padding: 24px 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.status {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 16px;
+}
+
+/* Three visual states, matching the three shapes of HealthState. */
+.status.loading {
+  color: var(--text);
+}
+.status.ok {
+  color: #16a34a; /* green */
+}
+.status.error {
+  color: #dc2626; /* red */
+}
