@@ -58,6 +58,7 @@ func main() {
 	userRepo := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepo)
 	mux.HandleFunc("GET /api/users", userHandler.List)
+	mux.HandleFunc("POST /api/users", userHandler.Create)
 
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.

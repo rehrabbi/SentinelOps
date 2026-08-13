@@ -392,6 +392,54 @@ frontend can consume it.
 - Error handling: log detail server-side, return a generic message to the client.
 - Manual dependency injection: `main()` constructs and connects the pieces explicitly.
 
+---
+
+## Stage: Users write API — POST /api/users (user creation / registration)
+
+**Decisions made (via decision prompts):**
+- Password hashing: **bcrypt** (`golang.org/x/crypto/bcrypt`, Go-team maintained) over argon2id —
+  simplest to get right; strong enough. Cost = `bcrypt.DefaultCost` (10).
+- Input validation: **hand-written** (no validator library) — see the mechanics explicitly.
+- Password policy: **min 12 characters, no composition rules** (NIST 800-63B: length > symbols),
+  max 72 bytes (bcrypt's hard limit — we reject, never silently truncate).
+- Duplicate email: **trust the DB constraint** — INSERT and catch Postgres `23505`
+  (unique_violation), map to a sentinel `ErrEmailTaken` -> `409`. Atomic; avoids the
+  TOCTOU race a "SELECT-then-INSERT" pre-check would have.
+
+**Built (user typed all code in VSCode; I reviewed + gofmt'd each file):**
+- `internal/user/validate.go` (new): `CreateInput` struct, `Normalize()` (trim + lowercase email;
+  deliberately does NOT trim password), `Validate()` with `ErrValidation` sentinel wrapped via `%w`.
+  Uses `net/mail.ParseAddress` + bare-address check; rune count for min, byte count for max.
+- `internal/user/repository.go`: added `ErrEmailTaken` + `Create(ctx, email, fullName, passwordHash)`
+  using `INSERT ... RETURNING`, `$1/$2/$3` params, and `errors.As` on `*pgconn.PgError` to detect 23505.
+- `internal/user/handler.go`: added `Create` handler — `MaxBytesReader` (1 MiB cap),
+  strict JSON (`DisallowUnknownFields` + `dec.More()`), `Normalize`+`Validate`,
+  `bcrypt.GenerateFromPassword`, error mapping (`ErrEmailTaken`->409, else 500), `201` + `Location`.
+  Repo never sees plaintext — hashing happens in the handler.
+- `main.go`: registered `POST /api/users -> userHandler.Create` (method-based mux route).
+- Added dependency: `golang.org/x/crypto` (bcrypt), now direct. `go mod tidy` / `vet` / `build` all green.
+
+**Verified (live, via curl + psql):**
+- Valid create -> `201`, `Location` header, user JSON with NO `passwordHash`.
+- Duplicate (`CAROL@` vs `carol@`) -> `409` — proves case-insensitive `lower(email)` index.
+- Password < 12 -> `400`; bad email -> `400`; unknown field `isAdmin` -> `400` (mass-assignment blocked).
+- DB inspection: stored hash = `$2a$10$…`, 60 chars — a real bcrypt hash (salt embedded).
+
+**Concepts learned:**
+- Never trust the client: the server is the only enforcement point. Six-step defensive handler
+  (size cap -> strict parse -> validate -> hash -> error-map -> 201).
+- bcrypt anatomy: `$2a$` alg, `10` cost (2^10 rounds), embedded salt, fixed 60-char output —
+  so no separate salt column; identical passwords -> different hashes.
+- `errors.As` (extract a typed error like `*pgconn.PgError`) vs `errors.Is` (identity match);
+  `%w` wrapping + sentinel errors as the clean cross-layer error-signaling pattern.
+- REST semantics: `POST` = create, `201 Created` + `Location`, distinct method routes on one path.
+- Mass-assignment defense via `DisallowUnknownFields`.
+
+**Security notes:**
+- Account enumeration: returning `409` reveals an email is registered. Accepted for UX in this
+  portfolio app; revisit for registration/login hardening (generic responses / email-verification flow).
+- Fake seed users (alice/bob) have invalid hashes and cannot authenticate; clean up when building login.
+
 *(Log entry uncommitted — goes in the next commit.)*
 
 ---
