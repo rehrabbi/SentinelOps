@@ -364,6 +364,38 @@ errors to safe, generic messages in handlers.
 
 ---
 
+## Stage 8 — Users API: read path (GET /api/users)
+
+**Built (by-feature layering in `internal/user`):**
+- `user.go`: the `User` model; `PasswordHash` tagged `json:"-"` so it can never serialize to
+  a client.
+- `repository.go`: `Repository` (owns the `*sql.DB`); `List(ctx)` runs the SELECT (omitting
+  `password_hash`), scans rows into `[]User`, checks `rows.Err()`, returns a non-nil empty
+  slice so "no users" encodes as `[]` not `null`.
+- `handler.go`: `Handler.List` calls the repo, logs the real error server-side but returns a
+  generic 500 to the client (no sensitive-data exposure).
+- `main.go`: wired `userRepo -> userHandler` by hand (manual dependency injection) and
+  registered `GET /api/users`.
+
+**Verified:** seeded 2 users; `GET /api/users` returned them as JSON (id, email, fullName,
+timestamps) with NO `password_hash` (confirmed by a leak check). CORS header present, so the
+frontend can consume it.
+
+**Concepts learned:**
+- Layered request flow: router -> handler (HTTP concerns) -> repository (SQL concerns) -> DB
+  and back. Each layer has one job.
+- Go packages + the special `internal/` dir (only importable within this module); exported
+  (Capitalized) vs unexported identifiers; constructor funcs (`NewRepository`/`NewHandler`).
+- `database/sql` read path: `QueryContext`, `rows.Next()`/`Scan` (scan order must match the
+  SELECT), `defer rows.Close()`, and checking `rows.Err()` after the loop.
+- Don't fetch secrets you don't need (omitted `password_hash`) + `json:"-"` as a second layer.
+- Error handling: log detail server-side, return a generic message to the client.
+- Manual dependency injection: `main()` constructs and connects the pieces explicitly.
+
+*(Log entry uncommitted — goes in the next commit.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

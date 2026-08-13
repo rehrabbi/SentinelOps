@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"sentinelops/internal/user"
 )
 
 // main is the entry point of every Go program. It sets up the HTTP
@@ -49,6 +51,13 @@ func main() {
 
 	// Readiness — "can we serve real traffic?" Pings the database.
 	mux.HandleFunc("GET /readyz", readyHandler(db))
+
+	// Users feature: wire the repository (SQL) to the handler (HTTP), then
+	// register its routes. This is dependency injection by hand — main() is
+	// where all the pieces are constructed and connected.
+	userRepo := user.NewRepository(db)
+	userHandler := user.NewHandler(userRepo)
+	mux.HandleFunc("GET /api/users", userHandler.List)
 
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
