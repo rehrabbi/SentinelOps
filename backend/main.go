@@ -28,6 +28,18 @@ func main() {
 	}
 	defer db.Close()
 
+	// Subcommand: "migrate" applies pending DB migrations, then exits.
+	// Run with:  api.exe migrate   (or during dev: go run . migrate)
+	// We keep migrations a separate, explicit step rather than auto-running
+	// them on server startup — schema changes should be deliberate.
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		if err := runMigrateUp(db); err != nil {
+			log.Fatalf("migration failed: %v", err)
+		}
+		log.Println("migrations applied successfully")
+		return
+	}
+
 	// A ServeMux ("multiplexer" / router) inspects each incoming
 	// request and decides which handler function should answer it.
 	mux := http.NewServeMux()

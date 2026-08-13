@@ -327,6 +327,43 @@ choices to make *before* the first push.
 
 ---
 
+## Stage 6 (cont.) — First Migration: golang-migrate + users table
+
+**Built:**
+- Migration tooling: **golang-migrate** used as a library. SQL migrations are embedded in
+  the binary via `go:embed`; a `migrate` **subcommand** on the api binary applies them
+  (`api.exe migrate`), kept separate from server startup so schema changes are deliberate.
+  A `schema_migrations` table tracks the current `version` and a `dirty` flag.
+- First migration `000001_create_users` (`.up.sql` / `.down.sql`): the `users` table with a
+  **UUID** primary key (`gen_random_uuid()`), `email` / `password_hash` / `full_name` as
+  `NOT NULL text`, `created_at` / `updated_at` as `timestamptz DEFAULT now()`, and a UNIQUE
+  index on `lower(email)` for case-insensitive email uniqueness.
+- Dependency added: `github.com/golang-migrate/migrate/v4` (installed with a targeted
+  `go get`, NOT `go mod tidy`, to avoid pulling the driver's heavy test-only deps).
+
+**Verified:** migration applied (`version 1, dirty = f`). Live constraint tests: an insert
+auto-generated the UUID + timestamps; a case-variant duplicate email was rejected by the
+unique index; a NULL email was rejected by NOT NULL. Test row deleted (table left empty).
+
+**Concepts learned:**
+- Migrations = versioned, ordered, reversible schema changes; `schema_migrations` bookkeeping;
+  `dirty = t` means a migration failed midway and must be resolved before continuing.
+- Constraints (`NOT NULL`, `UNIQUE`) are enforced by the **database** regardless of app bugs —
+  the last line of defense for data integrity.
+- Case-insensitive uniqueness via a unique index on `lower(email)`.
+- DB-generated UUID primary keys; `timestamptz` defaults.
+- `go:embed` ships migrations inside the binary; keep `migrate` a separate step from serving.
+- Transient Go checksum-DB (`sum.golang.org`) failures are retryable; targeted `go get`
+  avoids pulling a dependency's test-only deps that `go mod tidy` would.
+
+**Security note (observed):** a Postgres error `DETAIL` echoed the failing row (incl. the fake
+hash). The API must NEVER return raw DB errors to clients (sensitive-data exposure) — map DB
+errors to safe, generic messages in handlers.
+
+*(Log entry uncommitted — goes in the next commit.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
