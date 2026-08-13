@@ -440,6 +440,35 @@ frontend can consume it.
   portfolio app; revisit for registration/login hardening (generic responses / email-verification flow).
 - Fake seed users (alice/bob) have invalid hashes and cannot authenticate; clean up when building login.
 
+*(Committed in b353b02.)*
+
+---
+
+## Stage: Authentication — decisions + sessions table (migration 000002)
+
+**Decisions made (via decision prompts):**
+- Auth strategy: **server-side sessions** (opaque token in an HttpOnly cookie, session row in
+  Postgres) over JWT or a managed provider — most secure + instructive for a browser app;
+  instant revocation; teaches secure cookies + CSRF. Revisit JWT later for service/mobile APIs.
+- Token at rest: store only the **SHA-256 hash** of the session token, never the raw token —
+  a DB leak yields useless hashes. Fast SHA-256 is fine here (token is 128+ bits of randomness,
+  nothing to brute-force) — contrast bcrypt for guessable human passwords.
+- Session lifetime: **7-day absolute expiry**.
+
+**Built (user typed the SQL; I reviewed):**
+- `migrations/000002_create_sessions.up.sql`: `sessions` table — `token_hash text PRIMARY KEY`,
+  `user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE`, `created_at` (default now()),
+  `expires_at`; plus `sessions_user_id_idx` and `sessions_expires_at_idx`.
+- `migrations/000002_create_sessions.down.sql`: `DROP TABLE IF EXISTS sessions;`.
+
+**Verified:** `go run . migrate` applied cleanly; `\d sessions` shows the 4 columns, PK on
+token_hash, both indexes, and the FK with ON DELETE CASCADE; `schema_migrations` = 2, dirty = f.
+
+**Concepts learned:**
+- Session token is a *bearer credential* — hashing it at rest is defense-in-depth against DB leaks.
+- Foreign keys + `ON DELETE CASCADE`: the DB enforces the session→user relationship and auto-cleans.
+- Why hash choice differs by input entropy (bcrypt for passwords vs SHA-256 for random tokens).
+
 *(Log entry uncommitted — goes in the next commit.)*
 
 ---
