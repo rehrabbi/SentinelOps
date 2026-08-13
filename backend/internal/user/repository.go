@@ -93,3 +93,24 @@ func (r *Repository) Create(ctx context.Context, email, fullName, passwordHash s
 	}
 	return u, nil
 }
+
+var ErrUserNotFound = errors.New("user not found")
+
+func (r *Repository) GetByEmail(ctx context.Context, email string) (User, error) {
+	const query = `
+	SELECT id, email, full_name, password_hash, created_at, updated_at
+	FROM users
+	WHERE lower(email) = lower($1)`
+
+	var u User
+	err := r.db.QueryRowContext(ctx, query, email).
+		Scan(&u.ID, &u.Email, &u.FullName, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrUserNotFound
+		}
+		return User{}, fmt.Errorf("get user by email: %w", err)
+	}
+	return u, nil
+}
