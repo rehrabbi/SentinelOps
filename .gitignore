@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────
+# SentinelOps .gitignore
+# Tells git which files to NOT track. Grouped by reason.
+# ─────────────────────────────────────────────────────────────
+
+# --- Secrets & local config (NEVER commit these) --------------
+# .env files hold passwords, DB credentials, API keys. Keeping
+# them out of git is a primary defense against secret leakage.
+.env
+.env.*
+# ...but DO allow a committed template that lists the *names* of
+# required variables with no real values:
+!.env.example
+
+# --- Dependencies (reproducible from lockfiles) ---------------
+node_modules/
+
+# --- Build / compiled output ----------------------------------
+# Go compiles to binaries; the frontend builds to /dist.
+/backend/bin/
+/backend/tmp/
+*.exe
+*.exe~
+dist/
+/frontend/dist/
+
+# --- Go test / profiling artifacts ----------------------------
+*.test
+*.out
+
+# --- Logs -----------------------------------------------------
+*.log
+
+# --- Editor & OS noise ----------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
