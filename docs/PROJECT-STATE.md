@@ -44,7 +44,7 @@ AWS via Terraform. Everything must be **free**.
 | DB access | **`database/sql` + pgx driver**, hand-written SQL, **no ORM** | Learn SQL directly |
 | Frontend | **React + Vite + TypeScript** | react-ts template |
 | Database | **PostgreSQL 17** in Docker | localhost-only bind |
-| Repo | **Monorepo** (`backend/`, `frontend/`, `docs/`), **private** GitHub | keep real email in commits |
+| Repo | **Monorepo** (`backend/`, `frontend/`, `docs/`), **public** GitHub | keep real email in commits; repo is public, so treat everything pushed as visible to anyone |
 | Migrations | **golang-migrate** (as a library, `go:embed` SQL) | explicit `migrate` subcommand |
 | Config | 12-factor env vars; git-ignored `.env` + committed `.env.example` | secrets never committed |
 
