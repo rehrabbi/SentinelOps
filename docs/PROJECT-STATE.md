@@ -4,7 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-13 · **Current stage:** Authentication (login) — mid-build.
+> **Last updated:** 2026-08-16 · **Current stage:** Authentication — **login works end-to-end**;
+> next is the auth middleware that protects routes.
 
 ---
 
@@ -15,9 +16,9 @@
    per the Session behavior section and continue."* (Re-paste the operating manual too if
    you have it — but WAYS-OF-WORKING.md captures all of it.)
 3. Claude should summarize state, confirm the next step below, and wait for your go-ahead.
-4. **Prerequisites on the new device:** Docker Desktop, Go 1.26+, Node.js + npm, git.
-   Recreate the git-ignored `backend/../.env` (see `.env.example`) — it holds the
-   Postgres credentials (never committed).
+4. **Prerequisites on the new device:** a container runtime, Go 1.26+, Node.js + npm, git.
+   Recreate the git-ignored root `.env` (see `.env.example`) — it holds the Postgres
+   credentials (never committed). Platform-specific setup is in §9.
 
 > **Note:** Claude's saved "memory" is per-device and does NOT travel. All rules/prefs
 > are captured in `docs/WAYS-OF-WORKING.md` instead — that file is authoritative.
@@ -71,7 +72,7 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 - Strict JSON parse: `MaxBytesReader` (1 MiB) + `DisallowUnknownFields` (mass-assignment
   defense) + reject trailing data. Success = `201 Created` + `Location`.
 
-**Authentication (in progress):**
+**Authentication — login (complete):**
 - Strategy: **server-side sessions** (opaque token in an HttpOnly cookie, session row in
   Postgres) — over JWT / managed provider. Instant revocation; teaches secure cookies + CSRF.
 - Token at rest: store **SHA-256 hash** of the token only (fast SHA-256 is fine — token
@@ -84,7 +85,27 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 - Cookie: `SameSite=Lax` (CSRF defense), `HttpOnly`, `Secure` (env-driven; off for local
   http), 7-day expiry.
 - Package structure: **`internal/session`** (data) + **`internal/auth`** (login/logout
-  handlers + upcoming middleware).
+  handlers + upcoming middleware). `auth` depends on BOTH `user` and `session`, which is
+  exactly why it is its own package — putting login inside either domain would weld the
+  two together and risk an import cycle.
+- Timing defense: on an unknown email, run a bcrypt compare against a **precomputed dummy
+  hash** so "no such user" costs the same as "wrong password" (blocks user enumeration by
+  response time). Both paths return an identical `401 invalid email or password`.
+
+**Config & CORS decisions (Step 5):**
+- `SECURE_COOKIES` — dedicated boolean env var, **default false** (local dev is plain
+  http, where a `Secure` cookie would be silently dropped). Production MUST set it true.
+  Chosen over deriving it from an `APP_ENV` because the link from var to behavior is direct.
+- `FRONTEND_ORIGIN` — env var, defaults to `http://localhost:5173`. Replaces the hardcoded
+  `allowedOrigin` const; matters more now that credentialed CORS is on.
+- `Access-Control-Allow-Credentials: true` — required for the browser to store/send the
+  session cookie cross-origin (`:5173` → `:8080`). **Never combine with `*`** — browsers
+  forbid it, because it would let any site call the API with the victim's cookie.
+- **OPTIONS preflight handled in `withCORS`**, returning 204 with `Allow-Methods`,
+  `Allow-Headers`, `Max-Age`. Fixed a latent bug: `mux.HandleFunc("POST /api/...")` matches
+  only POST, so preflight fell through to 405 and *any* browser JSON POST would have failed
+  — including the existing registration endpoint. curl never revealed it (curl doesn't
+  preflight; only browsers do).
 
 ---
 
@@ -92,7 +113,19 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 
 **Endpoints live:** `GET /healthz` (liveness), `GET /readyz` (DB readiness),
 `GET /api/users` (list), `POST /api/users` (register — tested 6/6: 201, dup→409,
-short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…` bcrypt hash).
+short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…` bcrypt hash),
+**`POST /api/sessions` (login)**.
+
+**Login test results (8/8 passing):** 200 + `Set-Cookie` on valid credentials; 401 on wrong
+password; 401 **byte-identical** on unknown email; 400 on unknown JSON field; `OPTIONS`
+preflight → 204 with full CORS headers; session row present with a 64-char hash and 7-day
+expiry. Cookie observed as `Path=/; Max-Age=604800; HttpOnly; SameSite=Lax` (no `Secure`,
+correct for local http). Three security properties verified rather than assumed:
+1. No bcrypt hash in the login response body (`json:"-"` holds, on a struct that *did* carry it).
+2. Timing indistinguishable — unknown email **51.0ms** vs wrong password **52.0ms** over 5
+   runs each (the ~50ms *is* bcrypt cost 10; without the dummy hash the miss would be ~1ms).
+3. DB stores `sha256(raw token)`, never the raw token — confirmed by hashing the returned
+   cookie locally and comparing. Note both values are 64 hex chars, so length proves nothing.
 
 **Files:**
 - `backend/main.go` — routes + CORS middleware + `migrate` subcommand + manual DI.
@@ -104,177 +137,72 @@ short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…`
   repository now includes `GetByEmail` (loads `password_hash`) + `ErrUserNotFound`.
 - `backend/internal/session/{session.go, repository.go}` — Session model; `GenerateToken`
   (crypto/rand, 32 bytes), `HashToken` (SHA-256), `Repository.Create`.
+- `backend/internal/auth/handler.go` — **login handler** (`Login`), `NewHandler`, cookie
+  constants, precomputed dummy hash for timing equalization.
+- `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
+  `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
+  helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
 - `frontend/` — React+Vite+TS; `src/App.tsx` fetches `/healthz` (not yet wired to auth).
 
-**Git:** on `main`, pushed. Recent commits: sessions migration (000002), user creation
-endpoint, users read API, golang-migrate + users table, Postgres via Docker Compose.
+**Git:** on `main`. Login work (auth package + main.go wiring) and these doc updates are
+**uncommitted** as of this snapshot. Last pushed commit: `2e98c88` (README + continuity guides).
 
-**Runtime state:** Docker container `sentinelops-db` (Postgres 17) runs the DB. Seeded
-test users exist: `alice@`/`bob@` have FAKE hashes (cannot log in — clean up later),
-`carol@example.com` has a REAL bcrypt hash from the registration test.
+**Runtime state:** container `sentinelops-db` (Postgres 17) runs the DB.
+⚠️ **Database contents do NOT travel between devices** — `pgdata` is a local Docker volume,
+not part of the repo. The Windows box's users (`alice@`/`bob@` with fake hashes,
+`carol@example.com`) do **not** exist on other machines. On the Mac the DB was created fresh
+and holds one throwaway account, `testuser@example.com` (password
+`correct-horse-battery-staple` — disposable local test credential only), plus its sessions.
+After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP (Authentication login build)
+## 6. ⏭️ THE EXACT NEXT STEP — auth middleware (protect routes)
 
-We're mid-way through building login as small typed steps. **Done: Steps 1–3.**
-**Next: Step 4 — create `backend/internal/auth/handler.go`** (I type it; Claude checks).
+**Login is done.** Steps 1–5 all complete and verified (see §5). What's missing is the other
+half: *nothing currently checks the session cookie*. You can log in, but no route is
+protected, so the cookie doesn't yet buy access to anything.
 
-Build plan:
-| Step | File | Status |
-|---|---|---|
-| 1 | `internal/session/session.go` (Session model) | ✅ done |
-| 2 | `internal/session/repository.go` (token gen + Create) | ✅ done |
-| 3 | `internal/user/repository.go` (add `GetByEmail`) | ✅ done |
-| 4 | `internal/auth/handler.go` (Login handler) | ⏭️ **NEXT — type this** |
-| 5 | `main.go` (wire auth handler, register `POST /api/sessions`, CORS-credentials tweak) | ⬜ pending |
+**Next: auth middleware.** The flow it must implement:
 
-### Step 4 code to type — `backend/internal/auth/handler.go` (new file)
-
-Create folder `internal/auth`, then file `handler.go`, and type/paste:
-
-```go
-// Package auth implements authentication behavior: logging in (creating a
-// session), logging out, and (soon) the middleware that protects routes.
-package auth
-
-import (
-	"encoding/json"
-	"errors"
-	"log"
-	"net/http"
-	"strings"
-	"time"
-
-	"golang.org/x/crypto/bcrypt"
-
-	"sentinelops/internal/session"
-	"sentinelops/internal/user"
-)
-
-const (
-	// cookieName is the name of the session cookie in the browser.
-	cookieName = "sentinelops_session"
-	// sessionTTL is how long a login session stays valid (our 7-day decision).
-	sessionTTL = 7 * 24 * time.Hour
-)
-
-// dummyHash is a precomputed bcrypt hash used ONLY to equalize response timing
-// when a login targets an email that doesn't exist. Running a real bcrypt
-// comparison in that case makes "no such user" take about as long as "wrong
-// password", so an attacker can't use response time to discover which emails
-// are registered.
-var dummyHash []byte
-
-// init runs once when the package loads, precomputing the dummy hash.
-func init() {
-	h, err := bcrypt.GenerateFromPassword([]byte("timing-equalizer-not-a-real-password"), bcrypt.DefaultCost)
-	if err != nil {
-		panic("auth: cannot precompute dummy hash: " + err.Error())
-	}
-	dummyHash = h
-}
-
-// Handler wires the user and session repositories together to implement login.
-// It depends on BOTH domains, which is why it lives in its own auth package.
-type Handler struct {
-	users         *user.Repository
-	sessions      *session.Repository
-	secureCookies bool
-}
-
-// NewHandler builds an auth Handler. secureCookies controls the cookie's Secure
-// flag: false for local http development, true in production over HTTPS.
-func NewHandler(users *user.Repository, sessions *session.Repository, secureCookies bool) *Handler {
-	return &Handler{users: users, sessions: sessions, secureCookies: secureCookies}
-}
-
-// loginInput is the request body for POST /api/sessions.
-type loginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-// Login handles POST /api/sessions: verify credentials, then create a session.
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	// Same input hardening as registration: cap the body, parse strictly.
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-
-	var in loginInput
-	if err := dec.Decode(&in); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	in.Email = strings.TrimSpace(in.Email)
-
-	// 1) Find the user. A missing user must fail the SAME way as a wrong
-	// password: generic message, same 401, similar timing.
-	u, err := h.users.GetByEmail(r.Context(), in.Email)
-	if err != nil {
-		if errors.Is(err, user.ErrUserNotFound) {
-			// Equalize timing with a throwaway bcrypt compare, then fail generically.
-			bcrypt.CompareHashAndPassword(dummyHash, []byte(in.Password))
-			http.Error(w, "invalid email or password", http.StatusUnauthorized)
-			return
-		}
-		log.Printf("login: get user: %v", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	// 2) Verify the password against the stored bcrypt hash.
-	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)); err != nil {
-		http.Error(w, "invalid email or password", http.StatusUnauthorized)
-		return
-	}
-
-	// 3) Credentials valid — mint a session token and store only its hash.
-	rawToken, tokenHash, err := session.GenerateToken()
-	if err != nil {
-		log.Printf("login: generate token: %v", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-	expiresAt := time.Now().Add(sessionTTL)
-	if _, err := h.sessions.Create(r.Context(), tokenHash, u.ID, expiresAt); err != nil {
-		log.Printf("login: create session: %v", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	// 4) Send the RAW token to the browser in a hardened cookie. The database
-	// holds only its hash, so this cookie is the only copy of the secret.
-	http.SetCookie(w, &http.Cookie{
-		Name:     cookieName,
-		Value:    rawToken,
-		Path:     "/",
-		HttpOnly: true,                 // JS cannot read it -> XSS can't steal it
-		Secure:   h.secureCookies,      // HTTPS-only in production
-		SameSite: http.SameSiteLaxMode, // not sent on cross-site sub-requests -> CSRF defense
-		Expires:  expiresAt,
-		MaxAge:   int(sessionTTL.Seconds()),
-	})
-
-	// 5) Respond with the logged-in user. PasswordHash was loaded for step 2,
-	// but its json:"-" tag guarantees it is never serialized here.
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(u); err != nil {
-		log.Printf("login: encode response: %v", err)
-	}
-}
+```
+request -> read "sentinelops_session" cookie
+        -> HashToken(raw)                  (SHA-256, same function login used)
+        -> look up session by token_hash
+        -> reject if missing OR expired    -> 401
+        -> load the user, attach to request context
+        -> call the next handler
 ```
 
-After Step 4 builds, **Step 5** (main.go) will: construct `sessionRepo` and
-`authHandler` (with a `secureCookies` bool read from an env var, default false for local
-http), register `mux.HandleFunc("POST /api/sessions", authHandler.Login)`, and update
-`withCORS` to add `Access-Control-Allow-Credentials: true` (and reflect the specific
-allowed origin) so the browser will store/send the cookie cross-origin. Then test login
-with curl (200 + `Set-Cookie`; wrong password → 401; verify a `sessions` row appears).
+**Files this will touch** (taught interactively, in small pieces — not pre-written here):
+| File | Change |
+|---|---|
+| `internal/session/repository.go` | add a lookup by token hash |
+| `internal/user/repository.go` | add a lookup by ID (middleware has a `user_id`, needs the user) |
+| `internal/auth/middleware.go` | **new** — the middleware itself + context helpers |
+| `main.go` | wire it, and register one protected route to prove it works |
 
----
+**Decisions to make before coding** (use the decision protocol — options + tradeoffs, then choose):
+1. **Where is expiry enforced** — in the SQL (`WHERE token_hash = $1 AND expires_at > now()`)
+   or in Go after loading the row? (Leaning SQL: one round-trip, and the DB clock is the
+   single source of truth.)
+2. **What gets attached to the context** — the full `user.User`, or just the user ID? Trades
+   a second query against carrying more state than most handlers need.
+3. **The context key type** — a package-private named type, never a bare string. Bare-string
+   keys can collide across packages; `go vet` flags them.
+4. **Which route proves it** — likely `GET /api/me` returning the current user, which the
+   frontend will need anyway.
+5. **Expired-row cleanup** — deferred, but decide whether it's a later background job or a
+   periodic query, and record it.
+
+**Acceptance criteria:** no cookie → 401; garbage cookie → 401; expired session → 401;
+valid cookie → 200 with the right user; and the protected route must be unreachable without
+a session even when the user ID is known (that's the IDOR-adjacent check).
+
+**After that:** logout (`DELETE /api/sessions/current` — delete the session row *and* expire
+the cookie), then wire the frontend login form (`credentials: "include"` on fetch, or the
+cookie is never sent).
+
 
 ## 7. After login: remaining auth pieces, then roadmap
 
@@ -293,20 +221,52 @@ cost/perf review → production hardening → documentation/portfolio review.
 ## 8. How to run locally (quick reference)
 
 ```bash
+# 0) macOS only: start the container VM first (see §9)
+colima start
+
 # 1) Start Postgres
 docker compose up -d
 
-# 2) Apply migrations (from backend/, with DATABASE_URL built from .env — never printed)
-#    DATABASE_URL = postgres://<POSTGRES_USER>:<POSTGRES_PASSWORD>@127.0.0.1:5432/<POSTGRES_DB>?sslmode=disable
+# 2) Build DATABASE_URL from .env WITHOUT printing the password, then migrate (from backend/)
+set -a; . ../.env; set +a
+export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}?sslmode=disable"
 go run . migrate
 
-# 3) Run the API (same DATABASE_URL)
+# 3) Run the API (same shell, same DATABASE_URL)
 go run .
 
 # 4) Run the frontend
 cd ../frontend && npm install && npm run dev
 ```
 
-> On Windows, Go lives at `C:\Users\<you>\AppData\Local\Programs\Go` (portable ZIP, no
-> admin). PowerShell subprocess PATH can be stale — refresh from Machine+User env, or
-> prepend `.../Go/bin` to PATH in the shell.
+Optional env vars (both have working local defaults, so no `.env` change is needed):
+`FRONTEND_ORIGIN` (default `http://localhost:5173`) and `SECURE_COOKIES` (default `false`;
+**must be `true` in production**, or the session cookie travels in cleartext).
+
+---
+
+## 9. Per-device environment notes
+
+**Windows:** Go lives at `C:\Users\<you>\AppData\Local\Programs\Go` (portable ZIP, no
+admin). PowerShell subprocess PATH can be stale — refresh from Machine+User env, or prepend
+`.../Go/bin` to PATH in the shell.
+
+**macOS (Apple Silicon) — set up 2026-08-16:**
+- Toolchain via Homebrew: `brew install go colima docker docker-compose node`.
+  Homebrew installs to `/opt/homebrew` and writes `/etc/paths.d/homebrew`, so **a new
+  terminal tab** picks it up; an already-open shell keeps its stale PATH (`command not
+  found: docker` is almost always this, not a broken install).
+- **Colima instead of Docker Desktop** — free with no licensing conditions at any company
+  size (Docker Desktop requires a paid licence above 250 employees / $10M revenue).
+  Colima provides the Linux VM; the `docker` CLI and compose plugin are separate packages.
+  `compose.yaml` needs no changes. Start it with `colima start` before `docker compose`.
+- **`docker compose` needs one-time wiring.** Homebrew puts the plugin somewhere the CLI
+  doesn't search, so `docker: unknown command: docker compose` until `~/.docker/config.json`
+  contains:
+  ```json
+  { "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"] }
+  ```
+- Verified working: Go 1.26.6 (go.mod needs 1.26.5), Colima 0.10.3, docker 29.7.2,
+  compose 5.4.0, Node 26.7.0.
+- **Git identity does not survive a clone.** Set it before committing on a new machine:
+  `git config --global user.name "..."` and `git config --global user.email "..."`.

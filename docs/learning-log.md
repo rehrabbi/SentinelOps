@@ -473,6 +473,103 @@ token_hash, both indexes, and the FK with ON DELETE CASCADE; `schema_migrations`
 
 ---
 
+## Stage: Authentication — login endpoint (POST /api/sessions)
+
+**Built (user typed; I reviewed):**
+- `internal/auth/handler.go` (new package): `Handler` holding both repositories +
+  `secureCookies`, `NewHandler`, `loginInput`, and `Login` — strict JSON decode (1 MiB cap,
+  `DisallowUnknownFields`), `GetByEmail`, bcrypt compare, `GenerateToken`, session insert,
+  hardened `Set-Cookie`, 200 + user JSON.
+- `main.go`: `sessionRepo` + `authHandler` wired by hand, `POST /api/sessions` registered,
+  `envOr`/`envBool` config helpers, `withCORS(next, allowedOrigin)` with credentials +
+  OPTIONS preflight.
+
+**Why `auth` is its own package:** login needs *both* `user` (verify password) and `session`
+(record the login). Putting it in either domain would force that domain to import the other
+— coupling two independent domains, and risking an **import cycle** (a compile error in Go,
+not a warning). `auth` sits above both and depends on each; neither knows the other exists.
+
+**Decisions made:**
+- `SECURE_COOKIES` as a dedicated boolean env var (default false) rather than deriving it
+  from an `APP_ENV`: the link from variable to behavior stays direct and hard to misread.
+- `FRONTEND_ORIGIN` env var replacing the hardcoded `allowedOrigin` const.
+- Handle OPTIONS preflight now rather than deferring it to frontend work.
+
+**Bug found and fixed before it bit:** `withCORS` set only `Allow-Origin`, and the router
+registers method-specific patterns (`"POST /api/users"`). An `OPTIONS` request matched no
+pattern → **405** → preflight failure. That meant *no browser JSON POST could ever succeed*,
+including the registration endpoint already marked "tested and working". It passed testing
+because **curl does not send preflight requests — only browsers do.** Lesson: curl proves
+the handler works; it does not prove the *browser* can reach it.
+
+**Verified (8/8):** 200 + `Set-Cookie`; wrong password → 401; unknown email → 401
+byte-identical; unknown JSON field → 400; OPTIONS → 204 with full CORS headers; session row
+with 64-char hash and 7-day expiry. Cookie: `Path=/; Max-Age=604800; HttpOnly; SameSite=Lax`,
+no `Secure` (correct on local http — a `Secure` cookie there is silently dropped by the
+browser, so login would "work" while never persisting).
+
+**Security properties proven, not assumed:**
+- **No hash in the response.** `GetByEmail` deliberately loads `password_hash`, so the
+  struct encoded at the end genuinely holds it — `json:"-"` is the only thing preventing the
+  leak. Grepped the body for `password` and `$2a$`: clean.
+- **Timing defense measurable.** Unknown email 51.0ms vs wrong password 52.0ms over 5 runs
+  each. The ~50ms *is* bcrypt cost 10; without the dummy-hash compare the unknown-email path
+  would return in ~1ms and stand out by ~50x. Confirmed registration also uses
+  `bcrypt.DefaultCost`, so the two paths do equal work.
+- **DB stores the hash, not the token.** Hashed the returned cookie locally and compared
+  against `sessions.token_hash`: match, and the stored value ≠ the raw token. Worth noting
+  both are 64 hex chars (32 random bytes vs SHA-256 output), so **length proves nothing** —
+  only the comparison does.
+
+**Known tradeoff to fix as a pair (not yet done):** login now resists user enumeration by
+timing, but registration still returns `409 email already registered`, which leaks the same
+fact far more directly and deliberately (`internal/user/handler.go`, documented in-code).
+The subtle channel is closed while the obvious one stays open by choice. Either accept both
+or fix both — fixing only one is theatre.
+
+**Concepts learned:**
+- Import cycles and why a composition package resolves them.
+- CORS preflight: which requests trigger it, and why `Allow-Credentials: true` may never be
+  paired with `Allow-Origin: *` (any site could then call the API with the victim's cookie).
+- `init()` for one-time package setup; package-level state.
+- Config precedence: env var → safe default, with a logged warning on unparseable input so a
+  security flag never silently falls back.
+
+*(Log entry uncommitted — goes in the next commit.)*
+
+---
+
+## Stage: Second development environment (macOS, Apple Silicon)
+
+Set up the project from a bare Mac to prove the repo is genuinely portable. Full setup
+details live in `PROJECT-STATE.md` §9; the *lessons* are here.
+
+- **Docs are the only thing that travels.** Claude's memory doesn't, and neither does the
+  database: `pgdata` is a local Docker volume, so every seeded user from the Windows box was
+  absent. A fresh test user had to be registered. Worth remembering before assuming "the
+  data is just there" on any new machine.
+- **Git identity doesn't survive a clone.** `user.name`/`user.email` were unset, and a
+  commit fails outright until they're configured.
+- **Stale PATH is not a broken install.** `command not found: docker` in a terminal opened
+  *before* the tool was installed — shells read PATH once at startup. A new tab fixes it.
+  Diagnose by checking whether the binary exists on disk before reinstalling anything.
+- **Unbundling Docker Desktop has a cost.** Colima (VM), `docker` (CLI), and compose
+  (plugin) are three packages that must be told about each other — hence the
+  `cliPluginsExtraDirs` entry in `~/.docker/config.json`.
+- **Secrets can be generated without ever being seen.** The new Postgres password came from
+  `/dev/urandom` straight into a `chmod 600` `.env` — never printed, never in shell history.
+  Kept alphanumeric on purpose: `@`, `/`, `:`, `#` would break the `postgres://` URL parse
+  unless percent-encoded.
+
+*(Log entry uncommitted — goes in the next commit.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
+- Account enumeration: decide whether to close BOTH channels (login timing + registration's
+  409) or accept both. Currently inconsistent — the subtle one is defended, the obvious one
+  is not.
+- Expired `sessions` rows are never cleaned up. Decide on a strategy (periodic delete job vs
+  cleanup on write) before this reaches production.
