@@ -7,8 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
+	"sentinelops/internal/auth"
+	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
 
@@ -21,6 +24,15 @@ func main() {
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL environment variable is required")
 	}
+
+	// Where the browser frontend is served from. Must be an exact origin with
+	// no trailing slash — it goes straight into the CORS headers.
+	frontendOrigin := envOr("FRONTEND_ORIGIN", defaultFrontendOrigin)
+
+	// A Secure cookie is only sent over HTTPS. Local dev is plain http, so this
+	// defaults to false — but production MUST set SECURE_COOKIES=true, or the
+	// session cookie would travel in cleartext.
+	secureCookies := envBool("SECURE_COOKIES", false)
 
 	// Open the connection pool. This does NOT connect yet — it just prepares
 	// the pool; the first real connection happens on the first query/ping.
@@ -60,9 +72,16 @@ func main() {
 	mux.HandleFunc("GET /api/users", userHandler.List)
 	mux.HandleFunc("POST /api/users", userHandler.Create)
 
+	// Auth feature: login reads a user AND writes a session, so it takes both
+	// repositories. This is why auth is its own package rather than living
+	// inside user or session.
+	sessionRepo := session.NewRepository(db)
+	authHandler := auth.NewHandler(userRepo, sessionRepo, secureCookies)
+	mux.HandleFunc("POST /api/sessions", authHandler.Login)
+
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
-	handler := withCORS(mux)
+	handler := withCORS(mux, frontendOrigin)
 
 	// The address the server listens on. ":8080" means "all network
 	// interfaces on this machine, port 8080".
@@ -77,20 +96,62 @@ func main() {
 	}
 }
 
-// allowedOrigin is the ONLY origin a browser is permitted to read this API
-// from. Least privilege: we name exactly who is allowed, nothing more.
-// (Later we'll make this configurable via an environment variable.)
-const allowedOrigin = "http://localhost:5173"
+// defaultFrontendOrigin is used when FRONTEND_ORIGIN isn't set — the Vite dev
+// server. A real deployment sets the env var to its actual origin.
+const defaultFrontendOrigin = "http://localhost:5173"
+
+// envOr returns an environment variable's value, or a fallback when unset.
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// envBool reads a boolean environment variable. An unset OR unparseable value
+// falls back — and we log the bad value, because a silent fallback on a
+// security flag like SECURE_COOKIES is exactly the kind of thing that ships to
+// production unnoticed.
+func envBool(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		log.Printf("config: %s=%q is not a valid boolean, using %v", key, v, fallback)
+		return fallback
+	}
+	return b
+}
 
 // withCORS is middleware: it takes a handler and returns a NEW handler that
-// runs shared logic — here, adding the CORS headers a browser needs — before
+// runs shared logic — here, the CORS headers a browser needs — before
 // delegating to the original handler. This is the classic Go middleware shape.
-func withCORS(next http.Handler) http.Handler {
+//
+// allowedOrigin is always ONE named origin, never "*". Browsers forbid the
+// wildcard alongside Allow-Credentials, because it would let any website on the
+// internet call this API with the victim's session cookie attached.
+func withCORS(next http.Handler, allowedOrigin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Tell the browser this specific origin may read the response.
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		// Permit the browser to store and send our session cookie cross-origin.
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		// Signal to caches that the response depends on the Origin header.
 		w.Header().Add("Vary", "Origin")
+
+		// Preflight. Before a POST carrying a JSON body, the browser first
+		// sends OPTIONS to ask permission. We must answer it HERE and stop:
+		// the router only has GET/POST/DELETE patterns registered, so an
+		// OPTIONS request would fall through to a 405 and fail the preflight.
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.Header().Set("Access-Control-Max-Age", "600") // cache permission 10 min
+			w.WriteHeader(http.StatusNoContent)             // 204: permission granted, no body
+			return
+		}
 
 		// Hand off to the wrapped handler (our router).
 		next.ServeHTTP(w, r)
