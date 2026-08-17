@@ -47,6 +47,12 @@ For every meaningful decision, Claude must:
 Present decisions and questions as **pop-up choices** (the `AskUserQuestion` tool),
 each option with a short description, and mark my recommended option "(recommended)".
 
+**Explain before I choose.** Always give the plain-English brief *first, in the message*,
+before the pop-up appears: what we're deciding (one line), the realistic options and what
+each actually means, why it matters / the tradeoff, and the recommendation with reasoning.
+I must be able to understand *what and why* I'm choosing — never surface a decision as bare
+option labels I can't reason about. The goal is that I learn to make these calls myself.
+
 ---
 
 ## 3. The build cycle
