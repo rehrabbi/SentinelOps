@@ -114,3 +114,21 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (User, error)
 	}
 	return u, nil
 }
+
+func (r *Repository) GetByID(ctx context.Context, id string) (User, error) {
+	const query = `
+	SELECT id, email, full_name, created_at, updated_at
+	FROM users
+	WHERE id = $1`
+
+	var u User
+	err := r.db.QueryRowContext(ctx, query, id).
+		Scan(&u.ID, &u.Email, &u.FullName, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrUserNotFound
+		}
+		return User{}, fmt.Errorf("get user by id: %w", err)
+	}
+	return u, nil
+}

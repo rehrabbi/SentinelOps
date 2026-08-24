@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -46,6 +47,26 @@ func (r *Repository) Create(ctx context.Context, tokenHash, userID string, expir
 		Scan(&s.TokenHash, &s.UserID, &s.CreatedAt, &s.ExpiresAt)
 	if err != nil {
 		return Session{}, fmt.Errorf("insert session: %w", err)
+	}
+	return s, nil
+}
+
+var ErrSessionNotFound = errors.New("session not found")
+
+func (r *Repository) GetByTokenHash(ctx context.Context, tokenHash string) (Session, error) {
+	const query = `
+	SELECT token_hash, user_id, created_at, expires_at
+	FROM sessions
+	WHERE token_hash = $1 AND expires_at > now()`
+
+	var s Session
+	err := r.db.QueryRowContext(ctx, query, tokenHash).
+		Scan(&s.TokenHash, &s.UserID, &s.CreatedAt, &s.ExpiresAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Session{}, ErrSessionNotFound
+		}
+		return Session{}, fmt.Errorf("get session by token hash: %w", err)
 	}
 	return s, nil
 }
