@@ -79,6 +79,11 @@ func main() {
 	authHandler := auth.NewHandler(userRepo, sessionRepo, secureCookies)
 	mux.HandleFunc("POST /api/sessions", authHandler.Login)
 
+	// Protected route: GET /api/me returns the current user. RequireAuth wraps
+	// the Me handler, so an invalid/missing session is rejected with 401 before
+	// Me runs. This is our first route that requires authentication.
+	mux.Handle("GET /api/me", authHandler.RequireAuth(http.HandlerFunc(authHandler.Me)))
+
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
 	handler := withCORS(mux, frontendOrigin)
