@@ -1,51 +1,136 @@
-import { useEffect, useState } from 'react'
-import './App.css'
+import { useEffect, useState, type FormEvent } from "react";
+import "./App.css";
+import { getMe, login, logout, ApiError, type User } from "./api";
 
-// A "discriminated union": the health state is EXACTLY one of these three
-// shapes — never a contradictory mix like "loading AND error". The `kind`
-// field tells us which one we have, and TypeScript forces us to handle each.
-type HealthState =
-  | { kind: 'loading' }
-  | { kind: 'ok'; status: string }
-  | { kind: 'error'; message: string }
+// The auth state is exactly one of these three shapes. 'loading' means we're
+// still asking the server (GET /api/me) whether a session exists.
+type AuthState =
+  | { kind: "loading" }
+  | { kind: "anonymous" }
+  | { kind: "authenticated"; user: User };
 
 function App() {
-  // useState gives the component memory. It starts in the "loading" state.
-  const [health, setHealth] = useState<HealthState>({ kind: 'loading' })
+  const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
 
-  // useEffect with an empty dependency array [] runs ONCE, right after the
-  // component first renders — the correct place for a "fetch on load" effect.
+  // On first render, ask the server who we are. getMe() returns the user, or
+  // null on 401 (not logged in). We treat any error as "anonymous" for now.
   useEffect(() => {
-    fetch('http://localhost:8080/healthz')
-      .then((res) => {
-        // fetch only rejects on network/CORS failures, NOT on HTTP errors
-        // like 404/500 — so we check res.ok ourselves and throw if not.
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return res.json()
-      })
-      .then((data) => setHealth({ kind: 'ok', status: data.status }))
-      .catch((err) => setHealth({ kind: 'error', message: err.message }))
-  }, [])
+    getMe()
+      .then((user) =>
+        setAuth(user ? { kind: "authenticated", user } : { kind: "anonymous" })
+      )
+      .catch(() => setAuth({ kind: "anonymous" }));
+  }, []);
+
+  if (auth.kind === "loading") {
+    return (
+      <main className="app">
+        <h1>SentinelOps</h1>
+        <p className="status loading">Checking your session…</p>
+      </main>
+    );
+  }
 
   return (
     <main className="app">
       <h1>SentinelOps</h1>
       <p className="subtitle">Incident &amp; ticket management</p>
-
-      <section className="health-card">
-        <h2>API health</h2>
-        {health.kind === 'loading' && (
-          <p className="status loading">Checking…</p>
-        )}
-        {health.kind === 'ok' && (
-          <p className="status ok">● API status: {health.status}</p>
-        )}
-        {health.kind === 'error' && (
-          <p className="status error">● Cannot reach API: {health.message}</p>
-        )}
-      </section>
+      {auth.kind === "authenticated" ? (
+        <LoggedIn
+          user={auth.user}
+          onLogout={() => setAuth({ kind: "anonymous" })}
+        />
+      ) : (
+        <LoginForm
+          onLoggedIn={(user) => setAuth({ kind: "authenticated", user })}
+        />
+      )}
     </main>
-  )
+  );
 }
 
-export default App
+// The login form. On submit it calls the API and, on success, hands the user
+// up to App via onLoggedIn.
+function LoginForm({ onLoggedIn }: { onLoggedIn: (user: User) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "submitting" }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); // stop the browser's default full-page form submission
+    setStatus({ kind: "submitting" });
+    try {
+      const user = await login(email, password);
+      onLoggedIn(user);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Something went wrong";
+      setStatus({ kind: "error", message });
+    }
+  }
+
+  return (
+    <section className="auth-card">
+      <h2>Log in</h2>
+      <form onSubmit={handleSubmit}>
+        <label>
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="username"
+          />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </label>
+        {status.kind === "error" && (
+          <p className="status error">{status.message}</p>
+        )}
+        <button type="submit" disabled={status.kind === "submitting"}>
+          {status.kind === "submitting" ? "Logging in…" : "Log in"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+// The logged-in view: shows who you are and a logout button.
+function LoggedIn({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const [busy, setBusy] = useState(false);
+
+  async function handleLogout() {
+    setBusy(true);
+    try {
+      await logout();
+    } catch {
+      // Logout is idempotent server-side; clear local state regardless.
+    }
+    onLogout();
+  }
+
+  return (
+    <section className="auth-card">
+      <h2>Welcome, {user.fullName}</h2>
+      <p className="subtitle">{user.email}</p>
+      <button onClick={handleLogout} disabled={busy}>
+        {busy ? "Logging out…" : "Log out"}
+      </button>
+    </section>
+  );
+}
+
+export default App;

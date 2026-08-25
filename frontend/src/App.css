@@ -7,31 +7,94 @@
 
 .subtitle {
   color: var(--text);
-  margin-top: 4px;
+  margin-top:  4px;
 }
 
-.health-card {
-  margin-top: 40px;
-  padding: 24px 28px;
+/* Auth card - shared shell for the login form and the logged-in view. */
+.auth-card {
+  max-width: 380px;
+  margin: 40px auto 0;
+  padding: 28px 28px 32px;
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow);
+  background: var(--bg);
   text-align: left;
 }
 
+.auth-card h2 {
+  text-align: center;
+}
+
+/* Stack form fields with consistent spacing. */
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/* Each label wraps its input; the label text sits above the field. */
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.auth-card input {
+  font: inherit;
+  font-size: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+}
+
+/* Visible focus ring for keyboard users (accessibility). */
+.auth-card input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* Primary button - monochrome, flips per theme for guaranteed contrast. */
+.auth-card button {
+  font: inherit;
+  font-weight: 500;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--text-h);
+  color: var(--bg);
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.auth-card button:hover {
+  opacity: 0.88;
+}
+
+.auth-card button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Status text. */
 .status {
   margin-top: 12px;
-  font-family: var(--mono);
   font-size: 16px;
 }
 
-/* Three visual states, matching the three shapes of HealthState. */
 .status.loading {
   color: var(--text);
+  font-family: var(--mono);
 }
-.status.ok {
-  color: #16a34a; /* green */
-}
+
 .status.error {
   color: #dc2626; /* red */
+  font-size: 14px;
+  margin-top: -4px;
 }

@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **backend auth cycle
-> complete** (register → login → `/api/me` → logout, all verified); next is the frontend auth UI.
+> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **full-stack auth complete**
+> (React login/logout UI wired to the API, verified in-browser); next is the incident/ticket domain.
 
 ---
 
@@ -128,6 +128,11 @@ correct for local http). Three security properties verified rather than assumed:
 3. DB stores `sha256(raw token)`, never the raw token — confirmed by hashing the returned
    cookie locally and comparing. Note both values are 64 hex chars, so length proves nothing.
 
+**Frontend auth UI (verified in-browser):** initial load → session check shows the login form;
+valid login → logged-in view; logout → back to the form; **reload while logged in → still
+logged in** (cookie persists). No `password_hash` reaches the client, and the HttpOnly cookie
+is never read by JS — auth state comes from `GET /api/me`.
+
 **Files:**
 - `backend/main.go` — routes + CORS middleware + `migrate` subcommand + manual DI.
 - `backend/db.go` — `openDB` (sql.Open + pgx, pool tuning).
@@ -149,7 +154,13 @@ correct for local http). Three security properties verified rather than assumed:
 - `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
   `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
   helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
-- `frontend/` — React+Vite+TS; `src/App.tsx` fetches `/healthz` (not yet wired to auth).
+- `frontend/src/api.ts` (new) — API helper: `API_BASE` (Vite env-overridable), `User` type,
+  `ApiError`, and `getMe`/`login`/`logout` wrappers that all send `credentials: "include"`.
+- `frontend/src/App.tsx` — full auth UI: session check on load (`getMe`), login form
+  (`POST /api/sessions`), logged-in view, logout button (`DELETE /api/sessions/current`);
+  discriminated-union state, controlled inputs, typed error handling.
+- `frontend/src/App.css` — token-based styling (light/dark aware), accessible focus rings,
+  monochrome primary button.
 
 **Git:** on `main`. Login work (auth package + main.go wiring) and these doc updates are
 **uncommitted** as of this snapshot. Last pushed commit: `2e98c88` (README + continuity guides).
@@ -164,45 +175,36 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — wire the frontend auth UI
+## 6. ⏭️ THE EXACT NEXT STEP — the incident/ticket domain
 
-**The backend auth cycle is COMPLETE and verified: register → login → `/api/me` → logout.**
-Login 8/8, middleware + `/api/me` 7/7, logout 6/6 (incl. the key result: the *same* token
-returns 401 after logout, the DB row is deleted, and logout with a dead/no cookie is an
-idempotent 204). See the learning-log entries for the details.
+**Authentication is COMPLETE, full-stack.** Backend: register → login → `/api/me` → logout
+(verified 8/8, 7/7, 6/6). Frontend: React login form, session-detect-on-load, logged-in view,
+and logout — all wired with `credentials: "include"` and verified in a real browser (login,
+logout, and session-persists-across-reload). See the learning-log entries.
 
-**Next: the frontend.** Today `frontend/src/App.tsx` only calls `/healthz`. Build the real
-auth UX against the now-working API:
+**Next: start the app's actual domain — incidents/tickets.** This is where authorization
+finally matters (a user acting on their own vs others' data → IDOR territory). Likely order:
 
-```
-- a login form (email + password) -> POST /api/sessions
-- on load, call GET /api/me to detect an existing session (show the user, else the form)
-- a logout button -> DELETE /api/sessions/current
-- CRITICAL: every API fetch must set `credentials: "include"`, or the browser will neither
-  store nor send the session cookie across origins (:5173 -> :8080).
-```
+- **Decide the authorization model first** (RBAC roles? owner-based access? both?) — the first
+  real §10 authz decision. Nothing below should be built before this is chosen.
+- **First incident feature:** a migration for an `incidents` table, then `POST /api/incidents`
+  (create) and `GET /api/incidents` (list — scoped to what the user may see), behind
+  `RequireAuth`, using `UserFromContext` for ownership.
+- **Frontend:** a simple list + create form once the API exists.
 
-**Files this will touch** (taught interactively, small pieces):
-| File | Change |
-|---|---|
-| `frontend/src/` | an auth API helper (fetch wrappers that send credentials) |
-| `frontend/src/App.tsx` | login form / logged-in view / logout, with loading + error states |
+**Optional smaller item first:** a **registration UI** (a signup form calling the existing
+`POST /api/users`) to round out the auth UX — currently users can only be created via curl.
 
-**Decisions to make first** (decision protocol): how to hold auth state in React (local state
-vs context), where the API base URL comes from (Vite env var vs hardcoded), and the login
-form's loading/error UX. We'll cover these before any code.
-
-**Security to revisit here:** the account-enumeration inconsistency (login is timing-safe but
-registration still returns a distinguishing 409), and XSS discipline on the frontend (React
-escapes by default — never introduce `dangerouslySetInnerHTML` with server data).
-
-**After that:** authorization/RBAC, then the incident/ticket features.
+**Security to revisit here:** authorization (IDOR — never trust a client-supplied id; scope
+every query by the authenticated user), and the still-open account-enumeration inconsistency
+(login is timing-safe; registration's 409 still leaks whether an email exists).
 
 
 ## 7. After login: remaining auth pieces, then roadmap
 
-Immediate next: **wire the frontend** login/logout UI against the finished auth API. (Backend
-auth — register / login / logout / route-protection middleware — is done and verified; see §6.)
+Immediate next: begin the **incident/ticket domain** — decide the authorization model, then
+build the first incident endpoints behind `RequireAuth`. (Full-stack authentication — backend
++ React UI — is done and verified; see §6.) A registration UI is an optional smaller item first.
 
 Then the broader roadmap (guide, not auto-permission): authorization/RBAC → incident
 features → file/evidence handling → audit logging → security hardening → automated tests
