@@ -649,6 +649,42 @@ result: revocation is **server-side**, not merely a forgotten cookie.
 
 ---
 
+## Stage: Frontend — auth UI (login / session / logout) wired to the API
+
+**Decisions made (decision prompts):** auth state in **local `App` state** (not Context yet —
+one screen); API base URL as an **env-overridable constant** (`import.meta.env.VITE_API_URL ??
+'http://localhost:8080'`); all fetch logic in a **dedicated `src/api.ts`** helper.
+
+**Built (user typed; I type-checked with tsc + oxlint):**
+- `src/api.ts`: `API_BASE`, `User` type, `ApiError` (carries the HTTP status), a `request`
+  wrapper that ALWAYS sets `credentials: "include"`, and `getMe()` (→ `User | null`, 401 =
+  null), `login()`, `logout()`.
+- `src/App.tsx`: `getMe()` on mount to detect a session; discriminated-union `AuthState`
+  (loading | anonymous | authenticated); `LoginForm` (controlled inputs, `preventDefault`,
+  submitting/error states, `instanceof ApiError`); `LoggedIn` (welcome + logout button).
+- `src/App.css`: token-based, theme-aware styling; accessible `:focus-visible` rings; a
+  monochrome primary button that flips per theme for guaranteed contrast.
+
+**Verified in a real browser:** load → login form; valid creds → "Welcome, <name>"; logout →
+back to the form; log in again + **reload → still logged in** (cookie persisted). The two
+`401` console lines are the expected anonymous `GET /api/me` checks (React StrictMode
+double-fires the effect once in dev).
+
+**Concepts learned:**
+- The client CANNOT read the HttpOnly session cookie — auth state comes from asking
+  `GET /api/me`, never from `document.cookie`. That is the point of HttpOnly (XSS can't steal it).
+- `credentials: "include"` is mandatory on every cross-origin API call, or the browser neither
+  stores nor sends the session cookie (:5173 ↔ :8080).
+- Controlled inputs (value + onChange), `e.preventDefault()` on submit, lifting state up via
+  callbacks (`onLoggedIn` / `onLogout`), and typed error handling with `instanceof ApiError`.
+- Vite exposes `VITE_`-prefixed env vars on `import.meta.env`; a fallback avoids requiring a
+  frontend `.env`. `verbatimModuleSyntax` forces `import type` for type-only imports.
+- React auto-escapes rendered values → XSS-safe rendering of server data.
+
+*(Committed on `feat/frontend-auth`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
