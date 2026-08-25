@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **full-stack auth complete**
-> (React login/logout UI wired to the API, verified in-browser); next is the incident/ticket domain.
+> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **full-stack auth + registration
+> UI complete** (verified in-browser); next is the incident/ticket domain.
 
 ---
 
@@ -131,7 +131,9 @@ correct for local http). Three security properties verified rather than assumed:
 **Frontend auth UI (verified in-browser):** initial load → session check shows the login form;
 valid login → logged-in view; logout → back to the form; **reload while logged in → still
 logged in** (cookie persists). No `password_hash` reaches the client, and the HttpOnly cookie
-is never read by JS — auth state comes from `GET /api/me`.
+is never read by JS — auth state comes from `GET /api/me`. **Registration UI also verified:**
+new signup → auto-login → logged-in view; duplicate email → "email already registered" shown;
+logout → returns to the login view.
 
 **Files:**
 - `backend/main.go` — routes + CORS middleware + `migrate` subcommand + manual DI.
@@ -154,16 +156,19 @@ is never read by JS — auth state comes from `GET /api/me`.
 - `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
   `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
   helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
-- `frontend/src/api.ts` (new) — API helper: `API_BASE` (Vite env-overridable), `User` type,
-  `ApiError`, and `getMe`/`login`/`logout` wrappers that all send `credentials: "include"`.
-- `frontend/src/App.tsx` — full auth UI: session check on load (`getMe`), login form
-  (`POST /api/sessions`), logged-in view, logout button (`DELETE /api/sessions/current`);
-  discriminated-union state, controlled inputs, typed error handling.
+- `frontend/src/api.ts` — API helper: `API_BASE` (Vite env-overridable), `User` type,
+  `ApiError`, and `getMe`/`login`/`logout`/`register` wrappers that all send
+  `credentials: "include"`; `register` surfaces the server's plain-text error message.
+- `frontend/src/App.tsx` — full auth UI: session check on load (`getMe`), a login/register
+  mode toggle, login form (`POST /api/sessions`), **registration form** (`POST /api/users`
+  → auto-login), logged-in view, logout (`DELETE /api/sessions/current`, resets to login
+  view); discriminated-union state, controlled inputs, typed error handling.
 - `frontend/src/App.css` — token-based styling (light/dark aware), accessible focus rings,
-  monochrome primary button.
+  monochrome primary button, link-styled toggle (`.auth-card .link`).
 
-**Git:** on `main`. Login work (auth package + main.go wiring) and these doc updates are
-**uncommitted** as of this snapshot. Last pushed commit: `2e98c88` (README + continuity guides).
+**Git:** GitHub Flow on a protected `main`; features shipped via PRs #1–#4 plus the
+registration-UI PR. Merged branches are archived as `merged/*` (never deleted) — see
+`WAYS-OF-WORKING.md` §13.
 
 **Runtime state:** container `sentinelops-db` (Postgres 17) runs the DB.
 ⚠️ **Database contents do NOT travel between devices** — `pgdata` is a local Docker volume,
@@ -177,10 +182,11 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — the incident/ticket domain
 
-**Authentication is COMPLETE, full-stack.** Backend: register → login → `/api/me` → logout
-(verified 8/8, 7/7, 6/6). Frontend: React login form, session-detect-on-load, logged-in view,
-and logout — all wired with `credentials: "include"` and verified in a real browser (login,
-logout, and session-persists-across-reload). See the learning-log entries.
+**Authentication is COMPLETE, full-stack — including a registration UI.** Backend: register →
+login → `/api/me` → logout (verified 8/8, 7/7, 6/6). Frontend: login + **registration** forms
+(signup auto-logs-in), session-detect-on-load, logged-in view, and logout — all wired with
+`credentials: "include"` and verified in a real browser (signup→auto-login, duplicate-email
+error, login, logout→login view, session-persists-across-reload). See the learning-log entries.
 
 **Next: start the app's actual domain — incidents/tickets.** This is where authorization
 finally matters (a user acting on their own vs others' data → IDOR territory). Likely order:
@@ -191,9 +197,6 @@ finally matters (a user acting on their own vs others' data → IDOR territory).
   (create) and `GET /api/incidents` (list — scoped to what the user may see), behind
   `RequireAuth`, using `UserFromContext` for ownership.
 - **Frontend:** a simple list + create form once the API exists.
-
-**Optional smaller item first:** a **registration UI** (a signup form calling the existing
-`POST /api/users`) to round out the auth UX — currently users can only be created via curl.
 
 **Security to revisit here:** authorization (IDOR — never trust a client-supplied id; scope
 every query by the authenticated user), and the still-open account-enumeration inconsistency
