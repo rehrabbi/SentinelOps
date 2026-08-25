@@ -26,9 +26,9 @@ func openDB(databaseURL string) (*sql.DB, error) {
 	}
 
 	// Pool tuning — sensible small defaults for local development.
-	db.SetMaxOpenConns(10)               // never more than 10 connections at once
-	db.SetMaxIdleConns(5)                // keep up to 5 warm for reuse
-	db.SetConnMaxLifetime(time.Hour)     // recycle a connection after an hour
+	db.SetMaxOpenConns(10)           // never more than 10 connections at once
+	db.SetMaxIdleConns(5)            // keep up to 5 warm for reuse
+	db.SetConnMaxLifetime(time.Hour) // recycle a connection after an hour
 
 	return db, nil
 }

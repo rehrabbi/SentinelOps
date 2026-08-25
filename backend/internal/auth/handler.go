@@ -129,3 +129,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		log.Printf("login: encode response: %v", err)
 	}
 }
+
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	u, ok := UserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(u); err != nil {
+		log.Printf("me: encode response: %v", err)
+	}
+}
