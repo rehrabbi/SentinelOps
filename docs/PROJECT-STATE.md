@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-16 · **Current stage:** Authentication — **login works end-to-end**;
-> next is the auth middleware that protects routes.
+> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **auth middleware works**
+> (routes can be protected; `GET /api/me` live and verified); next is logout.
 
 ---
 
@@ -114,7 +114,8 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 **Endpoints live:** `GET /healthz` (liveness), `GET /readyz` (DB readiness),
 `GET /api/users` (list), `POST /api/users` (register — tested 6/6: 201, dup→409,
 short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…` bcrypt hash),
-**`POST /api/sessions` (login)**.
+**`POST /api/sessions` (login)**, **`GET /api/me`** (current user — protected by the auth
+middleware; tested 7/7, see the learning log).
 
 **Login test results (8/8 passing):** 200 + `Set-Cookie` on valid credentials; 401 on wrong
 password; 401 **byte-identical** on unknown email; 400 on unknown JSON field; `OPTIONS`
@@ -134,11 +135,16 @@ correct for local http). Three security properties verified rather than assumed:
 - `backend/migrations/000001_create_users.{up,down}.sql`
 - `backend/migrations/000002_create_sessions.{up,down}.sql` (applied; schema_migrations=2)
 - `backend/internal/user/{user.go, repository.go, handler.go, validate.go}` —
-  repository now includes `GetByEmail` (loads `password_hash`) + `ErrUserNotFound`.
+  repository includes `GetByEmail` (loads `password_hash`), **`GetByID`** (no `password_hash`),
+  `ErrUserNotFound`.
 - `backend/internal/session/{session.go, repository.go}` — Session model; `GenerateToken`
-  (crypto/rand, 32 bytes), `HashToken` (SHA-256), `Repository.Create`.
-- `backend/internal/auth/handler.go` — **login handler** (`Login`), `NewHandler`, cookie
-  constants, precomputed dummy hash for timing equalization.
+  (crypto/rand, 32 bytes), `HashToken` (SHA-256), `Repository.Create`, **`GetByTokenHash`**
+  (non-expired lookup, expiry enforced in SQL) + `ErrSessionNotFound`.
+- `backend/internal/auth/handler.go` — **login handler** (`Login`) + **`Me`** (returns the
+  current user from context), `NewHandler`, cookie constants, precomputed dummy hash.
+- `backend/internal/auth/middleware.go` (new) — **`RequireAuth`** (cookie → session → user →
+  request context; fail-closed `401` on missing/invalid/expired) + **`UserFromContext`** helper
+  using an unexported context-key type.
 - `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
   `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
   helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
@@ -157,58 +163,52 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — auth middleware (protect routes)
+## 6. ⏭️ THE EXACT NEXT STEP — logout (DELETE /api/sessions/current)
 
-**Login is done.** Steps 1–5 all complete and verified (see §5). What's missing is the other
-half: *nothing currently checks the session cookie*. You can log in, but no route is
-protected, so the cookie doesn't yet buy access to anything.
+**Auth middleware is DONE and verified.** `RequireAuth` gates routes and `GET /api/me`
+returns the current user. Live test matrix passed 7/7: no cookie → 401, garbage cookie → 401,
+register → 201, login → 200 + Set-Cookie, valid cookie → 200 with the exact user, no
+`password_hash` in the body, and — after expiring the session row in the DB — the same cookie
+→ 401 (proves the SQL expiry filter). Details in the learning-log entry *"Authentication —
+auth middleware + GET /api/me"*.
 
-**Next: auth middleware.** The flow it must implement:
+**Next: logout.** Login creates a session row and sets the cookie; logout must undo both.
+The flow:
 
 ```
-request -> read "sentinelops_session" cookie
-        -> HashToken(raw)                  (SHA-256, same function login used)
-        -> look up session by token_hash
-        -> reject if missing OR expired    -> 401
-        -> load the user, attach to request context
-        -> call the next handler
+DELETE /api/sessions/current
+   -> read the "sentinelops_session" cookie (none? still succeed — idempotent)
+   -> HashToken(raw) -> DELETE the sessions row by token_hash
+   -> overwrite the cookie with an expired one (MaxAge < 0) so the browser drops it
+   -> 204 No Content
 ```
 
-**Files this will touch** (taught interactively, in small pieces — not pre-written here):
+**Files this will touch** (taught interactively, in small pieces):
 | File | Change |
 |---|---|
-| `internal/session/repository.go` | add a lookup by token hash |
-| `internal/user/repository.go` | add a lookup by ID (middleware has a `user_id`, needs the user) |
-| `internal/auth/middleware.go` | **new** — the middleware itself + context helpers |
-| `main.go` | wire it, and register one protected route to prove it works |
+| `internal/session/repository.go` | add `DeleteByTokenHash` |
+| `internal/auth/handler.go` | add `Logout` handler |
+| `main.go` | register `DELETE /api/sessions/current` |
 
-**Decisions to make before coding** (use the decision protocol — options + tradeoffs, then choose):
-1. **Where is expiry enforced** — in the SQL (`WHERE token_hash = $1 AND expires_at > now()`)
-   or in Go after loading the row? (Leaning SQL: one round-trip, and the DB clock is the
-   single source of truth.)
-2. **What gets attached to the context** — the full `user.User`, or just the user ID? Trades
-   a second query against carrying more state than most handlers need.
-3. **The context key type** — a package-private named type, never a bare string. Bare-string
-   keys can collide across packages; `go vet` flags them.
-4. **Which route proves it** — likely `GET /api/me` returning the current user, which the
-   frontend will need anyway.
-5. **Expired-row cleanup** — deferred, but decide whether it's a later background job or a
-   periodic query, and record it.
+**Decisions to make first** (decision protocol — options + tradeoffs, then choose):
+1. **Does logout require a valid session (put it behind `RequireAuth`)?** Leaning **no**: a
+   stale/expired cookie should still be able to clear itself. Treat logout as "delete whatever
+   the cookie points to, always clear the cookie."
+2. **Idempotency** — logout with a missing/invalid cookie should still return success (deleting
+   a non-existent row is a no-op), not 401.
+3. **Response code** — `204 No Content` vs `200` + body. Leaning `204`.
 
-**Acceptance criteria:** no cookie → 401; garbage cookie → 401; expired session → 401;
-valid cookie → 200 with the right user; and the protected route must be unreachable without
-a session even when the user ID is known (that's the IDOR-adjacent check).
+**Acceptance criteria:** after logout, the same cookie no longer works on `GET /api/me` (→ 401)
+and the `sessions` row is gone from the DB; logging out with no/invalid cookie still succeeds.
 
-**After that:** logout (`DELETE /api/sessions/current` — delete the session row *and* expire
-the cookie), then wire the frontend login form (`credentials: "include"` on fetch, or the
-cookie is never sent).
+**After that:** wire the frontend login/logout UI (`credentials: "include"` on fetch, or the
+cookie is never sent), then authorization/RBAC and the incident features.
 
 
 ## 7. After login: remaining auth pieces, then roadmap
 
-Immediate next (after login works): **auth middleware** (read cookie → `HashToken` →
-look up session → reject if missing/expired → attach user to request context),
-**logout** (`DELETE /api/sessions/current`), then **wire the frontend** login form.
+Immediate next: **logout** (`DELETE /api/sessions/current`), then **wire the frontend**
+login/logout UI. (Auth middleware is done and verified — see §6.)
 
 Then the broader roadmap (guide, not auto-permission): authorization/RBAC → incident
 features → file/evidence handling → audit logging → security hardening → automated tests

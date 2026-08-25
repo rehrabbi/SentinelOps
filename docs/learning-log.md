@@ -565,6 +565,54 @@ details live in `PROJECT-STATE.md` §9; the *lessons* are here.
 
 ---
 
+## Stage: Authentication — auth middleware + GET /api/me
+
+**Built (user typed; I reviewed + gofmt'd each file):**
+- `internal/session/repository.go`: `GetByTokenHash` — fetch a session by token hash **only
+  if `expires_at > now()`** (expiry enforced in SQL); `ErrSessionNotFound` sentinel, so a
+  missing and an expired session are indistinguishable by design.
+- `internal/user/repository.go`: `GetByID` — load a user by primary key **without**
+  `password_hash` (identity lookup, not authentication).
+- `internal/auth/middleware.go` (new): `RequireAuth(next)` — read cookie → `HashToken` →
+  `GetByTokenHash` → `GetByID` → attach the `user.User` to the request context → call next;
+  every failure short-circuits with a generic `401`. `UserFromContext(ctx)` reads it back.
+- `internal/auth/handler.go`: `Me` — returns the context user as JSON, carrying no auth logic
+  of its own. `main.go`: `GET /api/me` registered behind `RequireAuth`.
+
+**Decisions made (decision prompts):**
+- Enforce session expiry **in SQL** (`WHERE token_hash = $1 AND expires_at > now()`) — one
+  round-trip, the DB clock is the single source of truth, and expired == missing.
+- Attach the **full `user.User`** to the request context (vs just the ID) — protected handlers
+  get the user for free; slim it later only if it ever costs too much.
+- First protected route = **`GET /api/me`** (the frontend needs it anyway, so not throwaway).
+- Context key = an **unexported named type** (`type contextKey int`), never a bare string.
+
+**Verified (live, 7/7):** no cookie → 401; garbage cookie → 401; register → 201; login →
+200 + `Set-Cookie`; `/api/me` with the cookie → 200 returning the **exact** registered user;
+body contains no `password_hash`; and after `UPDATE sessions SET expires_at = past`, the same
+cookie → 401 — proving the SQL expiry filter, not just the happy path.
+
+**Concepts learned:**
+- The Go middleware pattern as a **method** (it needs the handler's repositories) vs a plain
+  `func(next) http.Handler`.
+- **Fail-closed / default-deny**: every error path returns and rejects; `next` runs only on the
+  success path at the bottom — a missing `return` would be a security hole.
+- **Request context** for request-scoped values, keyed by an unexported named type so keys
+  cannot collide across packages (`go vet` flags bare-string context keys).
+- We compare the **hash** of the presented token against the stored hash — the raw token
+  never needs to exist in the database.
+- Least-privilege data loading: three user reads now differ by need — `List` and `GetByID`
+  omit `password_hash`; only `GetByEmail` (login) loads it.
+
+**Workflow / repo change:** adopted **GitHub Flow**. `main` is now protected (PR required,
+0 approvals so I can self-merge, `enforce_admins: true`, force-push + deletion blocked,
+conversation-resolution required). Work happens on short-lived `feat/*` branches merged into
+`main` via PR. This feature was built on `feat/auth-middleware` and merged via its PR.
+
+*(Committed with the middleware docs on `feat/auth-middleware`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
