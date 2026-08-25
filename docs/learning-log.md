@@ -613,6 +613,42 @@ conversation-resolution required). Work happens on short-lived `feat/*` branches
 
 ---
 
+## Stage: Authentication — logout (DELETE /api/sessions/current)
+
+**Decisions made (decision prompts):** logout is **public & idempotent** (NOT behind
+`RequireAuth`) and returns **`204 No Content`**. Rationale: refusing to log out an
+already-expired session would leave a dangling cookie in the browser; deleting a non-existent
+row is a harmless no-op, so "always clear the cookie, always succeed" is both simpler and safer.
+
+**Built (user typed; I reviewed + gofmt'd):**
+- `internal/session/repository.go`: `DeleteByTokenHash` — `DELETE FROM sessions WHERE
+  token_hash = $1` via `ExecContext`; idempotent (0 rows affected is still success), so it
+  never inspects `RowsAffected`.
+- `internal/auth/handler.go`: `Logout` — if a cookie is present, hash it and delete the row
+  (true server-side revocation); **always** overwrite the cookie with an expired one
+  (`MaxAge: -1`, empty value) so the browser drops it; respond `204`. A real DB error → 500.
+- `main.go`: `DELETE /api/sessions/current -> authHandler.Logout` — a public route (no
+  middleware wrap), method-matched.
+
+**Verified (live, 6/6):** logged in → `/api/me` 200; `DELETE` → 204 with
+`Set-Cookie: sentinelops_session=; Max-Age=0; HttpOnly; SameSite=Lax`; `/api/me` with the
+**same token** afterwards → 401; DB session count for the user = 0; a repeat `DELETE` with the
+dead token → 204; `DELETE` with no cookie → 204. The 401-with-the-original-token is the key
+result: revocation is **server-side**, not merely a forgotten cookie.
+
+**Concepts learned:**
+- A SQL `DELETE` of a non-existent row is not an error — it affects 0 rows and succeeds. That
+  property *is* the idempotency; no need to check `RowsAffected`.
+- `ExecContext` (no result rows) vs `QueryRow` (one) vs `QueryContext` (many).
+- Deleting a cookie = re-`Set-Cookie` with the **same Name + Path** and `MaxAge < 0` (renders
+  as `Max-Age=0`); the browser only replaces a cookie when name and path match the original.
+- Server-side sessions give **instant revocation** — the reason we chose them over JWTs — and
+  logout is exactly where that advantage is realized.
+
+*(Committed on `feat/logout`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

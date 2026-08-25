@@ -70,3 +70,12 @@ func (r *Repository) GetByTokenHash(ctx context.Context, tokenHash string) (Sess
 	}
 	return s, nil
 }
+
+func (r *Repository) DeleteByTokenHash(ctx context.Context, tokenHash string) error {
+	const query = `DELETE FROM sessions WHERE token_hash = $1`
+
+	if _, err := r.db.ExecContext(ctx, query, tokenHash); err != nil {
+		return fmt.Errorf("delete session: %w", err)
+	}
+	return nil
+}

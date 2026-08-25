@@ -84,6 +84,10 @@ func main() {
 	// Me runs. This is our first route that requires authentication.
 	mux.Handle("GET /api/me", authHandler.RequireAuth(http.HandlerFunc(authHandler.Me)))
 
+	// Logout: destroy the current session and clear the cookie. Public and
+	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth
+	mux.HandleFunc("DELETE /api/sessions/current", authHandler.Logout)
+
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
 	handler := withCORS(mux, frontendOrigin)
