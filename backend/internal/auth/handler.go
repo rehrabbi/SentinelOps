@@ -142,3 +142,32 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		log.Printf("me: encode response: %v", err)
 	}
 }
+
+// Logout handles DELETE /api/sessions/current: revoke the current session and
+// clear the cookie. It is public and idempotent — a missing or already-invalid
+// cookie still yields a clean 204, and the cookie is always expired.
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	// If a session cookie is present, delete its row so the token is truly
+	// revoked server-side — not merely forgotten by the browser.
+	if c, err := r.Cookie(cookieName); err == nil {
+		if err := h.sessions.DeleteByTokenHash(r.Context(), session.HashToken(c.Value)); err != nil {
+			log.Printf("logout: delete session: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Always overwrite the cookie with an expired one so the browser drops it.
+	// Name and Path must match the login cookie or the browser won't replace it.
+	http.SetCookie(w, &http.Cookie{
+		Name:     cookieName,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   h.secureCookies,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1, // negative MaxAge tells the browser to delete it immediately
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
