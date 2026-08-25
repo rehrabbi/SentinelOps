@@ -685,6 +685,45 @@ double-fires the effect once in dev).
 
 ---
 
+## Stage: Frontend — registration UI (signup + auto-login)
+
+**Decisions made (decision prompts):** after a successful signup, **auto-login** (call
+`login()` with the same credentials, since `POST /api/users` does not start a session);
+**minimal client-side validation** (HTML `required` / `type="email"` / `minLength={12}` hints;
+the Go server stays authoritative and its messages are shown).
+
+**Built (user typed; tsc + oxlint clean):**
+- `src/api.ts`: added `register(email, password, fullName)` — POSTs `/api/users`, and on
+  failure reads the server's plain-text message (`.trim()`) into `ApiError`, so the form shows
+  the real reason (validation detail, or "email already registered").
+- `src/App.tsx`: a `mode` state (`login | register`) toggled by a link (`<button
+  type="button" className="link">`); a `RegisterForm` (full name + email + password) that
+  registers then **auto-logs-in**; logout now also resets `mode` to `login`.
+- `src/App.css`: `.auth-switch` + `.auth-card .link` (a button styled as a link, scoped with
+  higher specificity to override the primary `.auth-card button`).
+
+**Verified in a real browser:** switch to Register → new signup → `POST /api/users` 201 →
+`POST /api/sessions` 200 → auto-logged-in ("Welcome, New User"); duplicate email → "email
+already registered" shown, stays on the form; logout → returns to the **login** view.
+
+**Concepts learned:**
+- Registration and login are separate concerns — creating an account does NOT authenticate;
+  the client sequences register → login to auto-login.
+- Reading a non-OK response's text body to surface server-authored error messages (keeps the
+  server the single source of validation truth — the "minimal client validation" decision).
+- CSS specificity: `.auth-card .link` (two classes) beats `.auth-card button` (class +
+  element), so the link styling wins — a concrete specificity lesson.
+- A `<button type="button">` styled as a link is the accessible way to trigger an in-page
+  action (vs an `<a>` with no real href); `type="button"` stops it submitting the form.
+
+**Security note (unchanged, revisit later):** the signup form surfaces the `409` "email already
+registered" — the same account-enumeration leak flagged earlier. Accepted for this portfolio
+app; the login path stays timing-safe.
+
+*(Committed on `feat/registration-ui`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
