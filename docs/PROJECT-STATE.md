@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **auth middleware works**
-> (routes can be protected; `GET /api/me` live and verified); next is logout.
+> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **backend auth cycle
+> complete** (register → login → `/api/me` → logout, all verified); next is the frontend auth UI.
 
 ---
 
@@ -114,8 +114,8 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 **Endpoints live:** `GET /healthz` (liveness), `GET /readyz` (DB readiness),
 `GET /api/users` (list), `POST /api/users` (register — tested 6/6: 201, dup→409,
 short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…` bcrypt hash),
-**`POST /api/sessions` (login)**, **`GET /api/me`** (current user — protected by the auth
-middleware; tested 7/7, see the learning log).
+**`POST /api/sessions` (login)**, **`GET /api/me`** (current user — protected; tested 7/7),
+**`DELETE /api/sessions/current`** (logout — tested 6/6, see the learning log).
 
 **Login test results (8/8 passing):** 200 + `Set-Cookie` on valid credentials; 401 on wrong
 password; 401 **byte-identical** on unknown email; 400 on unknown JSON field; `OPTIONS`
@@ -139,9 +139,10 @@ correct for local http). Three security properties verified rather than assumed:
   `ErrUserNotFound`.
 - `backend/internal/session/{session.go, repository.go}` — Session model; `GenerateToken`
   (crypto/rand, 32 bytes), `HashToken` (SHA-256), `Repository.Create`, **`GetByTokenHash`**
-  (non-expired lookup, expiry enforced in SQL) + `ErrSessionNotFound`.
-- `backend/internal/auth/handler.go` — **login handler** (`Login`) + **`Me`** (returns the
-  current user from context), `NewHandler`, cookie constants, precomputed dummy hash.
+  (non-expired lookup, expiry enforced in SQL), **`DeleteByTokenHash`** (idempotent revoke)
+  + `ErrSessionNotFound`.
+- `backend/internal/auth/handler.go` — **`Login`** + **`Me`** (current user) + **`Logout`**
+  (revoke session + expire cookie, idempotent `204`), `NewHandler`, cookie constants, dummy hash.
 - `backend/internal/auth/middleware.go` (new) — **`RequireAuth`** (cookie → session → user →
   request context; fail-closed `401` on missing/invalid/expired) + **`UserFromContext`** helper
   using an unexported context-key type.
@@ -163,52 +164,45 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — logout (DELETE /api/sessions/current)
+## 6. ⏭️ THE EXACT NEXT STEP — wire the frontend auth UI
 
-**Auth middleware is DONE and verified.** `RequireAuth` gates routes and `GET /api/me`
-returns the current user. Live test matrix passed 7/7: no cookie → 401, garbage cookie → 401,
-register → 201, login → 200 + Set-Cookie, valid cookie → 200 with the exact user, no
-`password_hash` in the body, and — after expiring the session row in the DB — the same cookie
-→ 401 (proves the SQL expiry filter). Details in the learning-log entry *"Authentication —
-auth middleware + GET /api/me"*.
+**The backend auth cycle is COMPLETE and verified: register → login → `/api/me` → logout.**
+Login 8/8, middleware + `/api/me` 7/7, logout 6/6 (incl. the key result: the *same* token
+returns 401 after logout, the DB row is deleted, and logout with a dead/no cookie is an
+idempotent 204). See the learning-log entries for the details.
 
-**Next: logout.** Login creates a session row and sets the cookie; logout must undo both.
-The flow:
+**Next: the frontend.** Today `frontend/src/App.tsx` only calls `/healthz`. Build the real
+auth UX against the now-working API:
 
 ```
-DELETE /api/sessions/current
-   -> read the "sentinelops_session" cookie (none? still succeed — idempotent)
-   -> HashToken(raw) -> DELETE the sessions row by token_hash
-   -> overwrite the cookie with an expired one (MaxAge < 0) so the browser drops it
-   -> 204 No Content
+- a login form (email + password) -> POST /api/sessions
+- on load, call GET /api/me to detect an existing session (show the user, else the form)
+- a logout button -> DELETE /api/sessions/current
+- CRITICAL: every API fetch must set `credentials: "include"`, or the browser will neither
+  store nor send the session cookie across origins (:5173 -> :8080).
 ```
 
-**Files this will touch** (taught interactively, in small pieces):
+**Files this will touch** (taught interactively, small pieces):
 | File | Change |
 |---|---|
-| `internal/session/repository.go` | add `DeleteByTokenHash` |
-| `internal/auth/handler.go` | add `Logout` handler |
-| `main.go` | register `DELETE /api/sessions/current` |
+| `frontend/src/` | an auth API helper (fetch wrappers that send credentials) |
+| `frontend/src/App.tsx` | login form / logged-in view / logout, with loading + error states |
 
-**Decisions to make first** (decision protocol — options + tradeoffs, then choose):
-1. **Does logout require a valid session (put it behind `RequireAuth`)?** Leaning **no**: a
-   stale/expired cookie should still be able to clear itself. Treat logout as "delete whatever
-   the cookie points to, always clear the cookie."
-2. **Idempotency** — logout with a missing/invalid cookie should still return success (deleting
-   a non-existent row is a no-op), not 401.
-3. **Response code** — `204 No Content` vs `200` + body. Leaning `204`.
+**Decisions to make first** (decision protocol): how to hold auth state in React (local state
+vs context), where the API base URL comes from (Vite env var vs hardcoded), and the login
+form's loading/error UX. We'll cover these before any code.
 
-**Acceptance criteria:** after logout, the same cookie no longer works on `GET /api/me` (→ 401)
-and the `sessions` row is gone from the DB; logging out with no/invalid cookie still succeeds.
+**Security to revisit here:** the account-enumeration inconsistency (login is timing-safe but
+registration still returns a distinguishing 409), and XSS discipline on the frontend (React
+escapes by default — never introduce `dangerouslySetInnerHTML` with server data).
 
-**After that:** wire the frontend login/logout UI (`credentials: "include"` on fetch, or the
-cookie is never sent), then authorization/RBAC and the incident features.
+**After that:** authorization/RBAC, then the incident/ticket features.
 
 
 ## 7. After login: remaining auth pieces, then roadmap
 
-Immediate next: **logout** (`DELETE /api/sessions/current`), then **wire the frontend**
-login/logout UI. (Auth middleware is done and verified — see §6.)
+Immediate next: **wire the frontend** login/logout UI against the finished auth API. (Backend
+auth — register / login / logout / route-protection middleware — is done and verified; see §6.)
 
 Then the broader roadmap (guide, not auto-permission): authorization/RBAC → incident
 features → file/evidence handling → audit logging → security hardening → automated tests
