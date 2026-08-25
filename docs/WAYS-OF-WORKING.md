@@ -201,6 +201,14 @@ git-ignored `.env`; a committed `.env.example` documents the shape.)
 
 ## 13. Git & GitHub conventions (LOCKED)
 
+- **Branching model — GitHub Flow.** `main` is protected (PR required to merge; direct
+  pushes, force-push, and branch deletion blocked; enforced for admins too). Do all work on
+  short-lived `feat/<name>` branches, one concern each, merged into `main` via a Pull Request.
+- **NEVER delete a merged branch — keep it as `merged/<name>`.** On merge, do NOT
+  `--delete-branch`; instead create `merged/<name>` at the feature's tip, push it, and remove
+  the old `feat/<name>` name. Merged branches are archived under the `merged/` prefix, never
+  removed, so the full feature history stays in the repo (e.g. `merged/auth-middleware`,
+  `merged/logout`).
 - **Do NOT push to remote unless I explicitly approve it.** Ask before every push.
 - **Commit messages:**
   - Conventional-commit subject line (e.g. `feat: ...`, `docs: ...`, `fix: ...`).
