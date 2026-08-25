@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
-import { getMe, login, logout, ApiError, type User } from "./api";
+import { getMe, login, logout, register, ApiError, type User } from "./api";
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
 // still asking the server (GET /api/me) whether a session exists.
@@ -11,9 +11,9 @@ type AuthState =
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
+  // When anonymous, which form to show.
+  const [mode, setMode] = useState<"login" | "register">("login");
 
-  // On first render, ask the server who we are. getMe() returns the user, or
-  // null on 401 (not logged in). We treat any error as "anonymous" for now.
   useEffect(() => {
     getMe()
       .then((user) =>
@@ -31,6 +31,8 @@ function App() {
     );
   }
 
+  const onLoggedIn = (user: User) => setAuth({ kind: "authenticated", user });
+
   return (
     <main className="app">
       <h1>SentinelOps</h1>
@@ -38,20 +40,34 @@ function App() {
       {auth.kind === "authenticated" ? (
         <LoggedIn
           user={auth.user}
-          onLogout={() => setAuth({ kind: "anonymous" })}
+          onLogout={() => {
+            setAuth({ kind: "anonymous"})
+            setMode("login")
+          }}
+        />
+      ) : mode === "login" ? (
+        <LoginForm
+          onLoggedIn={onLoggedIn}
+          onSwitch={() => setMode("register")}
         />
       ) : (
-        <LoginForm
-          onLoggedIn={(user) => setAuth({ kind: "authenticated", user })}
+        <RegisterForm
+          onLoggedIn={onLoggedIn}
+          onSwitch={() => setMode("login")}
         />
       )}
     </main>
   );
 }
 
-// The login form. On submit it calls the API and, on success, hands the user
-// up to App via onLoggedIn.
-function LoginForm({ onLoggedIn }: { onLoggedIn: (user: User) => void }) {
+// Login form. On success, hands the user up to App via onLoggedIn.
+function LoginForm({
+  onLoggedIn,
+  onSwitch,
+}: {
+  onLoggedIn: (user: User) => void;
+  onSwitch: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<
@@ -61,7 +77,7 @@ function LoginForm({ onLoggedIn }: { onLoggedIn: (user: User) => void }) {
   >({ kind: "idle" });
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); // stop the browser's default full-page form submission
+    e.preventDefault();
     setStatus({ kind: "submitting" });
     try {
       const user = await login(email, password);
@@ -104,11 +120,103 @@ function LoginForm({ onLoggedIn }: { onLoggedIn: (user: User) => void }) {
           {status.kind === "submitting" ? "Logging in…" : "Log in"}
         </button>
       </form>
+      <p className="auth-switch">
+        Need an account?{" "}
+        <button type="button" className="link" onClick={onSwitch}>
+          Register
+        </button>
+      </p>
     </section>
   );
 }
 
-// The logged-in view: shows who you are and a logout button.
+// Registration form. Creates the account, then auto-logs-in (registration does
+// not start a session), landing the new user in the logged-in view.
+function RegisterForm({
+  onLoggedIn,
+  onSwitch,
+}: {
+  onLoggedIn: (user: User) => void;
+  onSwitch: () => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "submitting" }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus({ kind: "submitting" });
+    try {
+      await register(email, password, fullName);
+      const user = await login(email, password);
+      onLoggedIn(user);
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Something went wrong";
+      setStatus({ kind: "error", message });
+    }
+  }
+
+  return (
+    <section className="auth-card">
+      <h2>Create your account</h2>
+      <form onSubmit={handleSubmit}>
+        <label>
+          Full name
+          <input
+            type="text"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+            autoComplete="name"
+          />
+        </label>
+        <label>
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+          />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={12}
+            autoComplete="new-password"
+          />
+        </label>
+        {status.kind === "error" && (
+          <p className="status error">{status.message}</p>
+        )}
+        <button type="submit" disabled={status.kind === "submitting"}>
+          {status.kind === "submitting"
+            ? "Creating account…"
+            : "Create account"}
+        </button>
+      </form>
+      <p className="auth-switch">
+        Have an account?{" "}
+        <button type="button" className="link" onClick={onSwitch}>
+          Log in
+        </button>
+      </p>
+    </section>
+  );
+}
+
+// Logged-in view: shows who you are and a logout button.
 function LoggedIn({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [busy, setBusy] = useState(false);
 

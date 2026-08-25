@@ -66,3 +66,22 @@ export async function logout(): Promise<void> {
     const res = await request('/api/sessions/current', { method: 'DELETE' })
     if (!res.ok) throw new ApiError(res.status, `Logout failed (${res.status})`)
 }
+
+// register creates a new account via POST /api/users. On success it returns the
+// created user (201). On failure it surfaces the server's plain-text message
+// (validation detail, or "email already registered") so the form can show why.
+export async function register(
+    email: string,
+    password: string,
+    fullName: string,
+): Promise<User> {
+    const res = await request('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, fullName }),
+    })
+    if (!res.ok) {
+        const text = (await res.text()).trim()
+        throw new ApiError(res.status, text || `Registration failed (${res.status})`)
+    }
+    return res.json()
+}  

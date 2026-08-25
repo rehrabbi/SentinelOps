@@ -98,3 +98,35 @@
   font-size: 14px;
   margin-top: -4px;
 }
+
+/* Login/resgister toggle line under the form. */
+.auth-switch {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text)
+}
+
+/* A button styld as an inline link. Scoped as `.auth-card .link` so it
+   overrides the primary `.auth-card button` style (higher specificity). */
+  .auth-card .link {
+    display: inline;
+    width: auto;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .auth-card .link:hover {
+    opacity: 0.8;
+  }
+
+  .auth-card .link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
