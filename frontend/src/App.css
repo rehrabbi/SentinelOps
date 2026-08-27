@@ -130,3 +130,189 @@
     outline-offset: 2px;
     border-radius: 2px;
   }
+
+    /* ---------- Incident dashboard ---------- */
+  
+    .incidents {
+      max-width: 560px;
+      margin: 32px auto 0;
+      text-align: left;
+    }
+  
+    .incidents h2 {
+      text-align: left;
+      margin-bottom: 16px;
+    }
+  
+    /* Create form — a card above the list. */
+    .incident-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+  
+    .incident-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--text-h);
+    }
+  
+    .incident-form input,
+    .incident-form textarea,
+    .incident-form select {
+      font: inherit;
+      font-size: 15px;
+      padding: 9px 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text-h);
+    }
+  
+    .incident-form textarea {
+      resize: vertical;
+    }
+  
+    .incident-form input:focus-visible,
+    .incident-form textarea:focus-visible,
+    .incident-form select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+  
+    .incident-form button {
+      align-self: flex-start;
+      font: inherit;
+      font-weight: 500;
+      padding: 9px 16px;
+      border: none;
+      border-radius: 8px;
+      background: var(--text-h);
+      color: var(--bg);
+      cursor: pointer;
+      transition: opacity 120ms ease;
+    }
+  
+    .incident-form button:hover {
+      opacity: 0.88;
+    }
+  
+    .incident-form button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  
+    /* The list. */
+    .incident-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+  
+    .incident-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+    }
+  
+    .incident-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+  
+    .incident-title {
+      font-weight: 500;
+      color: var(--text-h);
+    }
+  
+    .incident-desc {
+      font-size: 14px;
+      color: var(--text);
+    }
+  
+    .incident-badges {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+  
+    /* Badges — small pills; base shape, then per-value color. */
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+  
+    /* Severity: low → critical. */
+    .severity-low {
+      background: rgba(22, 163, 74, 0.12);
+      color: #16a34a;
+      border-color: rgba(22, 163, 74, 0.3);
+    }
+  
+    .severity-medium {
+      background: rgba(202, 138, 4, 0.14);
+      color: #ca8a04;
+      border-color: rgba(202, 138, 4, 0.3);
+    }
+  
+    .severity-high {
+      background: rgba(234, 88, 12, 0.14);
+      color: #ea580c;
+      border-color: rgba(234, 88, 12, 0.3);
+    }
+  
+    .severity-critical {
+      background: rgba(220, 38, 38, 0.14);
+      color: #dc2626;
+      border-color: rgba(220, 38, 38, 0.35);
+    }
+  
+    /* Status. */
+    .status-open {
+      background: rgba(37, 99, 235, 0.12);
+      color: #2563eb;
+      border-color: rgba(37, 99, 235, 0.3);
+    }
+  
+    .status-investigating {
+      background: rgba(147, 51, 234, 0.12);
+      color: #9333ea;
+      border-color: rgba(147, 51, 234, 0.3);
+    }
+  
+    .status-resolved {
+      background: rgba(22, 163, 74, 0.12);
+      color: #16a34a;
+      border-color: rgba(22, 163, 74, 0.3);
+    }
+  
+    .status-closed {
+      background: var(--code-bg);
+      color: var(--text);
+      border-color: var(--border);
+    }

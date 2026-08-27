@@ -85,3 +85,51 @@ export async function register(
     }
     return res.json()
 }  
+
+// Incident status/severity mirror the DB CHECK enums. Using unions (not plain
+// string) gives autocomplete and lets te UI map each value to a badge color.
+export type IncidentStatus = 'open' | 'investigating' | 'resolved' | 'closed'
+export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical'
+
+// Incident mirrors the API's JSON (see the Go Incident struct).
+export type Incident = {
+    id: string
+    userId: string
+    title: string
+    description: string
+    status: IncidentStatus
+    severity: IncidentSeverity
+    createdAt: string
+    updatedAt: string
+}
+
+// CreateIncidentInput is what the create form sends. description and severity are
+// optional — the server defaults them ('' and 'medium'). There is no status or
+// userId field: the server sets those (status='open', owner=authenticated user).
+export type CreateIncidentInput = {
+    title: string
+    description?: string
+    severity?: IncidentSeverity
+}
+
+// getIncidents returns the incidents the current user may see. The server
+// applies RBAC (reporter -> own, analyst/admin -> all); the client just renders.
+export async function getIncidents(): Promise<Incident[]> {
+    const res = await request('/api/incidents')
+    if (!res.ok) throw new ApiError(res.status, `GET /api/incidents failed (${res.status})`)
+    return res.json()
+}
+
+// createIncident posts a new incident and returns the created row. On failure it
+// surfaces the server's plain-text message (e.g. "invalid severity").
+export async function createIncident(input: CreateIncidentInput): Promise<Incident> {
+    const res = await request('/api/incidents', {
+        method: 'POST',
+        body: JSON.stringify(input)
+    })
+    if (!res.ok) {
+        const text = (await res.text()).trim()
+        throw new ApiError(res.status, text || `Create incident failed (${res.status})`)
+    }
+    return res.json()
+}
