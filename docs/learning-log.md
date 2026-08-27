@@ -779,6 +779,49 @@ clean crash-recovery). Consider a Defender exclusion for the Go build cache / pr
 
 ---
 
+## Stage: Frontend — incident dashboard (list + create, RBAC-agnostic UI)
+
+**Decisions made (decision prompts):** the dashboard lives in a **new `src/incidents.tsx`**
+component (keeps `App.tsx` focused on auth); incidents are presented as **styled rows with
+colored status/severity badges**. (Also: after create, **prepend** the returned row — no refetch.)
+
+**Built (user typed; tsc clean; verified in-browser):**
+- `src/api.ts`: `Incident` + `IncidentStatus`/`IncidentSeverity` union types,
+  `CreateIncidentInput`, and `getIncidents()` / `createIncident()` (through the shared `request`
+  wrapper, so `credentials: "include"` is automatic; `createIncident` surfaces the server's text
+  error).
+- `src/incidents.tsx`: `IncidentDashboard` (fetches on mount into a `loading|error|ready`
+  discriminated union; **RBAC-agnostic** — renders whatever the server returns) + a local
+  `CreateIncidentForm` (controlled title/description/severity-`select`; clears on success; lifts
+  the new incident up via `onCreated`; the dashboard prepends it).
+- `src/App.tsx`: the `LoggedIn` view now renders `<IncidentDashboard/>` (with the welcome card,
+  wrapped in a fragment).
+- `src/App.css`: dashboard styles — form card, incident rows, and **badges whose color is driven
+  by the className** (`badge severity-high`, `badge status-open`, …), all theme-aware via tokens.
+
+**Verified in-browser:** login → dashboard shows your incidents; create → the new incident
+appears at the top with `status=open`; **RBAC demo** — as a reporter, uitest saw 1 (own)
+incident; after `UPDATE users SET role='analyst'` + reload, the *same account* saw all 3 (no
+re-login, because the role is read fresh from the DB each request).
+
+**Concepts learned:**
+- The UI can be **role-agnostic**: it calls one endpoint and renders the result; the server
+  decides what to return. Authorization stays on the server — the client is untrusted.
+- **Data-driven styling**: the component builds a className from the data (`severity-${…}`) and
+  CSS maps each value to a color — no per-value JS branching.
+- `<select>` / `<textarea>` as controlled inputs; lifting state up (`onCreated`); an
+  optimistic-ish prepend using the real returned row (no refetch).
+- String-literal union types mirroring the DB enums give autocomplete and drive the badge classes.
+
+**Env note (Windows):** the project folder was renamed to include a space + `&`
+(`Cloud-Native Incident & Ticket Management`), which breaks `npx` / `npm run` (cmd treats `&` as
+a command separator). Run tools via node directly — e.g.
+`node node_modules/typescript/bin/tsc -p tsconfig.app.json` and `node node_modules/vite/bin/vite.js`.
+
+*(Committed on `feat/incident-ui`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

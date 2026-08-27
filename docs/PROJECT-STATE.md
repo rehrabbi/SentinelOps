@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-27 · **Current stage:** Incident domain — **backend + RBAC complete**
-> (create/list incidents with role-based access, verified live); next is the incident frontend.
+> **Last updated:** 2026-08-27 · **Current stage:** Incident domain — **full-stack (backend + UI)**,
+> RBAC create/list dashboard verified live; next is incident detail + status updates.
 
 ---
 
@@ -143,6 +143,11 @@ sets the owner from the authenticated user and always starts `status=open`; unau
 401; forged `userId`/`status`, invalid `severity`, or empty `title` → 400. The `WHERE user_id =
 $1` scoping is the concrete IDOR / broken-access-control defense.
 
+**Incident dashboard (verified in-browser):** login → the logged-in view lists your incidents
+with colored severity/status badges; the create form prepends the new incident (`status=open`).
+RBAC demo: as a reporter, uitest saw 1 (their own); after `UPDATE users SET role='analyst'` +
+reload, the **same account** saw all 3 — no re-login, since the role is read fresh each request.
+
 **Files:**
 - `backend/main.go` — routes + CORS middleware + `migrate` subcommand + manual DI.
 - `backend/db.go` — `openDB` (sql.Open + pgx, pool tuning).
@@ -171,18 +176,22 @@ $1` scoping is the concrete IDOR / broken-access-control defense.
 - `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
   `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
   helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
-- `frontend/src/api.ts` — API helper: `API_BASE` (Vite env-overridable), `User` type,
-  `ApiError`, and `getMe`/`login`/`logout`/`register` wrappers that all send
-  `credentials: "include"`; `register` surfaces the server's plain-text error message.
-- `frontend/src/App.tsx` — full auth UI: session check on load (`getMe`), a login/register
-  mode toggle, login form (`POST /api/sessions`), **registration form** (`POST /api/users`
-  → auto-login), logged-in view, logout (`DELETE /api/sessions/current`, resets to login
-  view); discriminated-union state, controlled inputs, typed error handling.
+- `frontend/src/api.ts` — API helper: `API_BASE` (Vite env-overridable), `User`/`Incident`
+  types, `ApiError`, and `getMe`/`login`/`logout`/`register`/`getIncidents`/`createIncident`
+  wrappers that all send `credentials: "include"`; `register`/`createIncident` surface the
+  server's plain-text error.
+- `frontend/src/App.tsx` — full auth UI (login/register toggle, auto-login, logout); the
+  logged-in view renders the incident dashboard.
+- `frontend/src/incidents.tsx` (new) — `IncidentDashboard` (fetches `GET /api/incidents` on
+  mount; RBAC-agnostic — renders whatever the server returns) + `CreateIncidentForm`
+  (`POST /api/incidents`, prepends the new row); discriminated-union list state.
 - `frontend/src/App.css` — token-based styling (light/dark aware), accessible focus rings,
-  monochrome primary button, link-styled toggle (`.auth-card .link`).
+  monochrome buttons, link-styled toggle, and the incident dashboard (form, rows, colored
+  severity/status **badges** driven by className).
 
-**Git:** GitHub Flow on a protected `main`; features shipped via PRs #1–#4 plus the
-registration-UI PR. Merged branches are archived as `merged/*` (never deleted) — see
+**Git:** GitHub Flow on a protected `main`; features shipped via PRs #1–#6 (auth middleware,
+logout, branch-retention docs, frontend auth, registration UI, incident domain) plus the
+incident-UI PR. Merged branches are archived as `merged/*` (never deleted) — see
 `WAYS-OF-WORKING.md` §13.
 
 **Runtime state:** container `sentinelops-db` (Postgres 17) runs the DB.
@@ -195,38 +204,35 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — the incident frontend
+## 6. ⏭️ THE EXACT NEXT STEP — incident detail + status updates
 
-**The incident backend + RBAC is COMPLETE and verified live.** Authorization model: **RBAC**
-with a single `role` column (`reporter` default / `analyst` / `admin`). `POST /api/incidents`
-(create, owner = authed user, `status` starts `open`) and `GET /api/incidents` (RBAC-scoped:
-reporter → own via `WHERE user_id = $1`; analyst/admin → all) both sit behind `RequireAuth`.
-Verified: IDOR defense (reporter can't see another's incident), role elevation (analyst sees
-all, role read live from the DB), mass-assignment blocked (no client `userId`/`status`), plus
-`401`/`400` paths. See the learning-log entry.
+**The incident domain is now full-stack and verified.** Backend: RBAC (`reporter`/`analyst`/
+`admin`), `POST`/`GET /api/incidents` behind `RequireAuth`, owner+role scoped. Frontend: a
+dashboard (list with colored severity/status badges + a create form) in the logged-in view,
+verified in-browser — a reporter sees only their own; promoting to analyst (+reload) shows all.
 
-**Next: the incident frontend.** Build the UI against the working API (on a `feat/*` branch):
-- an **incident list** (`GET /api/incidents`) shown after login — the logged-in view becomes a
-  dashboard; a reporter sees their own, an analyst sees all (same endpoint, server decides).
-- a **create form** (`POST /api/incidents`) — title, description, severity select.
-- add `getIncidents()` / `createIncident()` to `frontend/src/api.ts` (with `credentials`).
-- decisions to make first: component/state shape (extend `App` vs a new component), and how to
-  present severity/status (badges?).
+**Next options (pick one to start):**
+- **Incident detail + update** *(natural next authz lesson)*: `GET /api/incidents/{id}` and
+  `PATCH /api/incidents/{id}` (advance `status` through its lifecycle; edit fields). CRITICAL:
+  scope EVERY one by owner/role — an unscoped get-by-id or update is textbook IDOR
+  (per-object access checks, not just list scoping). Then a detail view / status control in the UI.
+- **Role-management / admin UI:** an admin-only view to change user roles (today they're set via
+  SQL). Introduces the `admin` role's first real power and admin-only route protection.
+- **Step toward production** (see §7): audit logging → Docker for the app → CI → AWS.
 
-**No role-management UI yet** — roles are changed directly in the DB for now (e.g.
-`UPDATE users SET role='analyst' WHERE email=…`). An admin UI to manage roles is a later item.
+**Frontend niceties deferred:** showing each incident's owner (needs the API to return owner
+email/name), an analyst filter, and empty/error polish.
 
-**Security to revisit here:** the still-open account-enumeration inconsistency (login is
-timing-safe; registration's 409 still leaks whether an email exists); and, as more incident
-operations arrive (get-by-id, update, delete), enforce the **same owner/role scoping on every
-one** — an unscoped `GET /api/incidents/{id}` would reintroduce IDOR.
+**Security to revisit:** the still-open account-enumeration inconsistency (login is timing-safe;
+registration's 409 leaks whether an email exists); and per-object authz on any new
+incident-by-id endpoint — never trust a client-supplied id; scope by owner/role.
 
 
 ## 7. After login: remaining auth pieces, then roadmap
 
-Immediate next: build the **incident frontend** (list + create form) against the finished
-incident API. (The incident backend with RBAC — create/list, owner+role scoped — is done and
-verified live; full-stack auth + registration UI are done; see §6.)
+Immediate next: extend incidents (**detail/update** with per-object authz, or an **admin
+role-management UI**), or step toward production (audit logging → Docker/CI → AWS). The incident
+domain is now full-stack (backend RBAC + dashboard UI) and verified; see §6.
 
 Then the broader roadmap (guide, not auto-permission): authorization/RBAC → incident
 features → file/evidence handling → audit logging → security hardening → automated tests

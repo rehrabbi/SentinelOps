@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
 import { getMe, login, logout, register, ApiError, type User } from "./api";
+import { IncidentDashboard } from "./incidents";
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
 // still asking the server (GET /api/me) whether a session exists.
@@ -230,14 +231,17 @@ function LoggedIn({ user, onLogout }: { user: User; onLogout: () => void }) {
     onLogout();
   }
 
-  return (
-    <section className="auth-card">
-      <h2>Welcome, {user.fullName}</h2>
-      <p className="subtitle">{user.email}</p>
-      <button onClick={handleLogout} disabled={busy}>
-        {busy ? "Logging out…" : "Log out"}
-      </button>
-    </section>
+    return (
+    <>
+      <section className="auth-card">
+        <h2>Welcome, {user.fullName}</h2>
+        <p className="subtitle">{user.email}</p>
+        <button onClick={handleLogout} disabled={busy}>
+          {busy ? "Logging out…" : "Log out"}
+        </button>
+      </section>
+      <IncidentDashboard />
+    </>
   );
 }
 
