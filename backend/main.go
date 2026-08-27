@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"sentinelops/internal/auth"
+	"sentinelops/internal/incident"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
@@ -85,8 +86,16 @@ func main() {
 	mux.Handle("GET /api/me", authHandler.RequireAuth(http.HandlerFunc(authHandler.Me)))
 
 	// Logout: destroy the current session and clear the cookie. Public and
-	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth
+	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth.
 	mux.HandleFunc("DELETE /api/sessions/current", authHandler.Logout)
+
+	// Incidents feature: create + list, BOTH behind RequireAuth. The handler
+	// reads the authenticated user from the request context (for ownership on
+	// create, and role-based scoping on list), so these must be wrapped.
+	incidentRepo := incident.NewRepository(db)
+	incidentHandler := incident.NewHandler(incidentRepo)
+	mux.Handle("POST /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Create)))
+	mux.Handle("GET /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.List)))
 
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.

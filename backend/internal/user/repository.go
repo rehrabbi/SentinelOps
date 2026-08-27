@@ -28,7 +28,7 @@ func NewRepository(db *sql.DB) *Repository {
 // later; for now this returns everyone.)
 func (r *Repository) List(ctx context.Context) ([]User, error) {
 	const query = `
-		SELECT id, email, full_name, created_at, updated_at
+		SELECT id, email, full_name, role, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC`
 
@@ -44,7 +44,7 @@ func (r *Repository) List(ctx context.Context) ([]User, error) {
 		var u User
 		// Scan copies the columns of the current row into these fields, IN THE
 		// SAME ORDER as the SELECT. Mismatched order/count is a bug.
-		if err := rows.Scan(&u.ID, &u.Email, &u.FullName, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, u)
@@ -73,14 +73,14 @@ func (r *Repository) Create(ctx context.Context, email, fullName, passwordHash s
 	const query = `
 		INSERT INTO users (email, full_name, password_hash)
 		VALUES ($1, $2, $3)
-		RETURNING id, email, full_name, created_at, updated_at`
+		RETURNING id, email, full_name, role, created_at, updated_at`
 
 	var u User
 	// QueryRowContext runs the INSERT and reads the single RETURNING row back in
 	// one round-trip. Every value is a $N parameter — never string-concatenated —
 	// so SQL injection is impossible here.
 	err := r.db.QueryRowContext(ctx, query, email, fullName, passwordHash).
-		Scan(&u.ID, &u.Email, &u.FullName, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		// Did our UNIQUE index on lower(email) reject a duplicate? Inspect the
 		// Postgres error CODE (23505 = unique_violation) rather than its text —
@@ -98,13 +98,13 @@ var ErrUserNotFound = errors.New("user not found")
 
 func (r *Repository) GetByEmail(ctx context.Context, email string) (User, error) {
 	const query = `
-	SELECT id, email, full_name, password_hash, created_at, updated_at
+	SELECT id, email, full_name, role, password_hash, created_at, updated_at
 	FROM users
 	WHERE lower(email) = lower($1)`
 
 	var u User
 	err := r.db.QueryRowContext(ctx, query, email).
-		Scan(&u.ID, &u.Email, &u.FullName, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 
 		if errors.Is(err, sql.ErrNoRows) {
@@ -117,13 +117,13 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (User, error)
 
 func (r *Repository) GetByID(ctx context.Context, id string) (User, error) {
 	const query = `
-	SELECT id, email, full_name, created_at, updated_at
+	SELECT id, email, full_name, role, created_at, updated_at
 	FROM users
 	WHERE id = $1`
 
 	var u User
 	err := r.db.QueryRowContext(ctx, query, id).
-		Scan(&u.ID, &u.Email, &u.FullName, &u.CreatedAt, &u.UpdatedAt)
+		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, ErrUserNotFound
