@@ -724,6 +724,61 @@ app; the login path stays timing-safe.
 
 ---
 
+## Stage: Incident domain — RBAC + incident CRUD (backend)
+
+**Decisions made (decision prompts):**
+- **Authorization model: RBAC** (chosen over owner-based-first). A single **`role` column** on
+  users (not a many-to-many roles table); values **reporter / analyst / admin**, default
+  **reporter** (least privilege). reporter = own incidents; analyst = view all; admin = all +
+  user-mgmt later.
+- **Incidents schema:** include **severity** (`low/medium/high/critical`, default medium) and a
+  **4-state status** lifecycle (`open/investigating/resolved/closed`, default open), both
+  CHECK-constrained. Owner FK **`ON DELETE RESTRICT`** to protect the audit trail (unlike
+  sessions' CASCADE).
+
+**Built (user typed; gofmt/build/vet clean; verified live):**
+- Migration `000003_add_user_role`: `ALTER TABLE users ADD COLUMN role ... NOT NULL DEFAULT
+  'reporter' CHECK (role IN (...))`. Backfilled existing users; CHECK rejects invalid roles.
+- `User.Role` added; `List`/`Create`/`GetByEmail`/`GetByID` all select `role`, so the
+  middleware-loaded user (from `GetByID`) carries the role — authorization reads it from the DB,
+  never from the client.
+- Migration `000004_create_incidents`: incidents table (uuid PK, `user_id` FK RESTRICT, title,
+  `description NOT NULL DEFAULT ''`, status + severity CHECK enums, timestamps) + indexes on
+  `user_id` and `status`.
+- `internal/incident`: `Incident` model; repo `Create` (owner is a param, never from the body;
+  status omitted so it defaults `open`) + `ListAll` + `ListByUser` (owner-scoped) sharing a
+  private variadic `query` helper; handler `Create` (strict JSON, NO `userId`/`status` fields,
+  severity validated to a clean 400 and defaulted to medium) + `List` (RBAC: switch on
+  `user.Role`; analyst/admin → `ListAll`, else → `ListByUser`; `default` = least privilege).
+- `main.go`: `POST`/`GET /api/incidents` behind `RequireAuth`.
+
+**Verified live (RBAC / IDOR / validation):** reporter1 lists → only their own incident;
+reporter2 → only theirs; analyst → both (role promoted via SQL, took effect on the next request
+with no re-login — proving the role is loaded fresh each request). Unauthenticated GET/POST →
+401. Forged `userId` → 400; `status` on create → 400 (both rejected by `DisallowUnknownFields`);
+invalid `severity` → 400; empty `title` → 400.
+
+**Concepts learned:**
+- **Authentication vs authorization**: authn proves identity; authz decides what you may do.
+  Broken access control is OWASP #1; **IDOR** is the classic form.
+- The IDOR defense is **scoping every query by the authenticated user** (`WHERE user_id = $1`);
+  the authz *policy* lives in the handler while the repo stays neutral (data operations).
+- RBAC via a role column + CHECK constraint — defense in depth (the DB itself refuses invalid roles).
+- **Never trust client-supplied identity/authority**: the owner and status come from the server,
+  the role from the DB via the session; a client-sent `userId`/`status` field is rejected outright
+  (the mass-assignment defense).
+- `ON DELETE RESTRICT` vs `CASCADE`: incidents are audit records (block user deletion) while
+  sessions are disposable (cascade).
+
+**Environment notes (not code):** Windows Defender false-positived `go run`'s temp binary
+("contains a virus"); worked around by building to a fixed path (`backend/bin/api.exe`, which is
+git-ignored). Docker Desktop stopped mid-session and needed a manual restart (Postgres did a
+clean crash-recovery). Consider a Defender exclusion for the Go build cache / project directory.
+
+*(Committed on `feat/incidents`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

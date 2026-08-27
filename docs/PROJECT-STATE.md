@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-25 · **Current stage:** Authentication — **full-stack auth + registration
-> UI complete** (verified in-browser); next is the incident/ticket domain.
+> **Last updated:** 2026-08-27 · **Current stage:** Incident domain — **backend + RBAC complete**
+> (create/list incidents with role-based access, verified live); next is the incident frontend.
 
 ---
 
@@ -115,7 +115,9 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 `GET /api/users` (list), `POST /api/users` (register — tested 6/6: 201, dup→409,
 short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…` bcrypt hash),
 **`POST /api/sessions` (login)**, **`GET /api/me`** (current user — protected; tested 7/7),
-**`DELETE /api/sessions/current`** (logout — tested 6/6, see the learning log).
+**`DELETE /api/sessions/current`** (logout — tested 6/6),
+**`POST /api/incidents`** (create) + **`GET /api/incidents`** (list, RBAC-scoped) — both behind
+`RequireAuth` (see the learning log).
 
 **Login test results (8/8 passing):** 200 + `Set-Cookie` on valid credentials; 401 on wrong
 password; 401 **byte-identical** on unknown email; 400 on unknown JSON field; `OPTIONS`
@@ -135,15 +137,24 @@ is never read by JS — auth state comes from `GET /api/me`. **Registration UI a
 new signup → auto-login → logged-in view; duplicate email → "email already registered" shown;
 logout → returns to the login view.
 
+**Incident domain + RBAC (verified live):** reporters see only their own incidents; an analyst
+sees all (role read fresh from the DB each request, so it cannot be forged client-side); create
+sets the owner from the authenticated user and always starts `status=open`; unauthenticated →
+401; forged `userId`/`status`, invalid `severity`, or empty `title` → 400. The `WHERE user_id =
+$1` scoping is the concrete IDOR / broken-access-control defense.
+
 **Files:**
 - `backend/main.go` — routes + CORS middleware + `migrate` subcommand + manual DI.
 - `backend/db.go` — `openDB` (sql.Open + pgx, pool tuning).
 - `backend/migrate.go` — `go:embed` migrations, `runMigrateUp`.
 - `backend/migrations/000001_create_users.{up,down}.sql`
-- `backend/migrations/000002_create_sessions.{up,down}.sql` (applied; schema_migrations=2)
-- `backend/internal/user/{user.go, repository.go, handler.go, validate.go}` —
-  repository includes `GetByEmail` (loads `password_hash`), **`GetByID`** (no `password_hash`),
-  `ErrUserNotFound`.
+- `backend/migrations/000002_create_sessions.{up,down}.sql`
+- `backend/migrations/000003_add_user_role.{up,down}.sql` — RBAC `role` column (CHECK:
+  reporter/analyst/admin, default reporter)
+- `backend/migrations/000004_create_incidents.{up,down}.sql` (all applied; schema_migrations=4)
+- `backend/internal/user/{user.go, repository.go, handler.go, validate.go}` — `User` now carries
+  **`Role`**; all queries (`List`/`Create`/`GetByEmail`/`GetByID`) select it, so the
+  middleware-loaded user carries the role used for authorization.
 - `backend/internal/session/{session.go, repository.go}` — Session model; `GenerateToken`
   (crypto/rand, 32 bytes), `HashToken` (SHA-256), `Repository.Create`, **`GetByTokenHash`**
   (non-expired lookup, expiry enforced in SQL), **`DeleteByTokenHash`** (idempotent revoke)
@@ -153,6 +164,10 @@ logout → returns to the login view.
 - `backend/internal/auth/middleware.go` (new) — **`RequireAuth`** (cookie → session → user →
   request context; fail-closed `401` on missing/invalid/expired) + **`UserFromContext`** helper
   using an unexported context-key type.
+- `backend/internal/incident/{incident.go, repository.go, handler.go}` (new package) —
+  `Incident` model; repository `Create` (owner = authenticated user, `status` defaults `open`)
+  + `ListAll` + `ListByUser` (owner-scoped); handler with strict JSON, severity validation, no
+  client `userId`/`status`, and **RBAC enforced in `List`** (reporter → own; analyst/admin → all).
 - `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
   `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
   helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
@@ -180,34 +195,38 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — the incident/ticket domain
+## 6. ⏭️ THE EXACT NEXT STEP — the incident frontend
 
-**Authentication is COMPLETE, full-stack — including a registration UI.** Backend: register →
-login → `/api/me` → logout (verified 8/8, 7/7, 6/6). Frontend: login + **registration** forms
-(signup auto-logs-in), session-detect-on-load, logged-in view, and logout — all wired with
-`credentials: "include"` and verified in a real browser (signup→auto-login, duplicate-email
-error, login, logout→login view, session-persists-across-reload). See the learning-log entries.
+**The incident backend + RBAC is COMPLETE and verified live.** Authorization model: **RBAC**
+with a single `role` column (`reporter` default / `analyst` / `admin`). `POST /api/incidents`
+(create, owner = authed user, `status` starts `open`) and `GET /api/incidents` (RBAC-scoped:
+reporter → own via `WHERE user_id = $1`; analyst/admin → all) both sit behind `RequireAuth`.
+Verified: IDOR defense (reporter can't see another's incident), role elevation (analyst sees
+all, role read live from the DB), mass-assignment blocked (no client `userId`/`status`), plus
+`401`/`400` paths. See the learning-log entry.
 
-**Next: start the app's actual domain — incidents/tickets.** This is where authorization
-finally matters (a user acting on their own vs others' data → IDOR territory). Likely order:
+**Next: the incident frontend.** Build the UI against the working API (on a `feat/*` branch):
+- an **incident list** (`GET /api/incidents`) shown after login — the logged-in view becomes a
+  dashboard; a reporter sees their own, an analyst sees all (same endpoint, server decides).
+- a **create form** (`POST /api/incidents`) — title, description, severity select.
+- add `getIncidents()` / `createIncident()` to `frontend/src/api.ts` (with `credentials`).
+- decisions to make first: component/state shape (extend `App` vs a new component), and how to
+  present severity/status (badges?).
 
-- **Decide the authorization model first** (RBAC roles? owner-based access? both?) — the first
-  real §10 authz decision. Nothing below should be built before this is chosen.
-- **First incident feature:** a migration for an `incidents` table, then `POST /api/incidents`
-  (create) and `GET /api/incidents` (list — scoped to what the user may see), behind
-  `RequireAuth`, using `UserFromContext` for ownership.
-- **Frontend:** a simple list + create form once the API exists.
+**No role-management UI yet** — roles are changed directly in the DB for now (e.g.
+`UPDATE users SET role='analyst' WHERE email=…`). An admin UI to manage roles is a later item.
 
-**Security to revisit here:** authorization (IDOR — never trust a client-supplied id; scope
-every query by the authenticated user), and the still-open account-enumeration inconsistency
-(login is timing-safe; registration's 409 still leaks whether an email exists).
+**Security to revisit here:** the still-open account-enumeration inconsistency (login is
+timing-safe; registration's 409 still leaks whether an email exists); and, as more incident
+operations arrive (get-by-id, update, delete), enforce the **same owner/role scoping on every
+one** — an unscoped `GET /api/incidents/{id}` would reintroduce IDOR.
 
 
 ## 7. After login: remaining auth pieces, then roadmap
 
-Immediate next: begin the **incident/ticket domain** — decide the authorization model, then
-build the first incident endpoints behind `RequireAuth`. (Full-stack authentication — backend
-+ React UI — is done and verified; see §6.) A registration UI is an optional smaller item first.
+Immediate next: build the **incident frontend** (list + create form) against the finished
+incident API. (The incident backend with RBAC — create/list, owner+role scoped — is done and
+verified live; full-stack auth + registration UI are done; see §6.)
 
 Then the broader roadmap (guide, not auto-permission): authorization/RBAC → incident
 features → file/evidence handling → audit logging → security hardening → automated tests
