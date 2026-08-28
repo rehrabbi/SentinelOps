@@ -97,6 +97,9 @@ func main() {
 	mux.Handle("POST /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Create)))
 	mux.Handle("GET /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.List)))
 
+	mux.Handle("GET /api/incidents/{id}",
+		authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Get)))
+
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
 	handler := withCORS(mux, frontendOrigin)

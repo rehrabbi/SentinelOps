@@ -3,6 +3,7 @@ package incident
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -80,4 +81,47 @@ func (r *Repository) query(ctx context.Context, query string, args ...any) ([]In
 		return nil, fmt.Errorf("iterate incidents: %w", err)
 	}
 	return incidents, nil
+}
+
+// ErrIncidentNotFound is returned when no incident matches the lookup. The
+// caller deliberately cannot tell "no such id" from "not yours" -- both become a
+// 404, so the API never confirms that an id exists.
+var ErrIncidentNotFound = errors.New("incident not found")
+
+// GetByID returns a single incident by id, unscoped. This is the analyst/admin
+// path -- the caller (hander) MUST check the role before calling it.
+func (r *Repository) GetByID(ctx context.Context, id string) (Incident, error) {
+	const query = `
+		SELECT id, user_id, title, description, status, severity, created_at, updated_at
+		FROM incidents
+		WHERE id = $1`
+	return r.get(ctx, query, id)
+}
+
+// GetByIDForUser returns the incident only if userID owns it. The ownership test
+// lives in the SQL, so a reporter asking for someone else's id gets zero rows —
+// the row is never loaded into memory. This is the per-object defense against
+// IDOR; scoping the list query does not cover by-id access.
+func (r *Repository) GetByIDForUser(ctx context.Context, id, userID string) (Incident, error) {
+	const query = `
+		SELECT id, user_id, title, description, status, severity, created_at, updated_at
+		FROM incidents
+		WHERE id = $1 AND user_id = $2`
+	return r.get(ctx, query, id, userID)
+}
+
+// get is the shared single-row helper behind the Get methods: run the query,
+// scan one row, and translate sql.ErrNoRows into our own sentinel so the handler
+// never has to import database/sql.
+func (r *Repository) get(ctx context.Context, query string, args ...any) (Incident, error) {
+	var i Incident
+	err := r.db.QueryRowContext(ctx, query, args...).
+		Scan(&i.ID, &i.UserID, &i.Title, &i.Description, &i.Status, &i.Severity, &i.CreatedAt, &i.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Incident{}, ErrIncidentNotFound
+	}
+	if err != nil {
+		return Incident{}, fmt.Errorf("get incident: %w", err)
+	}
+	return i, nil
 }

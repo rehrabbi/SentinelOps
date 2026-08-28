@@ -2,8 +2,10 @@ package incident
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"sentinelops/internal/auth"
@@ -16,6 +18,11 @@ const maxBodyBytes = 1 << 20 // 1 MiB request-body cap
 var validSeverities = map[string]bool{
 	"low": true, "medium": true, "high": true, "critical": true,
 }
+
+// uuidPattern matches the canonical 8-4-4-4-12 hexadecimal UUID form. Checking
+// the shape here means a malformed id becomes a clean 404 instead of reaching
+// Postgres, which would reject it as invalid uuid syntax and surface as a 500.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // Handler serves the incident HTTP endpoints. It depends on the incident
 // repository and (via the context) the authenticated user.
@@ -123,5 +130,50 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(incidents); err != nil {
 		log.Printf("list incidents: encode: %v", err)
+	}
+}
+
+// Get handles GET /api/incidents/{id}. This is per-object authorization:
+// reporters may read only their own incident, analysts and admins may read any.
+// The ownership test lives in the SQL, and a miss returns 404 — byte-identical
+// to a nonexistent id, so the API never confirms that an incident exists.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.UserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// The id comes straight from the URL, so it is untrusted input. Reject
+	// anything that is not UUID-shaped before it reaches the database.
+	id := r.PathValue("id")
+	if !uuidPattern.MatchString(id) {
+		http.Error(w, "incident not found", http.StatusNotFound)
+		return
+	}
+
+	var (
+		inc Incident
+		err error
+	)
+	switch user.Role {
+	case "analyst", "admin":
+		inc, err = h.incidents.GetByID(r.Context(), id)
+	default: // "reporter" and any future least-privileged role — fail safe
+		inc, err = h.incidents.GetByIDForUser(r.Context(), id, user.ID)
+	}
+	if errors.Is(err, ErrIncidentNotFound) {
+		http.Error(w, "incident not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("get incident: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(inc); err != nil {
+		log.Printf("get incident: encode: %v", err)
 	}
 }
