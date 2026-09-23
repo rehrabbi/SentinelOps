@@ -96,9 +96,10 @@ func main() {
 	incidentHandler := incident.NewHandler(incidentRepo)
 	mux.Handle("POST /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Create)))
 	mux.Handle("GET /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.List)))
-
 	mux.Handle("GET /api/incidents/{id}",
 		authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Get)))
+	mux.Handle("PATCH /api/incidents/{id}",
+		authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Update)))
 
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses.
@@ -167,7 +168,7 @@ func withCORS(next http.Handler, allowedOrigin string) http.Handler {
 		// the router only has GET/POST/DELETE patterns registered, so an
 		// OPTIONS request would fall through to a 405 and fail the preflight.
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.Header().Set("Access-Control-Max-Age", "600") // cache permission 10 min
 			w.WriteHeader(http.StatusNoContent)             // 204: permission granted, no body

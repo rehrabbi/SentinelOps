@@ -89,7 +89,7 @@ func (r *Repository) query(ctx context.Context, query string, args ...any) ([]In
 var ErrIncidentNotFound = errors.New("incident not found")
 
 // GetByID returns a single incident by id, unscoped. This is the analyst/admin
-// path -- the caller (hander) MUST check the role before calling it.
+// path -- the caller (handler) MUST check the role before calling it.
 func (r *Repository) GetByID(ctx context.Context, id string) (Incident, error) {
 	const query = `
 		SELECT id, user_id, title, description, status, severity, created_at, updated_at
@@ -110,9 +110,9 @@ func (r *Repository) GetByIDForUser(ctx context.Context, id, userID string) (Inc
 	return r.get(ctx, query, id, userID)
 }
 
-// get is the shared single-row helper behind the Get methods: run the query,
-// scan one row, and translate sql.ErrNoRows into our own sentinel so the handler
-// never has to import database/sql.
+// get is the shared single-row helper behind the Get methods and Update's
+// RETURNING: run the query, scan one row, and translate sql.ErrNoRows into our
+// own sentinel so the handler never has to import database/sql.
 func (r *Repository) get(ctx context.Context, query string, args ...any) (Incident, error) {
 	var i Incident
 	err := r.db.QueryRowContext(ctx, query, args...).
@@ -124,4 +124,17 @@ func (r *Repository) get(ctx context.Context, query string, args ...any) (Incide
 		return Incident{}, fmt.Errorf("get incident: %w", err)
 	}
 	return i, nil
+}
+
+// Update writes new field values to an incident by id and returns the updated
+// row. Authorization is the CALLER's responsibility — the handler performs the
+// owner/role-scoped read first, so reaching here means the caller may modify it.
+// updated_at is refreshed to now().
+func (r *Repository) Update(ctx context.Context, id, title, description, status, severity string) (Incident, error) {
+	const query = `
+		UPDATE incidents
+		SET title = $2, description = $3, status = $4, severity = $5, updated_at = now()
+		WHERE id = $1
+		RETURNING id, user_id, title, description, status, severity, created_at, updated_at`
+	return r.get(ctx, query, id, title, description, status, severity)
 }
