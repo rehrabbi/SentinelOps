@@ -133,3 +133,21 @@ export async function createIncident(input: CreateIncidentInput): Promise<Incide
     }
     return res.json()
 }
+
+
+// updateIncident applies a partial update (PATCH) to an incident by id and
+// returns the updated row. Only the fields present in `changes` are modified.
+export async function updateIncident(
+  id: string,
+  changes: Partial<Pick<Incident, 'title' | 'description' | 'status' | 'severity'>>,
+): Promise<Incident> {
+  const res = await request(`/api/incidents/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(changes),
+  })
+  if (!res.ok) {
+    const text = (await res.text()).trim()
+    throw new ApiError(res.status, text || `Update incident failed (${res.status})`)
+  }
+  return res.json()
+}
