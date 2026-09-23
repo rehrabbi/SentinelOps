@@ -4,8 +4,8 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-27 · **Current stage:** Incident domain — **full-stack (backend + UI)**,
-> RBAC create/list dashboard verified live; next is incident detail + status updates.
+> **Last updated:** 2026-08-27 · **Current stage:** Incident domain — **create/list + detail/update**
+> with per-object (IDOR-safe) authz and an inline status UI; verified live. Next: admin/roadmap.
 
 ---
 
@@ -116,8 +116,9 @@ has `json:"-"`; handler logs real errors but returns generic messages.
 short pw→400, bad email→400, unknown field→400, DB shows real `$2a$10$…` bcrypt hash),
 **`POST /api/sessions` (login)**, **`GET /api/me`** (current user — protected; tested 7/7),
 **`DELETE /api/sessions/current`** (logout — tested 6/6),
-**`POST /api/incidents`** (create) + **`GET /api/incidents`** (list, RBAC-scoped) — both behind
-`RequireAuth` (see the learning log).
+**`POST /api/incidents`** (create), **`GET /api/incidents`** (list, RBAC-scoped),
+**`GET /api/incidents/{id}`** + **`PATCH /api/incidents/{id}`** (detail + partial update,
+per-object authz) — all behind `RequireAuth` (see the learning log).
 
 **Login test results (8/8 passing):** 200 + `Set-Cookie` on valid credentials; 401 on wrong
 password; 401 **byte-identical** on unknown email; 400 on unknown JSON field; `OPTIONS`
@@ -148,6 +149,15 @@ with colored severity/status badges; the create form prepends the new incident (
 RBAC demo: as a reporter, uitest saw 1 (their own); after `UPDATE users SET role='analyst'` +
 reload, the **same account** saw all 3 — no re-login, since the role is read fresh each request.
 
+**Incident detail + update (verified 12/12 + in-browser):** `GET`/`PATCH /api/incidents/{id}`
+with **per-object authz** — a reporter gets **404 (not 403)** for another user's incident (no
+existence leak); analysts read/update any; partial PATCH (only sent fields change); invalid
+status/severity, empty body, or unknown field → 400. In the UI, each row's **status dropdown**
+PATCHes on change and persists across reload. Access is proven by an owner/role-scoped read
+*before* any write. A **malformed (non-UUID) id → 404** too — the handler checks the id's shape
+before it reaches Postgres, so bad input never surfaces as a 500. (GET was built on the other
+device; PATCH was rebased on top of it — see the learning log's git lesson.)
+
 **Files:**
 - `backend/main.go` — routes + CORS middleware + `migrate` subcommand + manual DI.
 - `backend/db.go` — `openDB` (sql.Open + pgx, pool tuning).
@@ -169,22 +179,22 @@ reload, the **same account** saw all 3 — no re-login, since the role is read f
 - `backend/internal/auth/middleware.go` (new) — **`RequireAuth`** (cookie → session → user →
   request context; fail-closed `401` on missing/invalid/expired) + **`UserFromContext`** helper
   using an unexported context-key type.
-- `backend/internal/incident/{incident.go, repository.go, handler.go}` (new package) —
-  `Incident` model; repository `Create` (owner = authenticated user, `status` defaults `open`)
-  + `ListAll` + `ListByUser` (owner-scoped); handler with strict JSON, severity validation, no
-  client `userId`/`status`, and **RBAC enforced in `List`** (reporter → own; analyst/admin → all).
+- `backend/internal/incident/{incident.go, repository.go, handler.go}` — `Incident` model;
+  repository `Create`, `ListAll`/`ListByUser` (owner-scoped), **`GetByID`/`GetByIDForUser`**
+  (per-object scoping) + `Update` + `ErrIncidentNotFound`; handlers `Create`, `List` (RBAC),
+  **`Get`/`Update`** (per-object authz via a scoped read first; partial PATCH; 404 on not-yours).
 - `backend/main.go` — now also builds `sessionRepo` + `authHandler`, registers
   `POST /api/sessions`, reads `FRONTEND_ORIGIN`/`SECURE_COOKIES` via `envOr`/`envBool`
   helpers, and `withCORS(next, allowedOrigin)` handles credentials + OPTIONS preflight.
 - `frontend/src/api.ts` — API helper: `API_BASE` (Vite env-overridable), `User`/`Incident`
-  types, `ApiError`, and `getMe`/`login`/`logout`/`register`/`getIncidents`/`createIncident`
-  wrappers that all send `credentials: "include"`; `register`/`createIncident` surface the
-  server's plain-text error.
+  types, `ApiError`, and `getMe`/`login`/`logout`/`register`/`getIncidents`/`createIncident`/
+  **`updateIncident`** (PATCH) wrappers that all send `credentials: "include"`; error-surfacing.
 - `frontend/src/App.tsx` — full auth UI (login/register toggle, auto-login, logout); the
   logged-in view renders the incident dashboard.
-- `frontend/src/incidents.tsx` (new) — `IncidentDashboard` (fetches `GET /api/incidents` on
-  mount; RBAC-agnostic — renders whatever the server returns) + `CreateIncidentForm`
-  (`POST /api/incidents`, prepends the new row); discriminated-union list state.
+- `frontend/src/incidents.tsx` — `IncidentDashboard` (fetches `GET /api/incidents` on mount;
+  RBAC-agnostic) + `CreateIncidentForm` (prepends the new row) + **`IncidentRow`** (per-row
+  **status dropdown** that PATCHes on change, owns its saving/error state); discriminated-union
+  list state; `handleUpdated` replaces the row in place.
 - `frontend/src/App.css` — token-based styling (light/dark aware), accessible focus rings,
   monochrome buttons, link-styled toggle, and the incident dashboard (form, rows, colored
   severity/status **badges** driven by className).
@@ -204,35 +214,40 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — incident detail + status updates
+## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-**The incident domain is now full-stack and verified.** Backend: RBAC (`reporter`/`analyst`/
-`admin`), `POST`/`GET /api/incidents` behind `RequireAuth`, owner+role scoped. Frontend: a
-dashboard (list with colored severity/status badges + a create form) in the logged-in view,
-verified in-browser — a reporter sees only their own; promoting to analyst (+reload) shows all.
+**Incidents are now a full CRUD-ish domain with per-object authz**, all verified: create, list
+(RBAC-scoped), get-by-id and partial update (owner/role-scoped, IDOR-safe 404s), with an inline
+status dropdown in the UI. Good place to choose the next thrust:
 
-**Next options (pick one to start):**
-- **Incident detail + update** *(natural next authz lesson)*: `GET /api/incidents/{id}` and
-  `PATCH /api/incidents/{id}` (advance `status` through its lifecycle; edit fields). CRITICAL:
-  scope EVERY one by owner/role — an unscoped get-by-id or update is textbook IDOR
-  (per-object access checks, not just list scoping). Then a detail view / status control in the UI.
-- **Role-management / admin UI:** an admin-only view to change user roles (today they're set via
-  SQL). Introduces the `admin` role's first real power and admin-only route protection.
-- **Step toward production** (see §7): audit logging → Docker for the app → CI → AWS.
+**Option A — Role-management / admin UI** *(rounds out RBAC)*: an **admin-only** page to change
+user roles (today done via SQL). First real use of the `admin` role + **admin-only route
+protection** (a `RequireRole("admin")` middleware or an in-handler check) — a clean next authz
+lesson. Would add `GET /api/users` behind admin + a `PATCH /api/users/{id}` for role.
 
-**Frontend niceties deferred:** showing each incident's owner (needs the API to return owner
-email/name), an analyst filter, and empty/error polish.
+**Option B — More incident depth**: `DELETE /api/incidents/{id}` (owner/admin only), an owner
+column shown in the analyst view (return owner email from the API), status-transition rules,
+comments/timeline, or file/evidence upload (a big security topic on its own).
 
-**Security to revisit:** the still-open account-enumeration inconsistency (login is timing-safe;
-registration's 409 leaks whether an email exists); and per-object authz on any new
-incident-by-id endpoint — never trust a client-supplied id; scope by owner/role.
+**Option C — Step toward production** *(the "engineering around the app" goal)*: **audit
+logging** → **Docker** for the app (multi-stage build) → **CI** (GitHub Actions: test/vet/build,
+then SAST + dependency/secret scanning) → **AWS + Terraform**. This is the DevSecOps arc the
+project set out to learn.
+
+**Recommendation:** if you want to keep deepening security/authz, **A** (admin + role middleware).
+If you're ready for the cloud/DevSecOps arc, start **C** with a Dockerfile + CI.
+
+**Security to revisit:** account-enumeration inconsistency (login is timing-safe; registration's
+409 leaks whether an email exists); keep per-object scoping on every new incident-by-id op
+(never trust a client-supplied id).
 
 
 ## 7. After login: remaining auth pieces, then roadmap
 
-Immediate next: extend incidents (**detail/update** with per-object authz, or an **admin
-role-management UI**), or step toward production (audit logging → Docker/CI → AWS). The incident
-domain is now full-stack (backend RBAC + dashboard UI) and verified; see §6.
+Immediate next (pick one — see §6): **(A)** admin role-management UI + role middleware,
+**(B)** more incident depth (delete, owner display, evidence upload), or **(C)** the production
+arc (audit logging → Docker → CI/security scanning → AWS/Terraform). Incidents are now full
+CRUD-ish with per-object authz and an inline status UI, all verified.
 
 Then the broader roadmap (guide, not auto-permission): authorization/RBAC → incident
 features → file/evidence handling → audit logging → security hardening → automated tests

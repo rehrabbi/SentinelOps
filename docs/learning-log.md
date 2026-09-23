@@ -822,6 +822,69 @@ a command separator). Run tools via node directly — e.g.
 
 ---
 
+## Stage: Incident detail + update — per-object authorization (IDOR at the object level)
+
+**Decisions made (decision prompts):** `PATCH /api/incidents/{id}` may update **status +
+severity + title + description** (full partial edit); **owner OR analyst/admin** may update
+(a reporter edits their own; analysts/admins any). Frontend: an **inline status dropdown** per
+row (rather than a full detail page for now).
+
+**Built (user typed, across two devices; gofmt/build/vet + tsc clean; verified live):**
+- `GET /api/incidents/{id}` was built on the **other device** (commit `b92779e`):
+  `GetByID` (any owner) and **`GetByIDForUser`** (`WHERE id=$1 AND user_id=$2`) sharing a `get`
+  helper, `ErrIncidentNotFound`, and a handler that first checks the id against a
+  **UUID-shape regex** — a malformed id becomes a clean 404 instead of reaching Postgres (which
+  would reject it as invalid uuid syntax and surface as a 500).
+- `PATCH /api/incidents/{id}` was layered on top: repository `Update` (writes fields by id,
+  `updated_at=now()`, RETURNING, via the shared `get`); handler `getScoped` (analyst/admin →
+  `GetByID`; else `GetByIDForUser`) and **`Update`** (same UUID check, then authorize by a scoped
+  read FIRST, then apply the provided fields — a pointer-based `updateInput` so nil = "not
+  sent"; validates status/severity; all-nil body → 400).
+- `main.go`: `GET`/`PATCH /api/incidents/{id}` behind `RequireAuth`; added **`PATCH` to the CORS
+  `Access-Control-Allow-Methods`** (PATCH is non-simple → browser preflights it).
+- `src/api.ts`: `updateIncident(id, changes)` — PATCH; `changes` typed
+  `Partial<Pick<Incident, …>>`.
+- `src/incidents.tsx`: extracted **`IncidentRow`** (owns its own saving/error state) with a status
+  `<select>` that PATCHes on change; the dashboard's `handleUpdated` replaces that row in place.
+
+**Verified (12/12 curl + in-browser):** owner GET/PATCH → 200; **another reporter → 404** on both
+(object-level IDOR defense — 404 not 403, so existence never leaks); analyst → 200 on any;
+unauthenticated → 401; nonexistent id → 404; invalid status/severity, empty body, unknown field
+→ 400; partial edit changes only the sent fields. In the browser, changing a row's status via the
+dropdown **persisted across a reload** (fresh GET).
+
+**Concepts learned:**
+- **Per-object authorization**: list-scoping isn't enough — every by-id read/write must check
+  "may THIS caller touch THIS object?". The clean pattern: **authorize with an owner/role-scoped
+  read first**, then mutate; a caller who can't see it gets `ErrIncidentNotFound`.
+- **404 vs 403**: return 404 for "not yours" so you don't leak that the object exists.
+- **Partial updates with pointer fields** (`*string`): distinguish "field absent" (nil) from
+  "field set to empty" — the core of a correct `PATCH`.
+- **CORS + PATCH**: non-simple methods are preflighted; the method must be listed in
+  `Access-Control-Allow-Methods` or the browser call fails (curl wouldn't reveal it).
+- React: a per-row component owning its own transient (saving/error) state; lifting the updated
+  entity up to replace it in the parent list.
+- **Validate untrusted path params before they reach the DB**: an id from the URL is user input.
+  Checking its shape turns "malformed" into the same 404 as "missing" / "not yours" instead of a
+  500 that leaks an internal error class.
+
+**Git lesson — reconciling work from two devices (rebase + conflicts):**
+- The same branch got a commit pushed from the other device while this device had unpushed
+  commits → `git push` was rejected as non-fast-forward. Never force-push over it: **rebase the
+  local, unpushed commits onto the remote** (no force needed, since nothing pushed is rewritten).
+- **During a rebase, `HEAD` (the `<<<<<<<` side) is the commit you're rebasing ONTO** — here the
+  other device's work — and the `>>>>>>>` side is your commit being replayed. That's the reverse
+  of a normal merge.
+- **A clean auto-merge is not a correct merge.** Git merged `main.go` with no conflict, yet it
+  now registered `GET /api/incidents/{id}` twice — which compiles but makes `ServeMux` panic at
+  startup. Read auto-merged files too, then build *and run*.
+- The duplicate-work resolution kept the better version (the one with UUID validation) and
+  extended its protection to the new `PATCH` path.
+
+*(Committed on `feat/incident-detail`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
