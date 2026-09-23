@@ -316,3 +316,24 @@
       color: var(--text);
       border-color: var(--border);
     }
+
+    /* Inline status dropdown on each incident row. */
+    .status-select {
+      font: inherit;
+      font-size: 13px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text-h);
+      cursor: pointer;
+    }
+    .status-select:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+    .status-select:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
