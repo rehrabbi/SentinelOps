@@ -72,3 +72,35 @@ func UserFromContext(ctx context.Context) (user.User, bool) {
 	u, ok := ctx.Value(userContextKey).(user.User)
 	return u, ok
 }
+
+// RequireRole is middleware that gates next behind a role. It must be chained
+// INSIDE RequireAuth, which is what puts the user in the context; on its own it
+// fails closed with a 401 rather than letting the request through.
+//
+// Authentication answers "who are you", authorization answers "may you do this".
+// RequireAuth only does the first, so a route that is merely authenticated is
+// open to every registered account.
+//
+// A caller who is authenticated but lacks the role gets 403, not 404: unlike an
+// incident, the existence of this route is not a secret, and hiding the reason
+// here would only make the API harder to debug without protecting anything.
+func (h *Handler) RequireRole(role string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, ok := UserFromContext(r.Context())
+		if !ok {
+			// No user in context means this was not placed behind RequireAuth.
+			// Fail closed rather than trusting the wiring.
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+			return
+		}
+
+		// The role comes from the user row loaded this request, never from the
+		// client, so it cannot be forged and a revoked role takes effect at once.
+		if u.Role != role {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
