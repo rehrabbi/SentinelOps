@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"sentinelops/internal/authctx"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
@@ -131,9 +132,23 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	u, ok := UserFromContext(r.Context())
+	p, ok := authctx.FromContext(r.Context())
 	if !ok {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	// The context carries only the caller's id and role, so load the full row
+	// to answer with. One extra query, and the response reflects the database
+	// at response time rather than at middleware time.
+	u, err := h.users.GetByID(r.Context(), p.ID)
+	if err != nil {
+		if errors.Is(err, user.ErrUserNotFound) {
+			http.Error(w, "authentication required", http.StatusUnauthorized)
+			return
+		}
+		log.Printf("me: get user: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
