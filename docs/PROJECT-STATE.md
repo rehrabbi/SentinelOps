@@ -6,7 +6,7 @@
 >
 > **Last updated:** 2026-10-20 · **Current stage:** Repo presentation pass (README, licence,
 > community health files, CI). Code unchanged since the incident detail/update stage.
-> Next: close the unauthenticated `GET /api/users`, then admin role management or the production arc.
+> Next: the admin role-management UI (`RequireRole` now exists), or the production arc.
 
 ---
 
@@ -228,21 +228,21 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-**⚠️ Found 2026-10-20, do this first.** `GET /api/users` is registered with a plain
-`HandleFunc` in `main.go` and is **not** wrapped in `RequireAuth`. An unauthenticated
-request returns every user's id, email, full name, and role (verified live with curl, 200).
-It predates the auth work. Closing it is a two-line change plus a decision about whether the
-route becomes authenticated-only or admin-only, which folds naturally into Option A below.
-
+**✅ Closed 2026-10-20.** `GET /api/users` was unauthenticated and returned every user's
+id, email, full name, and role. It is now **admin only**, via a new
+`auth.RequireRole(role, next)` middleware chained inside `RequireAuth`. Verified 6/6:
+anonymous 401, reporter 403, admin 200, demote mid-session 403 on the next request
+(role read fresh from the DB each time), registration still public, incidents unaffected.
 
 **Incidents are now a full CRUD-ish domain with per-object authz**, all verified: create, list
 (RBAC-scoped), get-by-id and partial update (owner/role-scoped, IDOR-safe 404s), with an inline
 status dropdown in the UI. Good place to choose the next thrust:
 
 **Option A — Role-management / admin UI** *(rounds out RBAC)*: an **admin-only** page to change
-user roles (today done via SQL). First real use of the `admin` role + **admin-only route
-protection** (a `RequireRole("admin")` middleware or an in-handler check) — a clean next authz
-lesson. Would add `GET /api/users` behind admin + a `PATCH /api/users/{id}` for role.
+user roles (today done via SQL). The middleware half is already done — `RequireRole` exists and
+`GET /api/users` is behind it. What remains is `PATCH /api/users/{id}` for the role change, with
+its own guards (an admin must not be able to demote themselves into locking everyone out), and
+the admin screen in the frontend.
 
 **Option B — More incident depth**: `DELETE /api/incidents/{id}` (owner/admin only), an owner
 column shown in the analyst view (return owner email from the API), status-transition rules,
@@ -256,7 +256,7 @@ project set out to learn.
 **Recommendation:** if you want to keep deepening security/authz, **A** (admin + role middleware).
 If you're ready for the cloud/DevSecOps arc, start **C** with a Dockerfile + CI.
 
-**Security to revisit:** the unauthenticated `GET /api/users` above; account-enumeration inconsistency (login is timing-safe; registration's
+**Security to revisit:** account-enumeration inconsistency (login is timing-safe; registration's
 409 leaks whether an email exists); keep per-object scoping on every new incident-by-id op
 (never trust a client-supplied id).
 
