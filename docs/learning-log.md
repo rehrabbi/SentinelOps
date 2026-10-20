@@ -885,6 +885,52 @@ dropdown **persisted across a reload** (fresh GET).
 
 ---
 
+## Stage: Repo presentation (README, licence, community health, CI)
+
+**Decisions made (decision prompts):** licence **MIT**; README aimed at **recruiters**
+first; visuals are **real screenshots plus a Mermaid diagram**; the first CI workflow does
+**build and vet only** for both stacks, with security scanning deferred to its own stage;
+Claude drafted the workflow YAML for review rather than the usual teach-and-type, since it
+is config rather than application code. Branching **stays GitHub Flow** (WAYS-OF-WORKING
+§13 unchanged), now written down in `CONTRIBUTING.md`; `dev`/`staging`/`prod` environment
+branches are recorded as a future step, after there is infrastructure to deploy to.
+
+**Built:** rewritten `README.md`; `LICENSE` (MIT); `SECURITY.md`; `CONTRIBUTING.md`;
+`.github/pull_request_template.md`; `.github/ISSUE_TEMPLATE/` (bug, feature, config);
+`.github/workflows/ci.yml`; three screenshots under `docs/images/`.
+
+**Security finding (the real outcome of this pass):** `GET /api/users` is registered with a
+plain `HandleFunc` and is **not** behind `RequireAuth`. An unauthenticated curl returned
+every user's id, email, full name, and role with a 200. It has been open since the first
+stage, before auth existed, and no later stage went back for it. Recorded in the README's
+"Known gaps" and as the first item in PROJECT-STATE §6.
+
+**Concepts learned:**
+- **Documentation work finds bugs.** Writing an honest API table forced a column for "auth
+  required" on every route, and the one route that could not be filled in was the hole. A
+  feature-by-feature build never revisits the endpoints it already shipped.
+- **Least privilege applies to CI too.** A workflow gets `permissions: contents: read` so a
+  compromised action cannot write to the repository with the default token.
+- **`npm ci` rather than `npm install` in CI**, because it installs exactly what the
+  lockfile pins and fails when the lockfile and `package.json` disagree.
+- **Reading the toolchain version from `go.mod`** with `go-version-file` keeps CI from
+  drifting away from what the module declares.
+- **A portfolio README is read in about a minute.** Screenshot, badges, what it does, and
+  the security table go above the fold; the learning narrative moves into `docs/`.
+- Publishing a **"Known gaps" section** is a stronger signal than a polished README with
+  nothing admitted, as long as every gap listed is genuinely tracked.
+
+**Divergence noticed between devices:** the August session on the Mac decided that
+reporters may not change `status` and that transitions follow a state machine with `closed`
+terminal. The `PATCH` that shipped from the other device allows the owner to set any valid
+status with no transition rules, and the log records that as the later decision. The code
+and the log agree; the two sessions did not. Later decision stands, flagged here so the
+disagreement is not mistaken for a bug.
+
+*(Committed on `docs/repo-presentation`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

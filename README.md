@@ -1,168 +1,250 @@
-# SentinelOps
+<h1 align="center">SentinelOps</h1>
 
-> A production-style, cloud-native **secure incident & ticket management platform** —
-> built as a hands-on learning project to master the *engineering around* a SaaS app:
-> backend, frontend, databases, authentication, authorization, application security,
-> Docker, CI/CD, infrastructure-as-code, AWS, and observability.
+<p align="center">
+  A production-style, cloud-native incident and ticket management platform,<br>
+  built to practise the security and cloud engineering <em>around</em> a SaaS app.
+</p>
 
-**Status:** 🚧 In active development — **login works end-to-end**; next up is the auth
-middleware that protects routes. This is a learning-in-public portfolio project; the git
-history is meant to read as a clear, incremental engineering story.
+<p align="center">
+  <a href="https://github.com/rehrabbi/SentinelOps/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rehrabbi/SentinelOps/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Go" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
 
----
-
-## 📖 Start here (especially on a new device)
-
-This project is built through an **interactive engineering apprenticeship** with an AI
-mentor. How we work and where we are is documented — read these in order:
-
-1. **[CLAUDE.md](CLAUDE.md)** — the short operating manual for an AI assistant working on
-   this repo (mentor, not autonomous builder). *(Read first.)*
-2. **[docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md)** — the collaboration contract:
-   my preferences, the locked rules, decision protocol, and approval gates. The
-   authoritative detail behind `CLAUDE.md`.
-3. **[docs/PROJECT-STATE.md](docs/PROJECT-STATE.md)** — current state, every decision made,
-   the **exact next step**, and per-device environment setup (§9).
-4. **[docs/learning-log.md](docs/learning-log.md)** — the detailed history of decisions
-   and lessons learned.
-
-> **Resuming on another device?** Clone the repo, then tell the AI:
-> *"Read docs/WAYS-OF-WORKING.md and docs/PROJECT-STATE.md, then re-orient and continue."*
-> Everything needed to continue seamlessly is in those files (the AI's local memory does
-> not travel between devices — the docs are the source of truth).
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="SentinelOps incident dashboard" width="700">
+</p>
 
 ---
 
-## 🏗️ Target architecture (the goal we're building toward)
+## What this is
 
-```
-                 INTERNET
-                    │
-                    ▼
-              CDN / WAF
-                    │
-                    ▼
-             Load Balancer
-                    │
-                    ▼
-        ┌────────────────────┐
-        │  Dockerized App    │
-        │  Frontend + API    │
-        └─────────┬──────────┘
-                  │
-                  ▼
-          PostgreSQL / RDS
+SentinelOps is a secure incident and ticket tracker. A reporter files an incident, an
+analyst triages it, and every read and write is checked against who is asking. It is a
+working application, and it is also a deliberate study of the engineering that surrounds
+one, meaning authentication, authorization, application security, containers, CI/CD,
+infrastructure as code, and cloud architecture.
 
-  GitHub → GitHub Actions → (tests, SAST, dependency/secret/container scanning,
-           Docker build, deploy) → AWS  ◄── Terraform
-```
+The code is written by hand rather than generated. The git history is meant to read as an
+incremental engineering story, one concern per branch and one concern per pull request.
 
-Every component is introduced only when a real problem justifies it — no complexity for
-its own sake. AWS Well-Architected pillars (Operational Excellence, Security,
-Reliability, Performance, Cost, Sustainability) guide decisions.
+**What works today**
 
----
+- Registration and login with server side sessions in an `HttpOnly` cookie
+- Role based access control across three roles, reporter, analyst, and admin
+- Incident create, list, read, and partial update, each one scoped by owner and role
+- A React dashboard with severity and status badges and inline status editing
+- Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
 
-## 🧱 Tech stack (all free)
+## Screens
 
-| Layer | Choice |
+| Sign in | Incident list |
 |---|---|
-| Backend | **Go** — standard-library `net/http` (no framework) |
-| Data access | **`database/sql` + pgx** — hand-written SQL, **no ORM** |
-| Database | **PostgreSQL 17** (Docker for local dev) |
-| Migrations | **golang-migrate** (embedded SQL) |
-| Frontend | **React + Vite + TypeScript** |
-| Auth | Server-side sessions, HttpOnly cookie, bcrypt passwords |
-| Config | 12-factor env vars; git-ignored `.env` (+ committed `.env.example`) |
+| <img src="docs/images/login.png" alt="Login screen" width="380"> | <img src="docs/images/incident-list.png" alt="Incident list with severity and status badges" width="380"> |
 
-See [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md) for the reasoning behind each choice.
+## Architecture
 
----
+Today the application runs as a Go API and a React client against Postgres.
 
-## 📂 Repository layout
+```mermaid
+flowchart LR
+    B["Browser<br/>React + Vite + TS"]
+    C["CORS<br/>one named origin"]
+    R["RequireAuth<br/>cookie, session, user"]
+    H["Handlers<br/>per-object authorization"]
+    D[("PostgreSQL 17")]
+
+    B -->|"JSON + session cookie"| C
+    C --> R
+    R --> H
+    H -->|"parameterised SQL"| D
+```
+
+The target deployment, which the roadmap below works toward, adds the cloud and delivery
+layers.
+
+```mermaid
+flowchart TB
+    U["Internet"] --> W["CDN and WAF"]
+    W --> LB["Load balancer"]
+    LB --> APP["Containers<br/>frontend + API"]
+    APP --> RDS[("Managed Postgres")]
+
+    GH["GitHub"] --> CI["GitHub Actions<br/>build, vet, scan, image"]
+    CI --> APP
+
+    TF["Terraform"] -.-> W
+    TF -.-> LB
+    TF -.-> APP
+    TF -.-> RDS
+```
+
+Complexity is added only when a real problem justifies it. There are no microservices, no
+queues, and no ORM, because nothing in the project has yet needed them.
+
+## Security
+
+Security is the point of the project rather than a footnote, so each control is tied to
+the threat it answers.
+
+| Threat | Control | Where |
+|---|---|---|
+| SQL injection | Parameterised queries only, no SQL is ever assembled from input | every `repository.go` |
+| Broken object level authorization, IDOR | Owner scoped SQL on every by id read and write, and a `404` rather than a `403` so existence never leaks | `internal/incident/handler.go` |
+| Privilege forging | Role is read from the database on every request, never taken from the client | `internal/auth/middleware.go` |
+| Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
+| Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
+| Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
+| Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
+| CSRF | `SameSite=Lax` on the session cookie | `internal/auth/handler.go` |
+| Cleartext session cookie | `Secure` flag driven by the `SECURE_COOKIES` environment variable | `main.go` |
+| Mass assignment | Strict JSON decoding with unknown fields rejected, and no client supplied owner or status on create | `internal/incident/handler.go` |
+| Oversized request bodies | `MaxBytesReader` caps every JSON body at 1 MiB | `internal/incident/handler.go` |
+| Internal error disclosure | Generic client messages, real errors logged server side | all handlers |
+| Overly open CORS | One named origin with credentials, never a wildcard | `main.go` |
+| Malformed identifiers reaching the database | Path parameters are shape checked before any query runs | `internal/incident/handler.go` |
+
+### Known gaps
+
+Listed openly, because a portfolio that hides its weak spots is not worth much.
+
+- `GET /api/users` is not behind authentication and returns every user's email and role.
+  It predates the auth work and is the next thing to close.
+- Registration returns `409` on a duplicate email, which leaks whether an account exists.
+  Login resists enumeration, so the two endpoints disagree.
+- No rate limiting, so login is open to brute force attempts.
+- Expired session rows are never pruned, so the table grows without bound.
+- No automated test suite yet. Verification so far is scripted `curl` runs and manual
+  browser checks, both recorded in the learning log.
+- No audit log of who changed what.
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Backend | Go with the standard library `net/http` | No framework, so the request lifecycle stays visible |
+| Data access | `database/sql` with the pgx driver, hand written SQL | No ORM hiding the database |
+| Database | PostgreSQL 17 in Docker, bound to localhost | Matches the managed Postgres it will deploy onto |
+| Migrations | golang-migrate, SQL embedded with `go:embed` | Versioned schema, one explicit `migrate` subcommand |
+| Frontend | React 19, Vite, TypeScript | Fast dev loop, typed API boundary |
+| Auth | Server side sessions, bcrypt, `HttpOnly` cookie | Instant revocation, and it teaches cookie security properly |
+| Config | 12 factor environment variables, git ignored `.env` | Secrets never reach the repository |
+
+## Quickstart
+
+You need a container runtime, Go 1.26 or newer, Node.js with npm, and git.
+
+```bash
+git clone https://github.com/rehrabbi/SentinelOps.git
+cd SentinelOps
+cp .env.example .env          # then set POSTGRES_PASSWORD to anything URL safe
+```
+
+```bash
+colima start                  # macOS only, starts the container VM
+docker compose up -d          # Postgres 17 on 127.0.0.1:5432
+```
+
+```bash
+cd backend
+set -a; . ../.env; set +a
+export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}?sslmode=disable"
+go run . migrate              # apply migrations
+go run .                      # API on :8080
+```
+
+```bash
+cd frontend
+npm install && npm run dev    # UI on :5173
+```
+
+Register a user at `http://localhost:5173`, then file an incident. The database lives in a
+local Docker volume and does not travel with the repository, so every machine starts
+empty. Promote yourself to analyst with
+`UPDATE users SET role='analyst' WHERE email='you@example.com';` to see every incident
+rather than only your own.
+
+Two optional variables both have working local defaults. `FRONTEND_ORIGIN` defaults to
+`http://localhost:5173`, and `SECURE_COOKIES` defaults to `false`, which must become
+`true` in production or the session cookie travels in cleartext.
+
+Per device setup notes, including the macOS and Colima path, live in
+[docs/PROJECT-STATE.md](docs/PROJECT-STATE.md).
+
+## API
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/healthz` | none | Liveness |
+| `GET` | `/readyz` | none | Readiness, including a database ping |
+| `POST` | `/api/users` | none | Register, returns `201` |
+| `GET` | `/api/users` | none today, see known gaps | List users |
+| `POST` | `/api/sessions` | none | Log in, sets the session cookie |
+| `DELETE` | `/api/sessions/current` | cookie | Log out, idempotent |
+| `GET` | `/api/me` | cookie | The authenticated user |
+| `POST` | `/api/incidents` | cookie | Create, owner is the caller and status starts `open` |
+| `GET` | `/api/incidents` | cookie | List, scoped by role |
+| `GET` | `/api/incidents/{id}` | cookie | Read one, scoped by owner and role |
+| `PATCH` | `/api/incidents/{id}` | cookie | Partial update, scoped by owner and role |
+
+## Repository layout
 
 ```
 SentinelOps/
 ├─ backend/
-│  ├─ main.go, db.go, migrate.go        # entry point, DB pool, migrations
-│  ├─ migrations/                       # versioned SQL (users, sessions)
+│  ├─ main.go, db.go, migrate.go     entry point, pool, migration runner
+│  ├─ migrations/                    versioned SQL, currently at version 4
 │  └─ internal/
-│     ├─ user/                          # user model, repository, handler, validation
-│     ├─ session/                       # session model + repository (token gen)
-│     └─ auth/                          # login handler (middleware + logout next)
-├─ frontend/                            # React + Vite + TS app
-├─ docs/                                # ways-of-working, project-state, learning-log
-├─ compose.yaml                         # Postgres 17 (localhost-only, healthchecked)
-├─ .env.example                         # config template (real .env is git-ignored)
-├─ CLAUDE.md                            # AI-assistant working agreement
-└─ README.md
+│     ├─ user/                       model, repository, handler, validation
+│     ├─ session/                    token generation, hashing, lookup
+│     ├─ auth/                       login, logout, me, RequireAuth middleware
+│     └─ incident/                   incident domain and per-object authorization
+├─ frontend/src/                     React app, api.ts is the typed API client
+├─ docs/                             working agreement, project state, learning log
+├─ .github/workflows/ci.yml          build, vet, and lint on every push
+└─ compose.yaml                      Postgres 17, localhost only, healthchecked
 ```
 
----
+## How this project is built
 
-## ▶️ Run it locally
+Work follows GitHub Flow. `main` is protected and only changes through a pull request,
+every change happens on a short lived `feat/` or `docs/` branch, and merged branches are
+archived under `merged/` rather than deleted, so the full history of each feature stays in
+the repository. Commit messages use a conventional subject line and a short bullet body.
 
-Prerequisites: **a container runtime, Go 1.26+ (go.mod requires 1.26.5), Node.js + npm,
-git**. Create a root-level `.env` from `.env.example` (holds Postgres credentials; never
-committed). Per-device setup — including the macOS/Colima path — is in
-**[docs/PROJECT-STATE.md §9](docs/PROJECT-STATE.md)**.
+The full contract, including commit style and the approval gates used while building,
+is in [CONTRIBUTING.md](CONTRIBUTING.md) and
+[docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md).
 
-```bash
-# From the repo root
-colima start                   # macOS only: start the container VM
-docker compose up -d           # start Postgres
+## Roadmap
 
-# From backend/ — build DATABASE_URL from .env without printing the password
-set -a; . ../.env; set +a
-export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}?sslmode=disable"
-go run . migrate               # apply DB migrations
-go run .                       # start the API on :8080
+Done so far, in order. Health and readiness, Postgres and migrations, user registration,
+login with sessions, auth middleware, logout, the React auth UI, the incident domain with
+RBAC, the incident dashboard, and per-object authorization on read and update.
 
-# From frontend/
-npm install && npm run dev     # start the UI on :5173
-```
+Next up.
 
-Health checks: `GET /healthz` (liveness), `GET /readyz` (DB readiness).
-API so far: `GET /api/users`, `POST /api/users` (register), `POST /api/sessions` (login).
+1. Close the open `GET /api/users` gap and add an admin only role management screen
+2. Audit logging of who changed what
+3. A Dockerfile for the application and a multi stage build
+4. CI hardening with dependency, secret, and static analysis scanning
+5. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
+   environment branches once there is somewhere to deploy
+6. Observability, alerting, backups, and a cost review
 
-Optional env vars, both with working local defaults: `FRONTEND_ORIGIN`
-(default `http://localhost:5173`) and `SECURE_COOKIES` (default `false` — **must be `true`
-in production**, or the session cookie travels in cleartext).
+## Documentation
 
-> **Note:** the database lives in a local Docker volume and does **not** travel with the
-> repo. After cloning on a new machine, run the migrations and register your own test user.
+| File | What it holds |
+|---|---|
+| [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md) | Where the project stands, every locked decision, the exact next step |
+| [docs/learning-log.md](docs/learning-log.md) | Decisions and why, concepts, security and debugging lessons |
+| [docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md) | The collaboration contract behind how this is built |
+| [SECURITY.md](SECURITY.md) | How to report a vulnerability |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branching, commits, and local setup |
 
----
+## License
 
-## 🔐 Security focus
-
-Security is a first-class goal, not an afterthought. Implemented so far: parameterized
-SQL (SQLi defense), bcrypt password hashing, strict JSON parsing (mass-assignment
-defense), request size caps, generic error responses (no info leak), least-privilege
-CORS (one named origin, never `*`, as required alongside credentialed requests),
-SHA-256-hashed session tokens at rest, `HttpOnly` + `SameSite=Lax` + environment-driven
-`Secure` cookies (XSS/CSRF defense), and constant-ish login timing so a missing account
-can't be distinguished from a wrong password. Each control is documented with the threat
-it addresses in [docs/learning-log.md](docs/learning-log.md).
-
-**Known open item:** account enumeration is inconsistent — login resists it, but
-registration still returns `409` on a duplicate email, which leaks the same fact
-deliberately. Tracked in the learning log's "questions to revisit".
-
----
-
-## 📍 Current state & next step
-
-**Done:** health/readiness endpoints · Postgres in Docker · golang-migrate (schema v2) ·
-users read + register APIs · session data layer · **login (`POST /api/sessions`) with
-cookie-based sessions, verified 8/8 including timing and token-hashing properties**.
-
-**Next:** **auth middleware** — read the session cookie, hash it, look up and validate the
-session, attach the user to the request context, and protect a first route (likely
-`GET /api/me`). Then logout (`DELETE /api/sessions/current`), then the frontend login form.
-
-**Then:** authorization/RBAC → incident features → audit logging → automated tests → Docker
-for the app → CI + security scanning → AWS via Terraform → observability.
-
-The full decision list, acceptance criteria for the next step, and per-device setup notes
-live in **[docs/PROJECT-STATE.md](docs/PROJECT-STATE.md)**.
+[MIT](LICENSE)

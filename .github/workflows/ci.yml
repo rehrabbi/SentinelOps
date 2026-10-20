@@ -1,0 +1,87 @@
+name: CI
+
+# Run on every push to main and on every pull request targeting main, so a branch
+# is checked before it is merged rather than after.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege. The default token can write to the repository; this workflow only
+# needs to read the code, so everything else is dropped.
+permissions:
+  contents: read
+
+# If a branch is pushed twice in quick succession, cancel the older run instead of
+# paying for a result nobody will look at.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # Read the version from go.mod rather than repeating it here, so the
+          # toolchain can never drift from what the module declares.
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # gofmt rewrites nothing in CI. It lists files that are not formatted, and any
+      # output at all fails the job.
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      # Passes cleanly while there are no test files. It starts earning its place the
+      # moment the first test lands.
+      - name: Test
+        run: go test ./...
+
+  frontend:
+    name: Frontend (React, TypeScript)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci installs exactly what package-lock.json pins and fails if the lockfile
+      # and package.json disagree. npm install would quietly resolve new versions,
+      # which is the wrong behaviour for a build you want to be reproducible.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Runs tsc -b and then the Vite production build, so a type error fails CI.
+      - name: Type check and build
+        run: npm run build
