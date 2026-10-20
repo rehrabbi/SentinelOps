@@ -4,8 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-08-27 · **Current stage:** Incident domain — **create/list + detail/update**
-> with per-object (IDOR-safe) authz and an inline status UI; verified live. Next: admin/roadmap.
+> **Last updated:** 2026-10-20 · **Current stage:** Repo presentation pass (README, licence,
+> community health files, CI). Code unchanged since the incident detail/update stage.
+> Next: close the unauthenticated `GET /api/users`, then admin role management or the production arc.
 
 ---
 
@@ -108,6 +109,17 @@ has `json:"-"`; handler logs real errors but returns generic messages.
   preflight; only browsers do).
 
 ---
+
+**Repo presentation decisions (2026-10-20):** licence is **MIT** (permissive, portfolio
+default). The README is rebuilt for a **recruiter-first skim**, leading with a screenshot,
+badges, a Mermaid architecture diagram, a threat-to-control security table, and an honest
+"Known gaps" section. Community health files added (`LICENSE`, `SECURITY.md`,
+`CONTRIBUTING.md`, PR and issue templates). CI is a **build-and-vet workflow only**
+(gofmt, vet, build, test for Go; lint and type-check for the frontend), with security
+scanning deliberately deferred to its own stage so it gets taught rather than bolted on.
+**Branching stays GitHub Flow** as locked in WAYS-OF-WORKING §13, now documented in
+`CONTRIBUTING.md`. **`dev`/`staging`/`prod` environment branches are a decided future step**,
+to be created only once there is real infrastructure to deploy to (after Docker, CI, and AWS).
 
 ## 5. What's built and working
 
@@ -216,6 +228,13 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
+**⚠️ Found 2026-10-20, do this first.** `GET /api/users` is registered with a plain
+`HandleFunc` in `main.go` and is **not** wrapped in `RequireAuth`. An unauthenticated
+request returns every user's id, email, full name, and role (verified live with curl, 200).
+It predates the auth work. Closing it is a two-line change plus a decision about whether the
+route becomes authenticated-only or admin-only, which folds naturally into Option A below.
+
+
 **Incidents are now a full CRUD-ish domain with per-object authz**, all verified: create, list
 (RBAC-scoped), get-by-id and partial update (owner/role-scoped, IDOR-safe 404s), with an inline
 status dropdown in the UI. Good place to choose the next thrust:
@@ -237,7 +256,7 @@ project set out to learn.
 **Recommendation:** if you want to keep deepening security/authz, **A** (admin + role middleware).
 If you're ready for the cloud/DevSecOps arc, start **C** with a Dockerfile + CI.
 
-**Security to revisit:** account-enumeration inconsistency (login is timing-safe; registration's
+**Security to revisit:** the unauthenticated `GET /api/users` above; account-enumeration inconsistency (login is timing-safe; registration's
 409 leaks whether an email exists); keep per-object scoping on every new incident-by-id op
 (never trust a client-supplied id).
 
