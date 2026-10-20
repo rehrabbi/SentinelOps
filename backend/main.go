@@ -70,7 +70,8 @@ func main() {
 	// where all the pieces are constructed and connected.
 	userRepo := user.NewRepository(db)
 	userHandler := user.NewHandler(userRepo)
-	mux.HandleFunc("GET /api/users", userHandler.List)
+	// GET /api/users is registered further down: it is admin-only, so it needs
+	// authHandler, which does not exist yet at this point.
 	mux.HandleFunc("POST /api/users", userHandler.Create)
 
 	// Auth feature: login reads a user AND writes a session, so it takes both
@@ -84,6 +85,12 @@ func main() {
 	// the Me handler, so an invalid/missing session is rejected with 401 before
 	// Me runs. This is our first route that requires authentication.
 	mux.Handle("GET /api/me", authHandler.RequireAuth(http.HandlerFunc(authHandler.Me)))
+
+	// Listing users exposes every account's email, name, and role, so it is
+	// admin-only rather than merely authenticated. RequireRole is chained INSIDE
+	// RequireAuth, because RequireAuth is what loads the user it reads.
+	mux.Handle("GET /api/users",
+		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(userHandler.List))))
 
 	// Logout: destroy the current session and clear the cookie. Public and
 	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth.

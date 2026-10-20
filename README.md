@@ -34,7 +34,8 @@ incremental engineering story, one concern per branch and one concern per pull r
 **What works today**
 
 - Registration and login with server side sessions in an `HttpOnly` cookie
-- Role based access control across three roles, reporter, analyst, and admin
+- Role based access control across three roles, reporter, analyst, and admin, with an
+  admin only user directory
 - Incident create, list, read, and partial update, each one scoped by owner and role
 - A React dashboard with severity and status badges and inline status editing
 - Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
@@ -95,6 +96,7 @@ the threat it answers.
 | SQL injection | Parameterised queries only, no SQL is ever assembled from input | every `repository.go` |
 | Broken object level authorization, IDOR | Owner scoped SQL on every by id read and write, and a `404` rather than a `403` so existence never leaks | `internal/incident/handler.go` |
 | Privilege forging | Role is read from the database on every request, never taken from the client | `internal/auth/middleware.go` |
+| Sensitive data exposure | The user directory is admin only, enforced by a `RequireRole` middleware chained inside `RequireAuth` | `internal/auth/middleware.go` |
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
@@ -111,8 +113,6 @@ the threat it answers.
 
 Listed openly, because a portfolio that hides its weak spots is not worth much.
 
-- `GET /api/users` is not behind authentication and returns every user's email and role.
-  It predates the auth work and is the next thing to close.
 - Registration returns `409` on a duplicate email, which leaks whether an account exists.
   Login resists enumeration, so the two endpoints disagree.
 - No rate limiting, so login is open to brute force attempts.
@@ -181,7 +181,7 @@ Per device setup notes, including the macOS and Colima path, live in
 | `GET` | `/healthz` | none | Liveness |
 | `GET` | `/readyz` | none | Readiness, including a database ping |
 | `POST` | `/api/users` | none | Register, returns `201` |
-| `GET` | `/api/users` | none today, see known gaps | List users |
+| `GET` | `/api/users` | cookie, admin only | List users |
 | `POST` | `/api/sessions` | none | Log in, sets the session cookie |
 | `DELETE` | `/api/sessions/current` | cookie | Log out, idempotent |
 | `GET` | `/api/me` | cookie | The authenticated user |
@@ -227,7 +227,7 @@ RBAC, the incident dashboard, and per-object authorization on read and update.
 
 Next up.
 
-1. Close the open `GET /api/users` gap and add an admin only role management screen
+1. An admin only role management screen, so roles stop being set by hand in SQL
 2. Audit logging of who changed what
 3. A Dockerfile for the application and a multi stage build
 4. CI hardening with dependency, secret, and static analysis scanning

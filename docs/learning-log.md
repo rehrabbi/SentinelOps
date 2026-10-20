@@ -931,6 +931,49 @@ disagreement is not mistaken for a bug.
 
 ---
 
+## Stage: Admin-only user directory (RequireRole middleware)
+
+**How it was found:** writing the README's API table for the repo-presentation stage forced
+an "auth" column on every route. Every row could be filled in except one. `GET /api/users`
+was registered with a plain `HandleFunc`, never wrapped in `RequireAuth`, and an
+unauthenticated curl returned every user's id, email, full name, and role with a 200. It had
+been open since the very first stage, built before authentication existed, and no later stage
+went back for it.
+
+**Decision (decision prompt):** admin-only, via a reusable middleware, over the two
+alternatives of merely authenticating the route or deleting it. Nothing consumes the endpoint
+today (the frontend only POSTs to `/api/users` to register), so deleting it was defensible,
+but the admin role-management screen is the next stage and needs exactly this control.
+
+**Built:** `auth.RequireRole(role string, next http.Handler) http.Handler` in
+`internal/auth/middleware.go`, and the route moved in `main.go` to where `authHandler` exists,
+wrapped as `RequireAuth(RequireRole("admin", ...))`.
+
+**Verified 6/6 with curl:** anonymous 401; logged-in reporter 403; after
+`UPDATE users SET role='admin'`, the **same cookie** returns 200 with no re-login; after
+demoting, the very next request is 403 again; `POST /api/users` stays public; incidents
+unaffected.
+
+**Concepts learned:**
+- **Authentication is not authorization.** `RequireAuth` answers "who are you". A route that
+  is only authenticated is open to every registered account, which for a user directory means
+  any attacker who can sign up gets a list of emails and roles.
+- **Middleware order is a dependency, not a style choice.** `RequireRole` reads the user from
+  the request context, and `RequireAuth` is what puts it there, so it must be chained inside.
+  It also fails closed with a 401 when the context has no user, rather than trusting the wiring.
+- **403 here, 404 for incidents.** The difference is whether existence is a secret. An
+  incident's existence is, so "not yours" must look like "not there". A fixed route's existence
+  is not, so hiding the reason would cost debuggability and protect nothing.
+- **Wiring order in `main.go` is real.** The first attempt put the route in the users block and
+  failed to compile, because `authHandler` is constructed further down. A compile error is the
+  cheapest possible version of that lesson.
+- **Documentation work is an audit.** A feature-by-feature build never revisits endpoints it
+  already shipped. Writing a table with a column you must fill honestly does.
+
+*(Committed on `feat/admin-roles`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
