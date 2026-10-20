@@ -92,6 +92,11 @@ func main() {
 	mux.Handle("GET /api/users",
 		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(userHandler.List))))
 
+	// Changing a role is admin-only too. The handler additionally refuses an
+	// admin changing their OWN role, which keeps at least one admin alive.
+	mux.Handle("PATCH /api/users/{id}",
+		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(userHandler.UpdateRole))))
+
 	// Logout: destroy the current session and clear the cookie. Public and
 	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth.
 	mux.HandleFunc("DELETE /api/sessions/current", authHandler.Logout)
