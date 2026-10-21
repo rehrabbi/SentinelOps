@@ -6,11 +6,17 @@
 // with VITE_ on import.meta.env; we fall back to the local dev server.
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 
+// Roles mirror the CHECK constraint on users.role in the database and the
+// validRoles map in the Go handler. Three copies of one truth, which is the
+// cost of not generating these types from the backend.
+export type Role = 'reporter' | 'analyst' | 'admin'
+
 // The user shape as the API returns it (matches the Go User JSON - no password)
 export type User = {
     id: string
     email: string
     fullName: string
+    role: Role
     createdAt: string
     updatedAt: string
 }
@@ -148,6 +154,34 @@ export async function updateIncident(
   if (!res.ok) {
     const text = (await res.text()).trim()
     throw new ApiError(res.status, text || `Update incident failed (${res.status})`)
+  }
+  return res.json()
+}
+
+// getUsers lists every account. The endpoint is admin-only, so a non-admin gets
+// a 403 here; the caller decides whether that is an error worth showing or just
+// a reason to hide the screen.
+export async function getUsers(): Promise<User[]> {
+  const res = await request('/api/users')
+  if (!res.ok) {
+    const text = (await res.text()).trim()
+    throw new ApiError(res.status, text || `Load users failed (${res.status})`)
+  }
+  return res.json()
+}
+
+// updateUserRole changes one user's role and returns the updated row, so the
+// caller can replace it in place rather than refetching the whole list.
+// The server refuses an admin changing their own role with a 403, and that
+// message is surfaced rather than swallowed.
+export async function updateUserRole(id: string, role: Role): Promise<User> {
+  const res = await request(`/api/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  })
+  if (!res.ok) {
+    const text = (await res.text()).trim()
+    throw new ApiError(res.status, text || `Update role failed (${res.status})`)
   }
   return res.json()
 }

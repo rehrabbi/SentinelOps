@@ -35,7 +35,7 @@ incremental engineering story, one concern per branch and one concern per pull r
 
 - Registration and login with server side sessions in an `HttpOnly` cookie
 - Role based access control across three roles, reporter, analyst, and admin, with an
-  admin only user directory
+  admin only user directory and an admin screen for changing roles
 - Incident create, list, read, and partial update, each one scoped by owner and role
 - A React dashboard with severity and status badges and inline status editing
 - Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
@@ -45,6 +45,12 @@ incremental engineering story, one concern per branch and one concern per pull r
 | Sign in | Incident list |
 |---|---|
 | <img src="docs/images/login.png" alt="Login screen" width="380"> | <img src="docs/images/incident-list.png" alt="Incident list with severity and status badges" width="380"> |
+
+<p align="center">
+  <img src="docs/images/admin-roles.png" alt="Admin screen for changing user roles" width="620">
+</p>
+
+<p align="center"><em>The admin screen. Your own row is locked, because an admin may not change their own role.</em></p>
 
 ## Architecture
 
@@ -97,6 +103,7 @@ the threat it answers.
 | Broken object level authorization, IDOR | Owner scoped SQL on every by id read and write, and a `404` rather than a `403` so existence never leaks | `internal/incident/handler.go` |
 | Privilege forging | Role is read from the database on every request, never taken from the client | `internal/auth/middleware.go` |
 | Sensitive data exposure | The user directory is admin only, enforced by a `RequireRole` middleware chained inside `RequireAuth` | `internal/auth/middleware.go` |
+| Privilege escalation | Role changes are admin only, accept no field but `role`, and an admin cannot change their own, so at least one admin always remains | `internal/user/handler.go` |
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
@@ -182,6 +189,7 @@ Per device setup notes, including the macOS and Colima path, live in
 | `GET` | `/readyz` | none | Readiness, including a database ping |
 | `POST` | `/api/users` | none | Register, returns `201` |
 | `GET` | `/api/users` | cookie, admin only | List users |
+| `PATCH` | `/api/users/{id}` | cookie, admin only | Change a user's role, never your own |
 | `POST` | `/api/sessions` | none | Log in, sets the session cookie |
 | `DELETE` | `/api/sessions/current` | cookie | Log out, idempotent |
 | `GET` | `/api/me` | cookie | The authenticated user |
@@ -223,17 +231,17 @@ is in [CONTRIBUTING.md](CONTRIBUTING.md) and
 
 Done so far, in order. Health and readiness, Postgres and migrations, user registration,
 login with sessions, auth middleware, logout, the React auth UI, the incident domain with
-RBAC, the incident dashboard, and per-object authorization on read and update.
+RBAC, the incident dashboard, per-object authorization on read and update, and role
+management behind an admin only screen.
 
 Next up.
 
-1. An admin only role management screen, so roles stop being set by hand in SQL
-2. Audit logging of who changed what
-3. A Dockerfile for the application and a multi stage build
-4. CI hardening with dependency, secret, and static analysis scanning
-5. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
+1. Audit logging of who changed what, now that privileged actions exist
+2. A Dockerfile for the application and a multi stage build
+3. CI hardening with dependency, secret, and static analysis scanning
+4. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
    environment branches once there is somewhere to deploy
-6. Observability, alerting, backups, and a cost review
+5. Observability, alerting, backups, and a cost review
 
 ## Documentation
 

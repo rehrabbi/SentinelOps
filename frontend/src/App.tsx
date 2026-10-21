@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
 import { getMe, login, logout, register, ApiError, type User } from "./api";
 import { IncidentDashboard } from "./incidents";
+import { Routes, Route, Navigate, Link } from "react-router";
+import { AdminPage } from "./admin";
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
 // still asking the server (GET /api/me) whether a session exists.
@@ -32,31 +34,50 @@ function App() {
     );
   }
 
-  const onLoggedIn = (user: User) => setAuth({ kind: "authenticated", user });
+    const onLoggedIn = (user: User) => setAuth({ kind: "authenticated", user });
 
-  return (
+    return (
     <main className="app">
       <h1>SentinelOps</h1>
       <p className="subtitle">Incident &amp; ticket management</p>
-      {auth.kind === "authenticated" ? (
-        <LoggedIn
-          user={auth.user}
-          onLogout={() => {
-            setAuth({ kind: "anonymous"})
-            setMode("login")
-          }}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            auth.kind === "authenticated" ? (
+              <LoggedIn
+                user={auth.user}
+                onLogout={() => {
+                  setAuth({ kind: "anonymous" });
+                  setMode("login");
+                }}
+              />
+            ) : mode === "login" ? (
+              <LoginForm
+                onLoggedIn={onLoggedIn}
+                onSwitch={() => setMode("register")}
+              />
+            ) : (
+              <RegisterForm
+                onLoggedIn={onLoggedIn}
+                onSwitch={() => setMode("login")}
+              />
+            )
+          }
         />
-      ) : mode === "login" ? (
-        <LoginForm
-          onLoggedIn={onLoggedIn}
-          onSwitch={() => setMode("register")}
+        <Route
+          path="/admin"
+          element={
+            auth.kind === "authenticated" && auth.user.role === "admin" ? (
+              <AdminPage currentUserId={auth.user.id} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
         />
-      ) : (
-        <RegisterForm
-          onLoggedIn={onLoggedIn}
-          onSwitch={() => setMode("login")}
-        />
-      )}
+        {/* Anything else goes home rather than showing a blank page. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </main>
   );
 }
@@ -239,6 +260,11 @@ function LoggedIn({ user, onLogout }: { user: User; onLogout: () => void }) {
         <button onClick={handleLogout} disabled={busy}>
           {busy ? "Logging out…" : "Log out"}
         </button>
+                {user.role === "admin" && (
+          <p className="admin-link">
+            <Link to="/admin">Manage user roles</Link>
+          </p>
+        )}
       </section>
       <IncidentDashboard />
     </>

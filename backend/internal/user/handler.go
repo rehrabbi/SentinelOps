@@ -5,9 +5,12 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"sentinelops/internal/authctx"
 )
 
 // Handler is the HTTP layer for users. It translates HTTP requests into
@@ -43,6 +46,16 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		log.Printf("encode users response: %v", err)
 	}
 }
+
+// validRoles mirrors the CHECK constraint on users.role from migration 3.
+// Checking here turns a bad value into a clean 400 instead of a database error.
+var validRoles = map[string]bool{
+	"reporter": true, "analyst": true, "admin": true,
+}
+
+// uuidPattern matches the canonical 8-4-4-4-12 form. The incident package has
+// its own copy; if a third one appears, it is time for a shared helper.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // maxBodyBytes caps the request body so a malicious client can't stream a huge
 // payload to exhaust server memory. A registration JSON is tiny; 1 MiB is plenty.
@@ -119,4 +132,72 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // characters").
 func validationMessage(err error) string {
 	return strings.TrimPrefix(err.Error(), ErrValidation.Error()+": ")
+}
+
+// updateRoleInput is the PATCH /api/users/{id} body. Role is the ONLY field.
+// Email, name, and password are deliberately absent, so this endpoint cannot
+// quietly become a way to rewrite someone else's credentials.
+type updateRoleInput struct {
+	Role string `json:"role"`
+}
+
+// UpdateRole handles PATCH /api/users/{id}. The route is wrapped in
+// RequireRole("admin"), so reaching this code already means the caller is an
+// admin; what remains is to stop an admin from changing their OWN role.
+//
+// That refusal is what keeps the system administrable. An admin may demote any
+// other admin, but never themselves, so the acting admin always survives and at
+// least one admin always exists. Counting remaining admins instead would need
+// the count and the write in one transaction, or two simultaneous demotions
+// could both pass the check and leave nobody.
+func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
+	caller, ok := authctx.FromContext(r.Context())
+	if !ok {
+		// Empty context means this was not placed behind RequireAuth.
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+
+	id := r.PathValue("id")
+	if !uuidPattern.MatchString(id) {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	// Authorization before validation: refuse the self change before we even
+	// read the body, so a refused request is never partly processed.
+	if id == caller.ID {
+		http.Error(w, "you cannot change your own role", http.StatusForbidden)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var in updateRoleInput
+	if err := dec.Decode(&in); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if !validRoles[in.Role] {
+		http.Error(w, "invalid role", http.StatusBadRequest)
+		return
+	}
+
+	u, err := h.repo.UpdateRole(r.Context(), id, in.Role)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("update user role: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(u); err != nil {
+		log.Printf("update user role: encode: %v", err)
+	}
 }

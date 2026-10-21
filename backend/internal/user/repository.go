@@ -132,3 +132,28 @@ func (r *Repository) GetByID(ctx context.Context, id string) (User, error) {
 	}
 	return u, nil
 }
+
+// UpdateRole sets a user's role and returns the stored row. The role string is
+// validated by the caller, and the CHECK constraint on users.role is the
+// backstop if an invalid value ever reaches here.
+//
+// The returned columns deliberately exclude password_hash, like every other
+// read in this file.
+func (r *Repository) UpdateRole(ctx context.Context, id, role string) (User, error) {
+	const query = `
+		UPDATE users
+		SET role = $2, updated_at = now()
+		WHERE id = $1
+		RETURNING id, email, full_name, role, created_at, updated_at`
+
+	var u User
+	err := r.db.QueryRowContext(ctx, query, id, role).
+		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrUserNotFound
+		}
+		return User{}, fmt.Errorf("update user role: %w", err)
+	}
+	return u, nil
+}

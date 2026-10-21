@@ -1,23 +1,14 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"log"
 	"net/http"
 
+	"sentinelops/internal/authctx"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
-
-// contextKey is a private type for the context keys this package sets. Using an
-// unexported named type (not a bare string) makes collisions impossible: another
-// package could use the string "user" as a key, but it cannot name auth.contextKey.
-// go vet flags bare-string context keys for exactly this reason.
-type contextKey int
-
-// userContextKey identifies the authenticated user stored in the request context.
-const userContextKey contextKey = 0
 
 // RequireAuth is middleware that gates next behind a valid session. It reads the
 // session cookie, verifies it maps to a live session, loads that user, attaches
@@ -58,19 +49,12 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// 4) Attach the user to the request context and proceed. Handlers behind
-		// this middleware can now pull the user out with UserFromContext.
-		ctx := context.WithValue(r.Context(), userContextKey, u)
+		// 4) Attach the caller to the request context and proceed. Handlers behind
+		// this middleware pull it out with authctx.FromContext. Only the id and
+		// role travel: a context states who is asking, it is not a row cache.
+		ctx := authctx.WithPrincipal(r.Context(), authctx.Principal{ID: u.ID, Role: u.Role})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-// UserFromContext returns the authenticated user that RequireAuth stored. The
-// bool is false when there is no user (i.e. the handler was not placed behind
-// RequireAuth) — callers must check it instead of assuming a user is present.
-func UserFromContext(ctx context.Context) (user.User, bool) {
-	u, ok := ctx.Value(userContextKey).(user.User)
-	return u, ok
 }
 
 // RequireRole is middleware that gates next behind a role. It must be chained
@@ -86,7 +70,7 @@ func UserFromContext(ctx context.Context) (user.User, bool) {
 // here would only make the API harder to debug without protecting anything.
 func (h *Handler) RequireRole(role string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, ok := UserFromContext(r.Context())
+		p, ok := authctx.FromContext(r.Context())
 		if !ok {
 			// No user in context means this was not placed behind RequireAuth.
 			// Fail closed rather than trusting the wiring.
@@ -96,7 +80,7 @@ func (h *Handler) RequireRole(role string, next http.Handler) http.Handler {
 
 		// The role comes from the user row loaded this request, never from the
 		// client, so it cannot be forged and a revoked role takes effect at once.
-		if u.Role != role {
+		if p.Role != role {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}

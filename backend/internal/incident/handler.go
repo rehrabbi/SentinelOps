@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"sentinelops/internal/auth"
+	"sentinelops/internal/authctx"
 )
 
 const maxBodyBytes = 1 << 20 // 1 MiB request-body cap
@@ -48,7 +48,7 @@ type createInput struct {
 
 // Create handles POST /api/incidents: create an incident owned by the caller.
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	caller, ok := authctx.FromContext(r.Context())
 	if !ok {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -88,7 +88,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inc, err := h.incidents.Create(r.Context(), user.ID, in.Title, in.Description, in.Severity)
+	inc, err := h.incidents.Create(r.Context(), caller.ID, in.Title, in.Description, in.Severity)
 	if err != nil {
 		log.Printf("create incident: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -106,7 +106,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 // List handles GET /api/incidents. RBAC policy lives HERE: reporters (and any
 // unrecognized role) see only their own incidents; analysts and admins see all.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	caller, ok := authctx.FromContext(r.Context())
 	if !ok {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -116,11 +116,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		incidents []Incident
 		err       error
 	)
-	switch user.Role {
+	switch caller.Role {
 	case "analyst", "admin":
 		incidents, err = h.incidents.ListAll(r.Context())
 	default: // "reporter" and any future least-privileged role — fail safe
-		incidents, err = h.incidents.ListByUser(r.Context(), user.ID)
+		incidents, err = h.incidents.ListByUser(r.Context(), caller.ID)
 	}
 	if err != nil {
 		log.Printf("list incidents: %v", err)
@@ -154,7 +154,7 @@ func (h *Handler) getScoped(ctx context.Context, id, userID, role string) (Incid
 // The ownership test lives in the SQL, and a miss returns 404 — byte-identical
 // to a nonexistent id, so the API never confirms that an incident exists.
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	caller, ok := authctx.FromContext(r.Context())
 	if !ok {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -172,11 +172,11 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		inc Incident
 		err error
 	)
-	switch user.Role {
+	switch caller.Role {
 	case "analyst", "admin":
 		inc, err = h.incidents.GetByID(r.Context(), id)
 	default: // "reporter" and any future least-privileged role — fail safe
-		inc, err = h.incidents.GetByIDForUser(r.Context(), id, user.ID)
+		inc, err = h.incidents.GetByIDForUser(r.Context(), id, caller.ID)
 	}
 	if errors.Is(err, ErrIncidentNotFound) {
 		http.Error(w, "incident not found", http.StatusNotFound)
@@ -209,7 +209,7 @@ type updateInput struct {
 // authorizes by reading the incident under the caller's scope first (404 if they
 // may not see it), then applies only the provided fields.
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.UserFromContext(r.Context())
+	caller, ok := authctx.FromContext(r.Context())
 	if !ok {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
@@ -237,7 +237,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authorize: read it under the caller's scope. 404 if they may not touch it.
-	inc, err := h.getScoped(r.Context(), id, user.ID, user.Role)
+	inc, err := h.getScoped(r.Context(), id, caller.ID, caller.Role)
 	if err != nil {
 		if errors.Is(err, ErrIncidentNotFound) {
 			http.Error(w, "incident not found", http.StatusNotFound)

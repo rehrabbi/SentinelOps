@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-10-20 · **Current stage:** Repo presentation pass (README, licence,
-> community health files, CI). Code unchanged since the incident detail/update stage.
-> Next: the admin role-management UI (`RequireRole` now exists), or the production arc.
+> **Last updated:** 2026-10-21 · **Current stage:** Role management complete — `RequireRole`
+> middleware, admin-only `GET`/`PATCH /api/users`, and an admin screen behind a real router.
+> Next: audit logging, or the production arc (Docker, CI hardening, AWS).
 
 ---
 
@@ -228,11 +228,28 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-**✅ Closed 2026-10-20.** `GET /api/users` was unauthenticated and returned every user's
-id, email, full name, and role. It is now **admin only**, via a new
-`auth.RequireRole(role, next)` middleware chained inside `RequireAuth`. Verified 6/6:
-anonymous 401, reporter 403, admin 200, demote mid-session 403 on the next request
-(role read fresh from the DB each time), registration still public, incidents unaffected.
+**✅ Role management shipped 2026-10-21.** `GET /api/users` is admin-only (it had been
+unauthenticated since stage one), and `PATCH /api/users/{id}` changes a role. Verified 11/11
+by curl plus a live browser pass: reporter self-promotion 403, analyst 403, anonymous 401,
+admin 200, **admin changing their own role 403**, invalid role 400, unknown field 400,
+missing/malformed id 404, empty body 400. A demoted user's very next request is refused on the
+same cookie, because the role is read from the database each request.
+
+**Key decisions:** the lockout guard is "an admin may never change their own role", which is
+race-free and guarantees at least one admin survives (the acting admin cannot remove
+themselves). Alternative was counting remaining admins, which needs the count and the write in
+one transaction. Frontend uses **react-router 8.5.0** (MIT, ~41 KB added to the bundle) with
+`/` and `/admin` routes; the admin guard is cosmetic and the API is the control, proven by
+calling it directly as a reporter.
+
+**Architecture note:** `user` could not import `auth` (auth already imports user, so it would
+cycle), so the request caller moved into a new **`internal/authctx`** package holding a
+`Principal{ID, Role}` and importing nothing. `auth`, `incident`, and `user` all read from it.
+`auth.Me` now loads the user by id, one extra query, in exchange for a context that states who
+is asking rather than caching a row.
+
+**Bootstrapping note for production:** the first admin must be created out of band with SQL
+(`UPDATE users SET role='admin' WHERE email='…'`). There is no other path, by design.
 
 **Incidents are now a full CRUD-ish domain with per-object authz**, all verified: create, list
 (RBAC-scoped), get-by-id and partial update (owner/role-scoped, IDOR-safe 404s), with an inline
