@@ -1024,6 +1024,60 @@ struct; the route behind `RequireAuth(RequireRole("admin", …))`; `internal/aut
 
 ---
 
+## Stage: Audit logging (append-only, hash-chained)
+
+**Decisions:** asked for "tamper proof", which is not achievable in-app, so the goal was
+restated as **tamper evident plus database-enforced append-only**. Postgres table over
+structured stdout (queryable now, shipping off-box comes with Docker). Auth plus privileged
+actions only. Entries written explicitly in handlers, because middleware sees
+`PATCH /api/users/{id} 200` and not `reporter -> admin`. Role changes transactional, auth
+events best effort.
+
+**Built:** migration 000005 (`audit_log` + `audit_log_seal` + three immutability triggers);
+`internal/audit` (`Entry`, `Record`, `RecordTx`, `ClientIP`, `Verify`); audit calls in
+`auth.Login`/`auth.Logout`; a transactional `user.Handler.UpdateRole`; `UpdateRole` repository
+method returning the previous role; `authctx.Principal.Email`; a `verify-audit` subcommand.
+
+**Attack-tested rather than assumed:** forged `prev_hash`/`entry_hash` on insert were
+overwritten by the trigger; `UPDATE`, `DELETE` and `TRUNCATE` all refused; a superuser edit to
+one row was **detected**; a superuser rebuild of the entire chain was **not** detected.
+Fault injection on the audit insert proved the role change rolls back.
+
+**Concepts learned:**
+- **An audit log is not application logging.** `log.Printf` is for us to debug. This is for
+  accountability, read later by someone else, which drives every design choice.
+- **Hash chaining gives evidence, not prevention.** Each row hashes its own content plus the
+  previous hash. Editing one row breaks every link after it. Rebuilding them all is still
+  possible for whoever controls the database, so the chain head must be anchored externally.
+- **Compute the chain in a trigger, not the application.** A compromised app then cannot write
+  a false entry. We proved it by sending `\xdeadbeef` and watching it be replaced.
+- **TRUNCATE bypasses row-level triggers** and needs its own statement-level trigger. An
+  append-only table without one is not append-only.
+- **`ON DELETE SET NULL`, never `CASCADE`, on an audit actor.** CASCADE would mean deleting a
+  user erases everything they did, which is a one-command way to destroy evidence.
+- **Denormalize the actor's email on purpose.** Normalization models current state; an audit
+  entry models past state, where a snapshot is correct.
+- **A statement sees its own pre-statement snapshot.** The CTE reading `role` returns the OLD
+  value even though the same statement overwrites it, which removes a read-then-write race.
+- **`defer tx.Rollback()` right after `BeginTx`** is the standard Go transaction shape, safe
+  because rollback after commit is a no-op, so every early return cleans up.
+- **Accept an interface to join someone else's transaction.** `execer` and `rowQuerier` are
+  three lines each and are what let a repository write inside a caller's `*sql.Tx`.
+- **`IS DISTINCT FROM`, not `!=`**, when a column can be NULL. `NULL != NULL` is NULL, so a
+  plain comparison would never flag the first row of the chain.
+- **Keep one definition of a canonical form.** Verification recomputes hashes in SQL because a
+  Go reimplementation would have to match Postgres timestamp formatting and jsonb
+  normalization exactly, and any drift would report tampering that never happened.
+- **A clean build does not mean wired up.** `Login` and `Logout` kept their old bodies while
+  the new `record` helper sat unused, and Go compiles unused methods happily. Only reading the
+  database afterwards revealed zero audit rows.
+- **Edit a file bottom to top** when applying several replacements, so earlier line numbers do
+  not shift under you. Several mis-selections this session came from exactly that.
+
+*(Committed on `feat/audit-log`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

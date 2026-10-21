@@ -3,6 +3,7 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"sentinelops/internal/audit"
 	"sentinelops/internal/authctx"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
@@ -40,18 +42,27 @@ func init() {
 	dummyHash = h
 }
 
-// Handler wires the user and session repositories together to implement login.
-// It depends on BOTH domains, which is why it lives in its own auth package.
 type Handler struct {
 	users         *user.Repository
 	sessions      *session.Repository
+	audit         *audit.Repository
 	secureCookies bool
 }
 
 // NewHandler builds an auth Handler. secureCookies controls the cookie's Secure
 // flag: false for local http development, true in production over HTTPS.
-func NewHandler(users *user.Repository, sessions *session.Repository, secureCookies bool) *Handler {
-	return &Handler{users: users, sessions: sessions, secureCookies: secureCookies}
+func NewHandler(users *user.Repository, sessions *session.Repository, auditLog *audit.Repository, secureCookies bool) *Handler {
+	return &Handler{users: users, sessions: sessions, audit: auditLog, secureCookies: secureCookies}
+}
+
+// record writes an audit entry, logging rather than failing when it cannot.
+// Authentication events have no surrounding transaction to join, so a lost
+// entry must not break the login itself. This is deliberately asymmetric with
+// privileged mutations, which use RecordTx and DO fail if the entry is lost.
+func (h *Handler) record(ctx context.Context, e audit.Entry) {
+	if err := h.audit.Record(ctx, e); err != nil {
+		log.Printf("audit: %v", err)
+	}
 }
 
 // loginInput is the request body for POST /api/sessions.
@@ -74,11 +85,23 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	in.Email = strings.TrimSpace(in.Email)
 
+	ip := audit.ClientIP(r)
+
 	// 1) Find the user. A missing user must fail the SAME way as a wrong
 	// password: generic message, same 401, similar timing.
 	u, err := h.users.GetByEmail(r.Context(), in.Email)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
+			// The response hides which of the two failed; the audit entry does
+			// not, because an investigator needs the difference. This is why
+			// the audit log is more sensitive than the API surface.
+			h.record(r.Context(), audit.Entry{
+				ActorEmail: in.Email,
+				Action:     audit.ActionLoginFailed,
+				Outcome:    audit.OutcomeFailure,
+				Detail:     map[string]any{"reason": "unknown_email"},
+				IP:         ip,
+			})
 			// Equalize timing with a throwaway bcrypt compare, then fail generically.
 			bcrypt.CompareHashAndPassword(dummyHash, []byte(in.Password))
 			http.Error(w, "invalid email or password", http.StatusUnauthorized)
@@ -91,6 +114,16 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// 2) Verify the password against the stored bcrypt hash.
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)); err != nil {
+		// Here we DO know who it was, so the entry names them. A run of these
+		// against one account is what a brute force attempt looks like.
+		h.record(r.Context(), audit.Entry{
+			ActorID:    &u.ID,
+			ActorEmail: u.Email,
+			Action:     audit.ActionLoginFailed,
+			Outcome:    audit.OutcomeFailure,
+			Detail:     map[string]any{"reason": "bad_password"},
+			IP:         ip,
+		})
 		http.Error(w, "invalid email or password", http.StatusUnauthorized)
 		return
 	}
@@ -108,6 +141,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	h.record(r.Context(), audit.Entry{
+		ActorID:    &u.ID,
+		ActorEmail: u.Email,
+		Action:     audit.ActionLogin,
+		Outcome:    audit.OutcomeSuccess,
+		IP:         ip,
+	})
 
 	// 4) Send the RAW token to the browser in a hardened cookie. The database
 	// holds only its hash, so this cookie is the only copy of the secret.
@@ -165,10 +206,33 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	// If a session cookie is present, delete its row so the token is truly
 	// revoked server-side — not merely forgotten by the browser.
 	if c, err := r.Cookie(cookieName); err == nil {
-		if err := h.sessions.DeleteByTokenHash(r.Context(), session.HashToken(c.Value)); err != nil {
+		tokenHash := session.HashToken(c.Value)
+
+		// Identify the session's owner BEFORE deleting it, so the audit entry
+		// can name them. Costs two reads on a logout, which is a fair price for
+		// a complete session lifecycle in the trail. A cookie that matches no
+		// live session simply yields no entry: there is nobody to name.
+		var actor *user.User
+		if sess, err := h.sessions.GetByTokenHash(r.Context(), tokenHash); err == nil {
+			if u, err := h.users.GetByID(r.Context(), sess.UserID); err == nil {
+				actor = &u
+			}
+		}
+
+		if err := h.sessions.DeleteByTokenHash(r.Context(), tokenHash); err != nil {
 			log.Printf("logout: delete session: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
+		}
+
+		if actor != nil {
+			h.record(r.Context(), audit.Entry{
+				ActorID:    &actor.ID,
+				ActorEmail: actor.Email,
+				Action:     audit.ActionLogout,
+				Outcome:    audit.OutcomeSuccess,
+				IP:         audit.ClientIP(r),
+			})
 		}
 	}
 

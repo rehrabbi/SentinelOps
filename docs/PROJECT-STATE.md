@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-10-21 · **Current stage:** Role management complete — `RequireRole`
-> middleware, admin-only `GET`/`PATCH /api/users`, and an admin screen behind a real router.
-> Next: audit logging, or the production arc (Docker, CI hardening, AWS).
+> **Last updated:** 2026-10-21 · **Current stage:** Audit logging complete — an append-only,
+> hash-chained `audit_log` with database-enforced immutability, auth + role-change events, and a
+> `verify-audit` command. Next: the production arc (Docker, CI hardening, AWS).
 
 ---
 
@@ -228,28 +228,30 @@ After cloning anywhere new, register your own test user via `POST /api/users`.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-**✅ Role management shipped 2026-10-21.** `GET /api/users` is admin-only (it had been
-unauthenticated since stage one), and `PATCH /api/users/{id}` changes a role. Verified 11/11
-by curl plus a live browser pass: reporter self-promotion 403, analyst 403, anonymous 401,
-admin 200, **admin changing their own role 403**, invalid role 400, unknown field 400,
-missing/malformed id 404, empty body 400. A demoted user's very next request is refused on the
-same cookie, because the role is read from the database each request.
+**✅ Audit logging shipped 2026-10-21.** `audit_log` records `user.login`,
+`user.login_failed`, `user.logout` and `user.role_changed` with actor, target, outcome,
+JSONB detail and source IP.
 
-**Key decisions:** the lockout guard is "an admin may never change their own role", which is
-race-free and guarantees at least one admin survives (the acting admin cannot remove
-themselves). Alternative was counting remaining admins, which needs the count and the write in
-one transaction. Frontend uses **react-router 8.5.0** (MIT, ~41 KB added to the bundle) with
-`/` and `/admin` routes; the admin guard is cosmetic and the API is the control, proven by
-calling it directly as a reporter.
+**Integrity, and its honest limit.** A `BEFORE INSERT` trigger SHA-256 chains each row to its
+predecessor, so the application cannot forge, skip or backdate an entry. `UPDATE`, `DELETE`
+and `TRUNCATE` are refused by triggers (TRUNCATE needs its own statement-level trigger, since
+it bypasses row-level ones). `pg_advisory_xact_lock` serializes inserts so concurrent writers
+cannot fork the chain. **Attack-tested:** forged hashes overwritten, update/delete/truncate
+refused, a single-row edit detected. **A superuser who disables the triggers CAN rebuild the
+whole chain and is NOT detected** — the fix is anchoring `verify-audit`'s head hash outside
+this database, planned with deployment.
 
-**Architecture note:** `user` could not import `auth` (auth already imports user, so it would
-cycle), so the request caller moved into a new **`internal/authctx`** package holding a
-`Principal{ID, Role}` and importing nothing. `auth`, `incident`, and `user` all read from it.
-`auth.Me` now loads the user by id, one extra query, in exchange for a context that states who
-is asking rather than caching a row.
+**Failure policy, deliberately asymmetric.** A role change and its audit entry share one
+transaction, so a failed audit write rolls the change back (fault-injection tested: role
+unchanged, no new row, HTTP 500). Login and logout have no transaction to join, so a failed
+audit write is logged and the request still succeeds.
 
-**Bootstrapping note for production:** the first admin must be created out of band with SQL
-(`UPDATE users SET role='admin' WHERE email='…'`). There is no other path, by design.
+**Design notes:** the previous role for `{"from":…,"to":…}` comes from a CTE in the same
+UPDATE statement, since subqueries see the pre-statement snapshot — no separate SELECT, no
+race. `audit.Record`/`RecordTx` take an `execer` interface satisfied by both `*sql.DB` and
+`*sql.Tx`; `user.Repository.UpdateRole` takes the same kind of `rowQuerier`. Chain
+verification lives in SQL, not Go, so the canonical form has exactly one definition.
+`authctx.Principal` gained `Email`, because an audit entry must name the actor.
 
 **Incidents are now a full CRUD-ish domain with per-object authz**, all verified: create, list
 (RBAC-scoped), get-by-id and partial update (owner/role-scoped, IDOR-safe 404s), with an inline

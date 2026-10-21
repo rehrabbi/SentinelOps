@@ -133,27 +133,47 @@ func (r *Repository) GetByID(ctx context.Context, id string) (User, error) {
 	return u, nil
 }
 
-// UpdateRole sets a user's role and returns the stored row. The role string is
-// validated by the caller, and the CHECK constraint on users.role is the
-// backstop if an invalid value ever reaches here.
+// rowQuerier is satisfied by both *sql.DB and *sql.Tx. Taking it as a parameter
+// is what lets a caller run this inside their own transaction, so a change and
+// its audit entry commit together or not at all. Same idiom as the audit
+// package's execer.
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// UpdateRole sets a user's role and returns the stored row together with the
+// role it had before, which the audit entry needs in order to record
+// "reporter -> admin" rather than just "admin".
 //
-// The returned columns deliberately exclude password_hash, like every other
-// read in this file.
-func (r *Repository) UpdateRole(ctx context.Context, id, role string) (User, error) {
+// The previous value comes from a CTE in the same statement rather than a
+// separate SELECT. Every subquery in a statement is evaluated against the
+// snapshot taken when the statement began, so `previous` sees the OLD role even
+// though this statement is overwriting it. One round trip, and no window for
+// another writer to slip in between a read and a write.
+//
+// The role string is validated by the caller, and the CHECK constraint on
+// users.role is the backstop. The returned columns deliberately exclude
+// password_hash, like every other read in this file.
+func (r *Repository) UpdateRole(ctx context.Context, q rowQuerier, id, role string) (User, string, error) {
 	const query = `
+		WITH previous AS (
+			SELECT role FROM users WHERE id = $1
+		)
 		UPDATE users
 		SET role = $2, updated_at = now()
 		WHERE id = $1
-		RETURNING id, email, full_name, role, created_at, updated_at`
+		RETURNING id, email, full_name, role, created_at, updated_at,
+		          (SELECT role FROM previous)`
 
 	var u User
-	err := r.db.QueryRowContext(ctx, query, id, role).
-		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+	var previousRole string
+	err := q.QueryRowContext(ctx, query, id, role).
+		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt, &previousRole)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return User{}, ErrUserNotFound
+			return User{}, "", ErrUserNotFound
 		}
-		return User{}, fmt.Errorf("update user role: %w", err)
+		return User{}, "", fmt.Errorf("update user role: %w", err)
 	}
-	return u, nil
+	return u, previousRole, nil
 }
