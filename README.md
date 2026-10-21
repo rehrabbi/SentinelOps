@@ -36,6 +36,8 @@ incremental engineering story, one concern per branch and one concern per pull r
 - Registration and login with server side sessions in an `HttpOnly` cookie
 - Role based access control across three roles, reporter, analyst, and admin, with an
   admin only user directory and an admin screen for changing roles
+- An append-only, hash-chained audit log recording logins, failed logins, logouts,
+  and role changes, with a command that verifies the chain
 - Incident create, list, read, and partial update, each one scoped by owner and role
 - A React dashboard with severity and status badges and inline status editing
 - Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
@@ -104,6 +106,9 @@ the threat it answers.
 | Privilege forging | Role is read from the database on every request, never taken from the client | `internal/auth/middleware.go` |
 | Sensitive data exposure | The user directory is admin only, enforced by a `RequireRole` middleware chained inside `RequireAuth` | `internal/auth/middleware.go` |
 | Privilege escalation | Role changes are admin only, accept no field but `role`, and an admin cannot change their own, so at least one admin always remains | `internal/user/handler.go` |
+| Repudiation, "nobody did that" | Every login, failed login, logout and role change is recorded with the actor, target, outcome and source address | `internal/audit/` |
+| Covering tracks | The audit log refuses `UPDATE`, `DELETE` and `TRUNCATE`, and every row is SHA-256 chained to its predecessor by a database trigger, so edits are detectable with `go run . verify-audit` | `migrations/000005_create_audit_log.up.sql` |
+| An unrecorded privileged action | A role change and its audit entry share one transaction, so if the entry cannot be written the change is rolled back | `internal/user/handler.go` |
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
@@ -126,7 +131,11 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 - Expired session rows are never pruned, so the table grows without bound.
 - No automated test suite yet. Verification so far is scripted `curl` runs and manual
   browser checks, both recorded in the learning log.
-- No audit log of who changed what.
+- The audit log is tamper evident, not tamper proof. A database superuser can drop the
+  triggers and rebuild the whole hash chain. Closing that means recording the head hash
+  outside this database, which is planned alongside deployment.
+- Authentication events are recorded on a best-effort basis, unlike role changes, which
+  are transactional. A failed audit write is logged but does not fail the login.
 
 ## Tech stack
 
@@ -177,6 +186,13 @@ rather than only your own.
 Two optional variables both have working local defaults. `FRONTEND_ORIGIN` defaults to
 `http://localhost:5173`, and `SECURE_COOKIES` defaults to `false`, which must become
 `true` in production or the session cookie travels in cleartext.
+
+Check the audit log's integrity at any time. It exits non-zero when the chain is broken,
+so it suits a scheduled job.
+
+```bash
+cd backend && go run . verify-audit
+```
 
 Per device setup notes, including the macOS and Colima path, live in
 [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md).
@@ -231,17 +247,17 @@ is in [CONTRIBUTING.md](CONTRIBUTING.md) and
 
 Done so far, in order. Health and readiness, Postgres and migrations, user registration,
 login with sessions, auth middleware, logout, the React auth UI, the incident domain with
-RBAC, the incident dashboard, per-object authorization on read and update, and role
-management behind an admin only screen.
+RBAC, the incident dashboard, per-object authorization on read and update, role
+management behind an admin only screen, and a tamper-evident audit log.
 
 Next up.
 
-1. Audit logging of who changed what, now that privileged actions exist
-2. A Dockerfile for the application and a multi stage build
-3. CI hardening with dependency, secret, and static analysis scanning
-4. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
+1. A Dockerfile for the application and a multi stage build
+2. CI hardening with dependency, secret, and static analysis scanning, plus a scheduled
+   `verify-audit` run and somewhere outside the database to anchor the chain head
+3. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
    environment branches once there is somewhere to deploy
-5. Observability, alerting, backups, and a cost review
+4. Observability, alerting, backups, and a cost review
 
 ## Documentation
 
