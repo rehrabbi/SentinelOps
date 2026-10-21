@@ -974,6 +974,56 @@ unaffected.
 
 ---
 
+## Stage: Role management (admin screen, RequireRole, authctx)
+
+**Decisions (decision prompts):** `PATCH /api/users/{id}` over `PUT /api/users/{id}/role`;
+lockout guard is **refuse any self role change**; frontend gets **react-router** rather than a
+conditional section; role picked with a **select plus an explicit Save** rather than saving on
+change; and, when the import cycle surfaced, **extract `internal/authctx`** rather than adding
+an `admin` package or bolting the handler onto `auth.Handler`.
+
+**Built:** `user.Repository.UpdateRole`; `user.Handler.UpdateRole` with a one-field input
+struct; the route behind `RequireAuth(RequireRole("admin", …))`; `internal/authctx`;
+`api.ts` gained `Role`, a `role` field on `User`, `getUsers`, and `updateUserRole`;
+`admin.tsx` with `AdminPage` and `UserRow`; routes in `App.tsx` and `BrowserRouter` in
+`main.tsx`; admin styles plus a stacking media query.
+
+**Concepts learned:**
+- **Go's import graph is architecture.** `user` cannot import `auth` because `auth` imports
+  `user`. The fix was not a trick, it was realising a request context should carry a
+  **principal** (id and role) rather than a cached database row. A package that imports
+  nothing can be imported by everything.
+- **Authorization before validation.** The self-change refusal runs before the body is read,
+  so a request we will never perform is never partly processed.
+- **Refusing self-change is a race-free invariant.** An admin may demote other admins but not
+  themselves, so the acting admin always survives. Counting remaining admins instead would
+  need the count and the write inside one transaction, or two simultaneous demotions both pass
+  the check and leave zero.
+- **Draft state versus server truth.** The select holds `choice`, the row holds `user.role`,
+  and `dirty` is the difference. On failure `choice` snaps back, so the screen never shows a
+  role the server rejected. A UI that disagrees with the database is worse than an error.
+- **A client guard is not a guard.** With the admin screen never opened, a reporter calling
+  `PATCH /api/users/{id}` directly got 403 three ways, including promoting herself.
+- **Roles are not hierarchical here.** `RequireRole` is an exact match, so an analyst is not
+  "nearly an admin". Deliberate, since hierarchy is where authorization bugs hide.
+- **Measure responsive layout, do not eyeball it.** A screenshot looked broken at phone width
+  but was only cropped. Measuring showed the real bug: the name column collapsed to **32px**
+  while the controls held 249px. The breakpoint (520px) was then chosen from where the layout
+  actually fails rather than from a device's width.
+- **A media query keys off the viewport, not the container.** The first attempt to verify the
+  fix shrank the container and concluded the CSS had not applied. The CSS was fine, the probe
+  was wrong.
+- **The loading guard protects the route guard.** On a refresh at `/admin`, auth state starts
+  as `loading`; the pre-existing early return stops `<Routes>` rendering, which is the only
+  reason a hard refresh does not bounce an admin off their own page.
+- **npm audit on a shallow tree.** `source-map-js` 1.2.1 to 1.2.2, a dev-only transitive
+  dependency of the build toolchain, not shipped to users. `npm audit fix` moved one patch
+  version and nothing else.
+
+*(Committed on `feat/role-management`.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
