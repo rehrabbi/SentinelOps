@@ -22,9 +22,14 @@ const principalKey contextKey = 0
 // Principal is the authenticated caller: who they are and what they may do.
 // Role is loaded fresh from the database on every request by the middleware, so
 // it cannot be forged by a client and a role change takes effect immediately.
+//
+// Email is here because an audit entry must name the actor in human-readable
+// form, and re-reading the user row on every privileged action to recover it
+// would be a query to retrieve something we already had.
 type Principal struct {
-	ID   string
-	Role string
+	ID    string
+	Email string
+	Role  string
 }
 
 // WithPrincipal returns a copy of ctx carrying p. Only the auth middleware

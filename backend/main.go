@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"sentinelops/internal/audit"
 	"sentinelops/internal/auth"
 	"sentinelops/internal/incident"
 	"sentinelops/internal/session"
@@ -55,6 +56,27 @@ func main() {
 		return
 	}
 
+	// Subcommand: "verify-audit" walks the audit hash chain and exits non-zero
+	// if it is broken, so it can be run from a scheduled job or a CI step.
+	// Record the head hash somewhere outside this database: that is what turns
+	// tamper evidence into something an attacker with database access cannot
+	// quietly defeat by rebuilding the chain.
+	if len(os.Args) > 1 && os.Args[1] == "verify-audit" {
+		report, err := audit.Verify(context.Background(), db)
+		if err != nil {
+			log.Fatalf("audit verification failed: %v", err)
+		}
+		if report.Entries == 0 {
+			log.Println("audit chain: empty, nothing to verify")
+			return
+		}
+		if !report.Intact() {
+			log.Fatalf("audit chain BROKEN: %d entries, first bad id %d", report.Entries, report.FirstBad)
+		}
+		log.Printf("audit chain intact: %d entries, head %s", report.Entries, report.HeadHash)
+		return
+	}
+
 	// A ServeMux ("multiplexer" / router) inspects each incoming
 	// request and decides which handler function should answer it.
 	mux := http.NewServeMux()
@@ -68,8 +90,13 @@ func main() {
 	// Users feature: wire the repository (SQL) to the handler (HTTP), then
 	// register its routes. This is dependency injection by hand — main() is
 	// where all the pieces are constructed and connected.
+	// The audit repository is built first because several handlers record to it.
+	auditRepo := audit.NewRepository(db)
+
+	// The user handler also takes the pool itself, because changing a role runs
+	// the update and its audit entry inside one transaction.
 	userRepo := user.NewRepository(db)
-	userHandler := user.NewHandler(userRepo)
+	userHandler := user.NewHandler(userRepo, db, auditRepo)
 	// GET /api/users is registered further down: it is admin-only, so it needs
 	// authHandler, which does not exist yet at this point.
 	mux.HandleFunc("POST /api/users", userHandler.Create)
@@ -78,7 +105,7 @@ func main() {
 	// repositories. This is why auth is its own package rather than living
 	// inside user or session.
 	sessionRepo := session.NewRepository(db)
-	authHandler := auth.NewHandler(userRepo, sessionRepo, secureCookies)
+	authHandler := auth.NewHandler(userRepo, sessionRepo, auditRepo, secureCookies)
 	mux.HandleFunc("POST /api/sessions", authHandler.Login)
 
 	// Protected route: GET /api/me returns the current user. RequireAuth wraps

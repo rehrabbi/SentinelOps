@@ -52,7 +52,7 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 		// 4) Attach the caller to the request context and proceed. Handlers behind
 		// this middleware pull it out with authctx.FromContext. Only the id and
 		// role travel: a context states who is asking, it is not a row cache.
-		ctx := authctx.WithPrincipal(r.Context(), authctx.Principal{ID: u.ID, Role: u.Role})
+		ctx := authctx.WithPrincipal(r.Context(), authctx.Principal{ID: u.ID, Email: u.Email, Role: u.Role})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

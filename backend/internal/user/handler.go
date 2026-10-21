@@ -1,6 +1,7 @@
 package user
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
@@ -10,6 +11,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"sentinelops/internal/audit"
 	"sentinelops/internal/authctx"
 )
 
@@ -17,12 +19,17 @@ import (
 // repository calls and repository results into HTTP responses. It knows
 // nothing about SQL.
 type Handler struct {
-	repo *Repository
+	repo  *Repository
+	db    *sql.DB
+	audit *audit.Repository
 }
 
-// NewHandler wires a Handler to a Repository.
-func NewHandler(repo *Repository) *Handler {
-	return &Handler{repo: repo}
+// NewHandler wires a Handler to a Repository. It also takes the pool itself and
+// the audit repository, because a role change runs the update and its audit
+// entry inside one transaction, which needs a connection the repository does
+// not own.
+func NewHandler(repo *Repository, db *sql.DB, auditLog *audit.Repository) *Handler {
+	return &Handler{repo: repo, db: db, audit: auditLog}
 }
 
 // List handles GET /api/users.
@@ -185,13 +192,53 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := h.repo.UpdateRole(r.Context(), id, in.Role)
+	// A privileged change and its audit entry share ONE transaction. If the
+	// entry cannot be written, the change is rolled back: an action nobody can
+	// account for must not happen. This is deliberately stricter than the
+	// best-effort policy used for login and logout, which have no transaction
+	// to join.
+	tx, err := h.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		log.Printf("update user role: begin: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	// Rollback after a successful Commit is a no-op, so deferring it
+	// unconditionally is safe and guarantees the connection is released on
+	// every path, including the early returns below.
+	defer tx.Rollback()
+
+	u, previousRole, err := h.repo.UpdateRole(r.Context(), tx, id, in.Role)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
 		log.Printf("update user role: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	targetType := "user"
+	if err := h.audit.RecordTx(r.Context(), tx, audit.Entry{
+		ActorID:    &caller.ID,
+		ActorEmail: caller.Email,
+		Action:     audit.ActionRoleChanged,
+		TargetType: &targetType,
+		TargetID:   &u.ID,
+		Outcome:    audit.OutcomeSuccess,
+		Detail:     map[string]any{"from": previousRole, "to": u.Role, "target_email": u.Email},
+		IP:         audit.ClientIP(r),
+	}); err != nil {
+		// The deferred Rollback undoes the role change. The caller is told it
+		// failed, which is true: nothing was committed.
+		log.Printf("update user role: audit: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("update user role: commit: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
