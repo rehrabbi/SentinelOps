@@ -337,3 +337,135 @@
       opacity: 0.6;
       cursor: wait;
     }
+
+
+/* Admin: user role management. */
+.admin {
+  margin-top: 32px;
+  text-align: left;
+}
+
+.admin h2 {
+  text-align: center;
+}
+
+/* The navigation links between the dashboard and the admin screen. */
+.admin-link {
+  text-align: center;
+  margin: 8px 0 20px;
+  font-size: 14px;
+}
+
+.user-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.user-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.user-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+/* Marks your own row, which cannot be edited. */
+.user-self {
+  font-weight: 400;
+  color: var(--text);
+}
+
+.user-email {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.user-controls select {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+}
+
+.user-controls select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* Disabled controls: your own row, an unchanged row, or a save in flight.
+   not-allowed rather than wait, because most of these are permanent. */
+.user-controls select:disabled,
+.user-controls button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.user-controls button {
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+/* Role badges, reusing the .badge pill shape. */
+.role-reporter {
+  background: var(--code-bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.role-analyst {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.role-admin {
+  background: rgba(147, 51, 234, 0.12);
+  color: #9333ea;
+  border-color: rgba(147, 51, 234, 0.3);
+}
+
+/* On a phone the row's two halves cannot share a line. The controls need about
+   250px, which squeezes the name column to roughly 30px and truncates the
+   email. Below this width, stack them instead of letting one starve the other. */
+@media (max-width: 520px) {
+  .user-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .user-controls {
+    justify-content: space-between;
+  }
+}
