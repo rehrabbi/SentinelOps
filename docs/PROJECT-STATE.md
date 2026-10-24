@@ -128,8 +128,12 @@ The repo allows **merge commits only** (squash and rebase disabled in GitHub set
 merge commit uses the **PR title and description** as its message, so PR write-ups live in
 `git log`. Merge commits were chosen because they keep commit hashes valid on `main`, which the
 docs cite. The PR template gained a linked issue, type of change, risk and rollback, and
-screenshots. Still planned, one at a time: CI as a required check, custom labels, milestones,
-`CODEOWNERS` and a code of conduct, semver releases with a `CHANGELOG.md`, and a README pass.
+screenshots. Both CI jobs are now **required checks** on `main`, reported by GitHub Actions
+only (app id 15368) and with branches required to be up to date before merging; the rule lives
+in the classic branch protection alongside the existing PR, admin, and conversation rules.
+Routine commits, pushes, PRs, and merges on green CI are **pre-approved** (see WAYS-OF-WORKING
+§11). Still planned, one at a time: custom labels, milestones, `CODEOWNERS` and a code of
+conduct, semver releases with a `CHANGELOG.md`, and a README pass.
 
 ## 5. What's built and working
 

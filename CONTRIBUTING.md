@@ -80,6 +80,13 @@ cd ../frontend && npm run lint && npm run build
 Also check that no secret, `.env` file, or build artifact is in the diff, and that the
 documentation in `docs/` still matches reality.
 
+Both CI jobs, `Backend (Go)` and `Frontend (React, TypeScript)`, are **required checks** on
+`main`: a pull request cannot merge until both pass, only results reported by GitHub
+Actions count, and the branch must be up to date with `main` first. When `main` has moved,
+use "Update branch" and let CI run again. Required checks are matched by job name, so
+renaming a job in `ci.yml` means updating the branch protection in the same change, or
+every pull request will wait for a check that no longer exists.
+
 ## Pull requests
 
 - The title uses the same conventional format as a commit subject, for example
@@ -91,6 +98,9 @@ documentation in `docs/` still matches reality.
   merge commit takes the pull request's title and description as its message, so the
   write-up ends up in `git log` itself. Write it to be read years later, and never paste a
   token, cookie, or password into it.
+- Write each paragraph and bullet of the description as one unbroken line. GitHub wraps
+  the merge commit message itself but keeps any line breaks typed into the description, so
+  hand-wrapped paragraphs come out ragged in `git log`.
 - Merge commits are the only merge method because they keep every commit, and its hash,
   on `main`. Squash and rebase merges rewrite those hashes, which would break every
   reference to a commit in `docs/`.
