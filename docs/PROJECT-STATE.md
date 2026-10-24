@@ -132,8 +132,14 @@ screenshots. Both CI jobs are now **required checks** on `main`, reported by Git
 only (app id 15368) and with branches required to be up to date before merging; the rule lives
 in the classic branch protection alongside the existing PR, admin, and conversation rules.
 Routine commits, pushes, PRs, and merges on green CI are **pre-approved** (see WAYS-OF-WORKING
-§11). Still planned, one at a time: custom labels, milestones, `CODEOWNERS` and a code of
-conduct, semver releases with a `CHANGELOG.md`, and a README pass.
+§11). Labels are prefixed `type:` (mirrors branch and commit types), `area:` and `priority:`,
+replacing GitHub's defaults except `duplicate`, `wontfix` and `question`. Milestones are one per
+roadmap stage, created when the stage starts, each ending in a release; milestone #1 is
+**Containerization**, and the 16 PRs merged before issue tracking were deliberately not
+backfilled. `.github/CODEOWNERS` is `* @rehrabbi`, informational only (code owner review is not
+required, since an author cannot approve their own PR). `CODE_OF_CONDUCT.md` is GitHub's
+Contributor Covenant 2.0 template, with bernardojirehrabbi@gmail.com as the report contact.
+Still planned, one at a time: semver releases with a `CHANGELOG.md`, and a README pass.
 
 ## 5. What's built and working
 

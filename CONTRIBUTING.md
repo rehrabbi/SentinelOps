@@ -46,6 +46,22 @@ template, before a branch exists. The issue records what is being built, why now
 decisions to make first, and what done looks like. Small `docs/` and `chore/` changes may
 skip the issue; everything else links one.
 
+Label every issue and pull request with one `type:` label, the same word as its branch and
+commits, plus one or more `area:` labels (`backend`, `frontend`, `database`, `infra`,
+`security`) and, for issues, a `priority:` label (`high`, `medium`, `low`). Close an issue
+that will not be done with `duplicate`, `wontfix`, or `question` as the reason.
+
+Each roadmap stage is a milestone, created when the stage starts, and every issue in the
+stage belongs to it. A stage ends when its milestone is closed, and each closed stage is
+tagged as a release.
+
+## Code of conduct and ownership
+
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+[`.github/CODEOWNERS`](.github/CODEOWNERS) names the maintainer, who is requested for review
+automatically; code owner review is deliberately not required, since an author cannot approve
+their own pull request.
+
 ## Commit messages
 
 Use a conventional subject line, a blank line, then a body of short bullet points.
