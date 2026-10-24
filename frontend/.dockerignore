@@ -1,0 +1,9 @@
+# Keep the build context minimal and keep secrets out of the image.
+# The image runs its own `npm ci` and `npm run build`, so local installs and
+# build output are never needed, and a Windows or macOS node_modules may carry
+# native binaries that would break on Alpine Linux.
+node_modules/
+dist/
+.env
+.env.*
+*.log
