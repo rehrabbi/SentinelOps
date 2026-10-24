@@ -27,13 +27,42 @@ project documentation.
 
 ## 2. Session startup
 
-1. Read this file, then `docs/WAYS-OF-WORKING.md`, then `docs/PROJECT-STATE.md`.
-2. Inspect repo structure; run `git status`; note the current branch.
-3. Summarize concisely: where the project stands, what's done, what's unfinished, and the
-   logical next step.
-4. **Do not start modifying code.** Wait for the task, then teach through it.
+Do all of this before saying anything substantive. It takes seconds, and it is the difference
+between continuing this project and accidentally restarting a stage that is already half built.
 
-Claude's per-device memory does **not** travel. The repository is the source of truth —
+1. Read this file, then `docs/WAYS-OF-WORKING.md`, then `docs/PROJECT-STATE.md`.
+
+2. **Look for unfinished work on another branch before trusting `main`.** A fresh clone lands
+   on `main`, and the newest work usually is not there. Anything listed below is an unfinished
+   stage, not an archive; archived branches are named `merged/*` and are already in `main`.
+
+   ```bash
+   git fetch origin
+   git status
+   git branch -r --no-merged main
+   ```
+
+   If that last command prints a branch, **switch to it and read ITS
+   `docs/PROJECT-STATE.md`** before forming any opinion about what comes next. The in-progress
+   stage, the decisions already settled for it, and the exact next step are recorded on that
+   branch and nowhere else. Re-opening a settled decision wastes the owner's time; re-deciding
+   it differently is worse.
+
+3. **Expect an empty database.** `pgdata` is a local Docker volume and never travels, so a new
+   machine has no users, no incidents, and an empty audit log. Bring-up is in
+   `docs/PROJECT-STATE.md` §5, including the first admin, which has to be created by hand in
+   SQL because the admin screen is itself admin-only.
+
+4. Summarize concisely: where the project stands, what is done, what is unfinished, and the
+   logical next step. Say which branch you would continue on and why.
+
+5. **Do not start modifying code.** Wait for the task, then teach through it.
+
+Verification commands live in `CONTRIBUTING.md`. Run them before claiming anything works, and
+remember a clean build only proves the code compiles. Code in this project has compiled
+perfectly while being completely unwired, and only reading the database afterwards revealed it.
+
+Claude's per-device memory does **not** travel. The repository is the source of truth, and
 `docs/` must carry everything needed to resume on another machine.
 
 ---
