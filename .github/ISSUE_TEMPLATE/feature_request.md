@@ -2,7 +2,7 @@
 name: Feature or stage
 about: A new capability or the next learning stage
 title: ''
-labels: enhancement
+labels: "type: feat"
 assignees: ''
 ---
 
