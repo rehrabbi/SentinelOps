@@ -121,6 +121,22 @@ every pull request will wait for a check that no longer exists.
   on `main`. Squash and rebase merges rewrite those hashes, which would break every
   reference to a commit in `docs/`.
 
+## Releases
+
+Versions follow [Semantic Versioning](https://semver.org/). While the version is `0.y.z`,
+each roadmap stage ends in a minor release (`v0.2.0`, `v0.3.0`) when its milestone closes,
+and fixes between stages are patch releases (`v0.2.1`). `1.0.0` is reserved for the first
+hardened production deployment on AWS.
+
+- [`CHANGELOG.md`](CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/).
+  Every pull request with a user-visible or security-relevant change adds a line under
+  `Unreleased`, grouped as Added, Changed, Fixed, Removed, or Security.
+- To release, move the `Unreleased` lines into a new version section dated that day, merge
+  that change, then create an annotated tag `vX.Y.Z` on the resulting merge commit and a
+  GitHub Release whose notes are that section.
+- A published tag is never moved or reused. A mistake in a release is fixed by the next one.
+- Every release is confirmed by the maintainer before it is tagged.
+
 ## Security changes
 
 Anything touching authentication, authorization, session handling, or input validation

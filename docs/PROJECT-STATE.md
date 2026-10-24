@@ -139,7 +139,13 @@ roadmap stage, created when the stage starts, each ending in a release; mileston
 backfilled. `.github/CODEOWNERS` is `* @rehrabbi`, informational only (code owner review is not
 required, since an author cannot approve their own PR). `CODE_OF_CONDUCT.md` is GitHub's
 Contributor Covenant 2.0 template, with bernardojirehrabbi@gmail.com as the report contact.
-Still planned, one at a time: semver releases with a `CHANGELOG.md`, and a README pass.
+**Releases:** semantic versioning, with today's `main` as **`v0.1.0`** (everything up to the
+repo standards), each roadmap stage ending in the next minor release (Containerization →
+`v0.2.0`), patch releases for fixes between stages, and **`1.0.0` reserved for the first
+hardened production deployment on AWS**. `CHANGELOG.md` is hand-written in Keep a Changelog
+format; every user-visible or security-relevant PR adds a line under `Unreleased`. Tags are
+annotated, never moved, and every release is confirmed by the owner before tagging (an
+approval gate in WAYS-OF-WORKING §11). Still planned: a README pass.
 
 ## 5. What's built and working
 
