@@ -5,8 +5,8 @@
 > has the blow-by-blow history.
 >
 > **Last updated:** 2026-10-24 · **Current stage:** 🚧 **Containerization, IN PROGRESS on branch
-> `feat/docker`.** The API image is built and verified; the frontend image is the next thing to
-> write. Full detail and the exact next step are in §6.
+> `feat/docker`.** The API and frontend images are both built and verified; adding them to
+> `compose.yaml` is next. Full detail and the exact next step are in §6.
 
 ---
 
@@ -263,37 +263,33 @@ non-root uid 65532, **no `/bin/sh` in the image at all**, fails loudly without `
 both `migrate` and `verify-audit` work from inside the container against the host database.
 Migrations are `go:embed`-ed, so the binary is the whole application and image and schema cannot drift.
 
-**⏭️ NEXT STEP: the frontend image.** Three new files, none of them yet written:
+**Done and verified (commit `167ce27`):** `frontend/.dockerignore`, `frontend/nginx.conf.template`
+and `frontend/Dockerfile`. Build stage `node:22-alpine` (the CI Node version) runs `npm ci` and
+`npm run build`; runtime stage `nginxinc/nginx-unprivileged:alpine` serves only `dist/`.
+- **Build-time vs run-time config, the point of this step.** `VITE_API_URL` is an `ARG` that Vite
+  inlines into the bundle, so the bundle talks to one API origin forever. `API_ORIGIN` is an `ENV`
+  (default `http://localhost:8080`) that the image's envsubst renders into the CSP at container start,
+  so the same image works against any API. The default stops an unset variable from leaving a literal
+  `${API_ORIGIN}` in the CSP, which would make the browser block every API call.
+- **All `add_header` directives sit at server level**, with the cache policy picked by a `map` on
+  `$uri`. nginx drops every inherited `add_header` in a location that declares its own, so a
+  per-location `Cache-Control` would have silently stripped the security headers from that location.
+- **Measured, not assumed:** build context **130 KB** (versus ~88 MB of `node_modules` without the
+  `.dockerignore`); image 91.5 MB, of which 91.1 MB is the nginx base and ~320 KB is ours (299 KB
+  bundle + config). Running it: uid 101; the CSP carried a fake `API_ORIGIN` passed at `docker run`;
+  `/` and `index.html` send `no-cache`; `/assets/*.js` sends `max-age=31536000, immutable` and gzip;
+  `/admin` returns `200 text/html` (SPA fallback); a missing asset is a real `404` that still carries
+  the security headers (`always`).
 
-1. `frontend/.dockerignore` — exclude `node_modules` (88 MB, versus a 168 KB tracked repo), `dist`,
-   `.env*`, `*.log`.
-2. `frontend/nginx.conf.template` — a server block: `listen 8080`; root `/usr/share/nginx/html`;
-   `X-Content-Type-Options: nosniff`; `Referrer-Policy: strict-origin-when-cross-origin`; a CSP of
-   `default-src 'self'; connect-src 'self' ${API_ORIGIN}; img-src 'self' data:; style-src 'self'
-   'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
-   (the `unsafe-inline` is an acknowledged weakening for Vite's injected style tag, removable later
-   with a nonce); `/assets/` cached one year `immutable` because Vite fingerprints filenames;
-   `index.html` `no-cache`; **SPA fallback** `try_files $uri $uri/ /index.html` so refreshing
-   `/admin` works; gzip on. It is a `.template` because the nginx image renders
-   `/etc/nginx/templates/*` with `envsubst` at container start, which makes `${API_ORIGIN}` RUNTIME
-   config.
-3. `frontend/Dockerfile` — build stage `node:22-alpine` (matching the CI Node version), manifests
-   copied before source so `npm ci` stays cached, `ARG VITE_API_URL=http://localhost:8080` plus a
-   matching `ENV`, then `npm run build`. Runtime stage `nginxinc/nginx-unprivileged:alpine`, copy
-   the template to `/etc/nginx/templates/default.conf.template`, copy `/src/dist` to
-   `/usr/share/nginx/html`, `EXPOSE 8080`.
+**Open, owner's call:** responses carry `Server: nginx/1.31.7`. `server_tokens off;` would hide the
+version; it was not in the agreed spec, so it was left out.
 
-**The teaching point this step exists for:** `VITE_API_URL` is **build-time** config that Vite
-inlines into the bundle, so that image only ever works against one API origin. `API_ORIGIN` in the
-CSP is **run-time** config via envsubst, so one image works anywhere. Knowing which a setting is
-decides whether you ship one image or one per environment.
-
-**After the frontend image:** add `api` and `web` services to `compose.yaml` (API needs
-`DATABASE_URL`, `FRONTEND_ORIGIN`, `SECURE_COOKIES`, and `depends_on` the healthy db; web needs
-`API_ORIGIN`), then verify end to end in containers, including that `/admin` survives a refresh.
-A `healthcheck` subcommand on the Go binary was proposed and not yet written: distroless has no
-shell or curl, so a normal `HEALTHCHECK CMD curl` cannot work, and a subcommand in the family of
-`migrate` and `verify-audit` is the clean answer.
+**⏭️ NEXT STEP: add `api` and `web` services to `compose.yaml`** (API needs `DATABASE_URL`,
+`FRONTEND_ORIGIN`, `SECURE_COOKIES`, and `depends_on` the healthy db; web needs `API_ORIGIN`), then
+verify end to end in containers, including that `/admin` survives a refresh. A `healthcheck`
+subcommand on the Go binary was proposed and not yet written: distroless has no shell or curl, so a
+normal `HEALTHCHECK CMD curl` cannot work, and a subcommand in the family of `migrate` and
+`verify-audit` is the clean answer.
 
 ---
 

@@ -1085,13 +1085,19 @@ single-image option would have removed CORS entirely by making everything same-o
 `distroless/static-debian12:nonroot` for the API; `nginxinc/nginx-unprivileged:alpine` for the
 frontend; app services added to `compose.yaml` so the local stack runs containerized.
 
-**Built so far:** `backend/Dockerfile` and `backend/.dockerignore`.
+**Built so far:** `backend/Dockerfile` and `backend/.dockerignore`; `frontend/Dockerfile`,
+`frontend/.dockerignore` and `frontend/nginx.conf.template`.
 
 **Measured, not assumed:** final image **20 MB** versus a **357 MB** builder, with the binary
 layer at 10.2 MB. `docker inspect` confirms uid 65532. Attempting `--entrypoint /bin/sh`
 fails with "no such file or directory", so there is genuinely no shell to pivot with. The
 container exits loudly without `DATABASE_URL`, and `migrate` and `verify-audit` both run from
 inside it.
+
+Frontend: build context **130 KB** with the `.dockerignore`. The image is 91.5 MB, but 91.1 MB
+of that is the nginx base; our layers are ~320 KB. Running it confirmed uid 101, a CSP carrying an
+`API_ORIGIN` passed only at `docker run`, `/admin` served as `200 text/html`, a year-long immutable
+cache plus gzip on `/assets/`, and a real `404` for a missing asset that still carries the headers.
 
 **Concepts learned:**
 - **Multi-stage builds exist to throw the toolchain away.** The builder needs 357 MB of Go
@@ -1115,9 +1121,22 @@ inside it.
   or one per environment.
 - **An image is not a secret store.** `DATABASE_URL` arrives at run time; anyone who can pull
   an image can read every layer of it.
+- **nginx `add_header` does not merge.** A location that declares any `add_header` loses every
+  one it would have inherited. Declaring one `Cache-Control` in `location /assets/` would have
+  silently stripped the CSP and `nosniff` from all JavaScript. Choosing the value with a `map` and
+  keeping every header at server level avoids the trap. `always` extends them to error responses.
+- **envsubst only replaces variables that exist.** The nginx image limits substitution to defined
+  environment variables, which is why `$uri` survives rendering. The flip side: an unset
+  `API_ORIGIN` would survive too, as literal text in the CSP, so the Dockerfile sets a default.
+- **`npm ci`, not `npm install`, in images.** It installs exactly what `package-lock.json` pins
+  and fails if the lockfile and `package.json` disagree, so every build is reproducible.
+- **A missing asset should 404.** Letting the SPA fallback answer `/assets/old.js` with
+  `index.html` hands the browser HTML where it expected JavaScript and hides the real problem.
+- **Measure what an image's size is made of.** 91.5 MB looked large until `docker history`
+  showed 91.1 MB was the base image and our part was ~320 KB.
 
-*(In progress on `feat/docker`. The frontend image, the compose services, and end-to-end
-verification remain.)*
+*(In progress on `feat/docker`. The compose services, the `healthcheck` subcommand, and
+end-to-end verification remain.)*
 
 ---
 
