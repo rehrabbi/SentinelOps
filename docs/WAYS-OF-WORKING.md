@@ -183,8 +183,9 @@ substantial existing code; changing the DB schema; creating a migration; running
 migration against anything other than the approved **local dev DB**; changing authn;
 changing authz; changing security controls; modifying infrastructure; `terraform
 apply`; creating cloud resources; causing AWS charges; changing CI/CD; modifying
-secrets/config; changing repository settings or branch protection; force-pushing or
-rewriting Git history; deploying; running destructive shell commands.
+secrets/config; changing repository settings or branch protection; tagging or publishing a
+release; force-pushing or rewriting Git history; deploying; running destructive shell
+commands.
 
 **Do not infer approval from previous steps.** Approval is per-action, per-session.
 
