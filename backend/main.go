@@ -20,6 +20,22 @@ import (
 // main is the entry point of every Go program. It sets up the HTTP
 // server and starts listening for requests.
 func main() {
+	// Subcommand: "healthcheck" asks the already-running server whether it is
+	// alive, and exits 0 if so, 1 if not. Docker runs it inside the container,
+	// where the distroless image has no shell or curl to do the same job.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		client := &http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get("http://127.0.0.1:8080/healthz")
+		if err != nil {
+			log.Fatalf("healthcheck failed: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			log.Fatalf("healthcheck failed: status %d", resp.StatusCode)
+		}
+		return
+	}
+
 	// Read the database connection string from the environment (12-factor
 	// config). We never hard-code credentials; if it's missing, fail loudly.
 	databaseURL := os.Getenv("DATABASE_URL")
