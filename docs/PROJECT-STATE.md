@@ -121,6 +121,16 @@ scanning deliberately deferred to its own stage so it gets taught rather than bo
 `CONTRIBUTING.md`. **`dev`/`staging`/`prod` environment branches are a decided future step**,
 to be created only once there is real infrastructure to deploy to (after Docker, CI, and AWS).
 
+**Repo standards decisions (2026-10-24):** branches are **typed** to mirror commit types
+(`feat/ fix/ docs/ build/ ci/ refactor/ chore/`), with no issue number in the name. Features,
+fixes, and stages start as an **issue** that the PR closes; small docs/chore changes may skip it.
+The repo allows **merge commits only** (squash and rebase disabled in GitHub settings), and the
+merge commit uses the **PR title and description** as its message, so PR write-ups live in
+`git log`. Merge commits were chosen because they keep commit hashes valid on `main`, which the
+docs cite. The PR template gained a linked issue, type of change, risk and rollback, and
+screenshots. Still planned, one at a time: CI as a required check, custom labels, milestones,
+`CODEOWNERS` and a code of conduct, semver releases with a `CHANGELOG.md`, and a README pass.
+
 ## 5. What's built and working
 
 **Endpoints live:** `GET /healthz` (liveness), `GET /readyz` (DB readiness),
