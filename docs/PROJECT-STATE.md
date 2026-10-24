@@ -4,15 +4,16 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-10-21 · **Current stage:** Audit logging complete — an append-only,
-> hash-chained `audit_log` with database-enforced immutability, auth + role-change events, and a
-> `verify-audit` command. Next: the production arc (Docker, CI hardening, AWS).
+> **Last updated:** 2026-10-24 · **Current stage:** 🚧 **Containerization, IN PROGRESS on branch
+> `feat/docker`.** The API image is built and verified; the frontend image is the next thing to
+> write. Full detail and the exact next step are in §6.
 
 ---
 
 ## 1. How to resume on a new device
 
-1. Clone the repo and open the folder in VSCode.
+1. Clone the repo and open the folder in VSCode. **Then check out the in-progress branch:**
+   `git fetch origin && git switch feat/docker` — `main` does NOT have the containerization work.
 2. Tell Claude: *"Read docs/WAYS-OF-WORKING.md and docs/PROJECT-STATE.md, then re-orient
    per the Session behavior section and continue."* (Re-paste the operating manual too if
    you have it — but WAYS-OF-WORKING.md captures all of it.)
@@ -218,15 +219,83 @@ incident-UI PR. Merged branches are archived as `merged/*` (never deleted) — s
 
 **Runtime state:** container `sentinelops-db` (Postgres 17) runs the DB.
 ⚠️ **Database contents do NOT travel between devices** — `pgdata` is a local Docker volume,
-not part of the repo. The Windows box's users (`alice@`/`bob@` with fake hashes,
-`carol@example.com`) do **not** exist on other machines. On the Mac the DB was created fresh
-and holds one throwaway account, `testuser@example.com` (password
-`correct-horse-battery-staple` — disposable local test credential only), plus its sessions.
-After cloning anywhere new, register your own test user via `POST /api/users`.
+not part of the repo. Every machine starts with an empty database.
+
+**Bringing up a fresh device (do this in order):**
+1. `colima start` (macOS), then `docker compose up -d`, then `go run . migrate` from `backend/`.
+   Schema should report version 5, dirty = f.
+2. Register a user through the UI or `POST /api/users` (needs `fullName`, `email`, and a
+   password of at least 12 characters).
+3. **Promote that user to admin by hand**, because nothing else can: the admin screen is
+   admin-only, so the first admin always has to be created out of band. This is true in
+   production too and is a deliberate property, not a gap.
+   `UPDATE users SET role='admin' WHERE email='you@example.com';`
+4. The `audit_log` starts empty. It is append-only and hash-chained, so entries from another
+   machine cannot be imported, and `go run . verify-audit` on an empty table reports
+   "empty, nothing to verify" rather than failing.
+
+The Mac's local database currently holds `jireh@example.com` (admin) and
+`mallory@example.com` (analyst), five seeded demo incidents, and six audit entries. None of
+that exists anywhere else. Test passwords in this project are disposable local-only strings
+and are never real credentials.
 
 ---
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
+
+### 🚧 IN PROGRESS: containerization (branch `feat/docker`)
+
+**Decisions already made, do not re-litigate:**
+- **Two images**, an API and a static frontend, matching the target diagram where a CDN fronts
+  static assets and a load balancer fronts the API. (One image serving both would have killed
+  CORS entirely; rejected in favour of matching the architecture.)
+- **`gcr.io/distroless/static-debian12:nonroot`** for the API runtime. Ships CA certificates for
+  TLS to a managed Postgres, runs as uid 65532, has no shell or package manager.
+- **`nginxinc/nginx-unprivileged:alpine`** for the frontend, because the official `nginx:alpine`
+  runs its master process as root (verified: `User` is empty on the official image, `101` on the
+  unprivileged one).
+- **The app services go into `compose.yaml`**, so the whole stack runs containerized locally.
+
+**Done and verified (commit `6068c7d`):** `backend/Dockerfile` and `backend/.dockerignore`.
+Multi-stage, `CGO_ENABLED=0` static binary (every dependency is pure Go), `-trimpath -ldflags="-s -w"`.
+**Final image 20 MB** against a 357 MB builder; the binary layer is 10.2 MB. Confirmed by running it:
+non-root uid 65532, **no `/bin/sh` in the image at all**, fails loudly without `DATABASE_URL`, and
+both `migrate` and `verify-audit` work from inside the container against the host database.
+Migrations are `go:embed`-ed, so the binary is the whole application and image and schema cannot drift.
+
+**⏭️ NEXT STEP: the frontend image.** Three new files, none of them yet written:
+
+1. `frontend/.dockerignore` — exclude `node_modules` (88 MB, versus a 168 KB tracked repo), `dist`,
+   `.env*`, `*.log`.
+2. `frontend/nginx.conf.template` — a server block: `listen 8080`; root `/usr/share/nginx/html`;
+   `X-Content-Type-Options: nosniff`; `Referrer-Policy: strict-origin-when-cross-origin`; a CSP of
+   `default-src 'self'; connect-src 'self' ${API_ORIGIN}; img-src 'self' data:; style-src 'self'
+   'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'`
+   (the `unsafe-inline` is an acknowledged weakening for Vite's injected style tag, removable later
+   with a nonce); `/assets/` cached one year `immutable` because Vite fingerprints filenames;
+   `index.html` `no-cache`; **SPA fallback** `try_files $uri $uri/ /index.html` so refreshing
+   `/admin` works; gzip on. It is a `.template` because the nginx image renders
+   `/etc/nginx/templates/*` with `envsubst` at container start, which makes `${API_ORIGIN}` RUNTIME
+   config.
+3. `frontend/Dockerfile` — build stage `node:22-alpine` (matching the CI Node version), manifests
+   copied before source so `npm ci` stays cached, `ARG VITE_API_URL=http://localhost:8080` plus a
+   matching `ENV`, then `npm run build`. Runtime stage `nginxinc/nginx-unprivileged:alpine`, copy
+   the template to `/etc/nginx/templates/default.conf.template`, copy `/src/dist` to
+   `/usr/share/nginx/html`, `EXPOSE 8080`.
+
+**The teaching point this step exists for:** `VITE_API_URL` is **build-time** config that Vite
+inlines into the bundle, so that image only ever works against one API origin. `API_ORIGIN` in the
+CSP is **run-time** config via envsubst, so one image works anywhere. Knowing which a setting is
+decides whether you ship one image or one per environment.
+
+**After the frontend image:** add `api` and `web` services to `compose.yaml` (API needs
+`DATABASE_URL`, `FRONTEND_ORIGIN`, `SECURE_COOKIES`, and `depends_on` the healthy db; web needs
+`API_ORIGIN`), then verify end to end in containers, including that `/admin` survives a refresh.
+A `healthcheck` subcommand on the Go binary was proposed and not yet written: distroless has no
+shell or curl, so a normal `HEALTHCHECK CMD curl` cannot work, and a subcommand in the family of
+`migrate` and `verify-audit` is the clean answer.
+
+---
 
 **✅ Audit logging shipped 2026-10-21.** `audit_log` records `user.login`,
 `user.login_failed`, `user.logout` and `user.role_changed` with actor, target, outcome,

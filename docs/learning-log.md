@@ -1078,6 +1078,49 @@ Fault injection on the audit insert proved the role change rolls back.
 
 ---
 
+## Stage: Containerization (IN PROGRESS, branch `feat/docker`)
+
+**Decisions:** two images rather than one (matches the target diagram; the rejected
+single-image option would have removed CORS entirely by making everything same-origin);
+`distroless/static-debian12:nonroot` for the API; `nginxinc/nginx-unprivileged:alpine` for the
+frontend; app services added to `compose.yaml` so the local stack runs containerized.
+
+**Built so far:** `backend/Dockerfile` and `backend/.dockerignore`.
+
+**Measured, not assumed:** final image **20 MB** versus a **357 MB** builder, with the binary
+layer at 10.2 MB. `docker inspect` confirms uid 65532. Attempting `--entrypoint /bin/sh`
+fails with "no such file or directory", so there is genuinely no shell to pivot with. The
+container exits loudly without `DATABASE_URL`, and `migrate` and `verify-audit` both run from
+inside it.
+
+**Concepts learned:**
+- **Multi-stage builds exist to throw the toolchain away.** The builder needs 357 MB of Go
+  compiler; the runtime needs one 10 MB binary. Measuring both makes the point concrete.
+- **Copy manifests before source.** Docker caches per instruction, keyed on the files it
+  touched, so `COPY go.mod go.sum` then `go mod download` means editing Go source never
+  re-downloads modules. The same pattern applies to `package.json` and `npm ci`.
+- **`CGO_ENABLED=0` is what unlocks distroless.** Every dependency here is pure Go, so a fully
+  static binary needs no libc, which is why a base image with no libc works at all.
+- **`ENTRYPOINT` over `CMD`** means `docker run image migrate` appends the argument, so the
+  existing subcommands become the deployment's migration mechanism for free.
+- **Distroless breaks the usual HEALTHCHECK.** There is no shell and no curl, so
+  `HEALTHCHECK CMD curl -f` cannot run. The clean answer is a `healthcheck` subcommand on the
+  binary itself, in the family of `migrate` and `verify-audit`. Not yet written.
+- **The official nginx image runs as root.** Verified rather than assumed: `User` is empty on
+  `nginx:alpine` and `101` on `nginxinc/nginx-unprivileged:alpine`, which also listens on 8080.
+- **Build-time versus run-time config.** Vite inlines `VITE_API_URL` into the bundle at build
+  time, so that image is environment-specific. nginx renders `/etc/nginx/templates/*` with
+  envsubst at container start, so `${API_ORIGIN}` in the CSP is run-time config. Same program,
+  two different kinds of configuration, and the distinction decides whether you ship one image
+  or one per environment.
+- **An image is not a secret store.** `DATABASE_URL` arrives at run time; anyone who can pull
+  an image can read every layer of it.
+
+*(In progress on `feat/docker`. The frontend image, the compose services, and end-to-end
+verification remain.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
