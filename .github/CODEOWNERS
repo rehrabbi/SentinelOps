@@ -1,0 +1,5 @@
+# Owners are requested for review automatically on pull requests touching their paths.
+# Informational only: "Require review from Code Owners" stays off in branch protection,
+# because GitHub never lets an author approve their own pull request, so requiring it
+# on a single-maintainer repository would block every merge.
+* @rehrabbi

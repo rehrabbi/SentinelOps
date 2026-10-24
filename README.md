@@ -12,6 +12,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
+  <a href="https://github.com/rehrabbi/SentinelOps/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/rehrabbi/SentinelOps"></a>
 </p>
 
 <p align="center">
@@ -28,8 +29,12 @@ working application, and it is also a deliberate study of the engineering that s
 one, meaning authentication, authorization, application security, containers, CI/CD,
 infrastructure as code, and cloud architecture.
 
-The code is written by hand rather than generated. The git history is meant to read as an
-incremental engineering story, one concern per branch and one concern per pull request.
+It is built incrementally, and the git history is meant to read as an engineering story,
+one concern per branch and one concern per pull request.
+
+**Status:** the current release is [v0.1.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.1.0).
+In progress is [Containerization](https://github.com/rehrabbi/SentinelOps/milestone/1),
+which will be released as v0.2.0. Every release is described in the [changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -183,6 +188,11 @@ empty. Promote yourself to analyst with
 `UPDATE users SET role='analyst' WHERE email='you@example.com';` to see every incident
 rather than only your own.
 
+The first admin has to be created the same way, with
+`UPDATE users SET role='admin' WHERE email='you@example.com';`. Nothing in the
+application can do it, because the admin screen is itself admin only. That is deliberate,
+and it holds in production too.
+
 Two optional variables both have working local defaults. `FRONTEND_ORIGIN` defaults to
 `http://localhost:5173`, and `SECURE_COOKIES` defaults to `false`, which must become
 `true` in production or the session cookie travels in cleartext.
@@ -220,44 +230,63 @@ Per device setup notes, including the macOS and Colima path, live in
 SentinelOps/
 ├─ backend/
 │  ├─ main.go, db.go, migrate.go     entry point, pool, migration runner
-│  ├─ migrations/                    versioned SQL, currently at version 4
+│  ├─ migrations/                    versioned SQL, currently at version 5
 │  └─ internal/
-│     ├─ user/                       model, repository, handler, validation
+│     ├─ user/                       model, repository, handler, validation, role changes
 │     ├─ session/                    token generation, hashing, lookup
-│     ├─ auth/                       login, logout, me, RequireAuth middleware
+│     ├─ auth/                       login, logout, me, RequireAuth and RequireRole
+│     ├─ authctx/                    the authenticated caller, carried in the request context
+│     ├─ audit/                      append-only, hash-chained audit entries
 │     └─ incident/                   incident domain and per-object authorization
 ├─ frontend/src/                     React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
-├─ .github/workflows/ci.yml          build, vet, and lint on every push
+├─ .github/workflows/ci.yml          format, vet, build, test, lint on every pull request
+├─ CHANGELOG.md                      every release, in Keep a Changelog format
 └─ compose.yaml                      Postgres 17, localhost only, healthchecked
 ```
 
 ## How this project is built
 
-Work follows GitHub Flow. `main` is protected and only changes through a pull request,
-every change happens on a short lived `feat/` or `docs/` branch, and merged branches are
-archived under `merged/` rather than deleted, so the full history of each feature stays in
-the repository. Commit messages use a conventional subject line and a short bullet body.
+Work follows GitHub Flow, run the way a team would run it.
 
-The full contract, including commit style and the approval gates used while building,
-is in [CONTRIBUTING.md](CONTRIBUTING.md) and
+- **Issues first.** Every feature, fix, and stage starts as a GitHub issue, labelled by
+  type, area, and priority, and grouped into a milestone per roadmap stage.
+- **Typed branches.** Each change lives on a short-lived branch named for its type,
+  `feat/`, `fix/`, `docs/`, `build/`, `ci/`, `refactor/`, or `chore/`, matching the
+  conventional commit types used in its commit messages.
+- **Protected `main`.** It changes only through a pull request, and both CI jobs must pass
+  on a branch that is up to date with `main` before anything merges, administrators
+  included.
+- **Merge commits only.** Every commit keeps its hash on `main`, and each merge commit
+  carries the pull request's full write-up, so the reasoning behind a change is in
+  `git log` itself.
+- **Nothing is deleted.** Merged branches are archived under `merged/`, so the full history
+  of each piece of work stays in the repository.
+- **Versioned releases.** Each finished stage is tagged as a minor release and described
+  in the [changelog](CHANGELOG.md). `1.0.0` is reserved for the first hardened production
+  deployment.
+
+The full contract is in [CONTRIBUTING.md](CONTRIBUTING.md) and
 [docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md).
 
 ## Roadmap
 
-Done so far, in order. Health and readiness, Postgres and migrations, user registration,
+**v0.1.0, released.** Health and readiness, Postgres and migrations, user registration,
 login with sessions, auth middleware, logout, the React auth UI, the incident domain with
 RBAC, the incident dashboard, per-object authorization on read and update, role
 management behind an admin only screen, and a tamper-evident audit log.
 
-Next up.
+Next up, each stage ending in a minor release.
 
-1. A Dockerfile for the application and a multi stage build
+1. **Containerization, v0.2.0, in progress.** Multi-stage images for the API and the
+   frontend, and the whole stack running in Compose
 2. CI hardening with dependency, secret, and static analysis scanning, plus a scheduled
    `verify-audit` run and somewhere outside the database to anchor the chain head
 3. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
    environment branches once there is somewhere to deploy
 4. Observability, alerting, backups, and a cost review
+
+**1.0.0** is the first hardened production deployment on AWS.
 
 ## Documentation
 
@@ -266,8 +295,10 @@ Next up.
 | [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md) | Where the project stands, every locked decision, the exact next step |
 | [docs/learning-log.md](docs/learning-log.md) | Decisions and why, concepts, security and debugging lessons |
 | [docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md) | The collaboration contract behind how this is built |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Issues, branches, commits, pull requests, labels, and releases |
 | [SECURITY.md](SECURITY.md) | How to report a vulnerability |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Branching, commits, and local setup |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Expected behaviour and how to report a problem |
 
 ## License
 

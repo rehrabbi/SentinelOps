@@ -183,10 +183,15 @@ substantial existing code; changing the DB schema; creating a migration; running
 migration against anything other than the approved **local dev DB**; changing authn;
 changing authz; changing security controls; modifying infrastructure; `terraform
 apply`; creating cloud resources; causing AWS charges; changing CI/CD; modifying
-secrets/config; **pushing Git commits**; opening PRs; deploying; running destructive
-shell commands.
+secrets/config; changing repository settings or branch protection; tagging or publishing a
+release; force-pushing or rewriting Git history; deploying; running destructive shell
+commands.
 
 **Do not infer approval from previous steps.** Approval is per-action, per-session.
+
+**Standing exception (2026-10-24):** committing, pushing feature branches, opening PRs, and
+merging them once CI is green are pre-approved, as is archiving a merged branch as
+`merged/<name>`. Do them without asking and report what was done (branch, hashes, PR link).
 
 ---
 
@@ -203,22 +208,33 @@ git-ignored `.env`; a committed `.env.example` documents the shape.)
 
 - **Branching model — GitHub Flow.** `main` is protected (PR required to merge; direct
   pushes, force-push, and branch deletion blocked; enforced for admins too). Do all work on
-  short-lived `feat/<name>` branches, one concern each, merged into `main` via a Pull Request.
+  short-lived **typed** branches, `<type>/<short-name>`, where the type mirrors the commit
+  type: `feat/`, `fix/`, `docs/`, `build/`, `ci/`, `refactor/`, `chore/`. No issue number in
+  the name. One concern each, merged into `main` via a Pull Request.
+- **Issues first.** Every feature, fix, and stage starts as a GitHub issue; its PR says
+  `Closes #n`. Small `docs/` and `chore/` changes may skip the issue.
+- **Merge commits only** (squash and rebase are disabled on the repo). The merge commit takes
+  the PR's title and full description, so every PR description must be complete, follow the
+  template (linked issue, type, what, why, security, risk and rollback, verification,
+  screenshots), and be fit to live in `git log` permanently.
 - **NEVER delete a merged branch — keep it as `merged/<name>`.** On merge, do NOT
-  `--delete-branch`; instead create `merged/<name>` at the feature's tip, push it, and remove
-  the old `feat/<name>` name. Merged branches are archived under the `merged/` prefix, never
+  `--delete-branch`; instead create `merged/<name>` at the branch's tip, push it, and remove
+  the old `<type>/<name>` name. Merged branches are archived under the `merged/` prefix, never
   removed, so the full feature history stays in the repo (e.g. `merged/auth-middleware`,
   `merged/logout`).
-- **Do NOT push to remote unless I explicitly approve it.** Ask before every push.
+- **Pushing, PRs, and merging are pre-approved** (see §11): push feature branches, open PRs,
+  and merge once CI is green without asking, then report. Force-push and history rewrites
+  still need explicit approval.
 - **Commit messages:**
   - Conventional-commit subject line (e.g. `feat: ...`, `docs: ...`, `fix: ...`).
-  - Blank line, then a **body of short `- ` bullet points** — NOT prose paragraphs.
+  - Blank line, then a **body of short `- ` bullet points** — NOT prose paragraphs. The body
+    is required and should let a `git log` reader understand the commit without the diff.
   - **NO `Co-Authored-By` trailer.** Commits are authored solely by me.
   - **Do NOT describe internal implementation approach** in the message (e.g. omit
     "hand-written" — just say "validation").
   - One concern per commit; suggest a commit at meaningful milestones.
-- Before committing, explain what changed, why, and the proposed message. Committing
-  and pushing are approval gates (see §11).
+- When committing, explain what changed and why, and show the message used. Committing
+  needs no per-action approval (see §11).
 
 ---
 

@@ -122,6 +122,35 @@ scanning deliberately deferred to its own stage so it gets taught rather than bo
 `CONTRIBUTING.md`. **`dev`/`staging`/`prod` environment branches are a decided future step**,
 to be created only once there is real infrastructure to deploy to (after Docker, CI, and AWS).
 
+**Repo standards decisions (2026-10-24):** branches are **typed** to mirror commit types
+(`feat/ fix/ docs/ build/ ci/ refactor/ chore/`), with no issue number in the name. Features,
+fixes, and stages start as an **issue** that the PR closes; small docs/chore changes may skip it.
+The repo allows **merge commits only** (squash and rebase disabled in GitHub settings), and the
+merge commit uses the **PR title and description** as its message, so PR write-ups live in
+`git log`. Merge commits were chosen because they keep commit hashes valid on `main`, which the
+docs cite. The PR template gained a linked issue, type of change, risk and rollback, and
+screenshots. Both CI jobs are now **required checks** on `main`, reported by GitHub Actions
+only (app id 15368) and with branches required to be up to date before merging; the rule lives
+in the classic branch protection alongside the existing PR, admin, and conversation rules.
+Routine commits, pushes, PRs, and merges on green CI are **pre-approved** (see WAYS-OF-WORKING
+§11). Labels are prefixed `type:` (mirrors branch and commit types), `area:` and `priority:`,
+replacing GitHub's defaults except `duplicate`, `wontfix` and `question`. Milestones are one per
+roadmap stage, created when the stage starts, each ending in a release; milestone #1 is
+**Containerization**, and the 16 PRs merged before issue tracking were deliberately not
+backfilled. `.github/CODEOWNERS` is `* @rehrabbi`, informational only (code owner review is not
+required, since an author cannot approve their own PR). `CODE_OF_CONDUCT.md` is GitHub's
+Contributor Covenant 2.0 template, with bernardojirehrabbi@gmail.com as the report contact.
+**Releases:** semantic versioning, with today's `main` as **`v0.1.0`** (everything up to the
+repo standards), each roadmap stage ending in the next minor release (Containerization →
+`v0.2.0`), patch releases for fixes between stages, and **`1.0.0` reserved for the first
+hardened production deployment on AWS**. `CHANGELOG.md` is hand-written in Keep a Changelog
+format; every user-visible or security-relevant PR adds a line under `Unreleased`. Tags are
+annotated, never moved, and every release is confirmed by the owner before tagging (an
+approval gate in WAYS-OF-WORKING §11).
+The README now carries a release badge and status line, describes this workflow, and makes
+no claim about how the code was produced; the repo homepage points at the latest release.
+The repo standards work is complete.
+
 ## 5. What's built and working
 
 **Endpoints live:** `GET /healthz` (liveness), `GET /readyz` (DB readiness),
