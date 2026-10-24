@@ -1,0 +1,50 @@
+# Rendered by the nginx image at container start: every file in
+# /etc/nginx/templates/ is passed through envsubst into /etc/nginx/conf.d/.
+# ${API_ORIGIN} is therefore RUN-TIME config, so one image works against any API.
+# Only variables that exist in the environment are replaced, which is why
+# nginx's own $uri below is left alone.
+
+# Cache policy chosen per request path. A map lives outside the server block,
+# and it lets ONE add_header below cover every location (see the note there).
+map $uri $cache_control {
+    # Vite fingerprints these filenames (index-3f9a1c.js), so a new build
+    # always means a new URL and the old file can be cached forever.
+    ~^/assets/  "public, max-age=31536000, immutable";
+    # Everything else, index.html above all, must be revalidated on each load,
+    # or browsers keep pointing at asset filenames that no longer exist.
+    default     "no-cache";
+}
+
+server {
+    # The unprivileged image cannot bind ports below 1024.
+    listen 8080;
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    # Every add_header lives here, at server level, on purpose. nginx discards
+    # ALL inherited add_header directives in any location that declares even
+    # one of its own, silently stripping the security headers from it.
+    # `always` keeps them on error responses (404, 500) too.
+    add_header Cache-Control           $cache_control always;
+    add_header X-Content-Type-Options  "nosniff" always;
+    add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
+    # 'unsafe-inline' on style-src is a known weakening for the style tag Vite
+    # injects; a nonce can remove it later.
+    add_header Content-Security-Policy "default-src 'self'; connect-src 'self' ${API_ORIGIN}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
+    gzip       on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    # A missing asset is a real 404. Falling back to index.html here would hand
+    # the browser HTML where it expected JavaScript.
+    location /assets/ {
+        try_files $uri =404;
+    }
+
+    # SPA fallback: /admin is a client-side route with no file on disk, so a
+    # refresh there must still receive index.html and let React Router take over.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
