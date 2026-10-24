@@ -183,10 +183,14 @@ substantial existing code; changing the DB schema; creating a migration; running
 migration against anything other than the approved **local dev DB**; changing authn;
 changing authz; changing security controls; modifying infrastructure; `terraform
 apply`; creating cloud resources; causing AWS charges; changing CI/CD; modifying
-secrets/config; **pushing Git commits**; opening PRs; deploying; running destructive
-shell commands.
+secrets/config; changing repository settings or branch protection; force-pushing or
+rewriting Git history; deploying; running destructive shell commands.
 
 **Do not infer approval from previous steps.** Approval is per-action, per-session.
+
+**Standing exception (2026-10-24):** committing, pushing feature branches, opening PRs, and
+merging them once CI is green are pre-approved, as is archiving a merged branch as
+`merged/<name>`. Do them without asking and report what was done (branch, hashes, PR link).
 
 ---
 
@@ -217,7 +221,9 @@ git-ignored `.env`; a committed `.env.example` documents the shape.)
   the old `<type>/<name>` name. Merged branches are archived under the `merged/` prefix, never
   removed, so the full feature history stays in the repo (e.g. `merged/auth-middleware`,
   `merged/logout`).
-- **Do NOT push to remote unless I explicitly approve it.** Ask before every push.
+- **Pushing, PRs, and merging are pre-approved** (see §11): push feature branches, open PRs,
+  and merge once CI is green without asking, then report. Force-push and history rewrites
+  still need explicit approval.
 - **Commit messages:**
   - Conventional-commit subject line (e.g. `feat: ...`, `docs: ...`, `fix: ...`).
   - Blank line, then a **body of short `- ` bullet points** — NOT prose paragraphs. The body
@@ -226,8 +232,8 @@ git-ignored `.env`; a committed `.env.example` documents the shape.)
   - **Do NOT describe internal implementation approach** in the message (e.g. omit
     "hand-written" — just say "validation").
   - One concern per commit; suggest a commit at meaningful milestones.
-- Before committing, explain what changed, why, and the proposed message. Committing
-  and pushing are approval gates (see §11).
+- When committing, explain what changed and why, and show the message used. Committing
+  needs no per-action approval (see §11).
 
 ---
 
