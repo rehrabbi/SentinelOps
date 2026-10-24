@@ -1078,15 +1078,17 @@ Fault injection on the audit insert proved the role change rolls back.
 
 ---
 
-## Stage: Containerization (IN PROGRESS, branch `feat/docker`)
+## Stage: Containerization (complete, issue #20)
 
 **Decisions:** two images rather than one (matches the target diagram; the rejected
 single-image option would have removed CORS entirely by making everything same-origin);
 `distroless/static-debian12:nonroot` for the API; `nginxinc/nginx-unprivileged:alpine` for the
 frontend; app services added to `compose.yaml` so the local stack runs containerized.
 
-**Built so far:** `backend/Dockerfile` and `backend/.dockerignore`; `frontend/Dockerfile`,
-`frontend/.dockerignore` and `frontend/nginx.conf.template`.
+**Built:** `backend/Dockerfile` and `backend/.dockerignore`; `frontend/Dockerfile`,
+`frontend/.dockerignore` and `frontend/nginx.conf.template`; an `api healthcheck` subcommand,
+written by the owner; and `migrate`, `api`, and `web` services in `compose.yaml` behind an `app`
+profile.
 
 **Measured, not assumed:** final image **20 MB** versus a **357 MB** builder, with the binary
 layer at 10.2 MB. `docker inspect` confirms uid 65532. Attempting `--entrypoint /bin/sh`
@@ -1110,8 +1112,9 @@ cache plus gzip on `/assets/`, and a real `404` for a missing asset that still c
 - **`ENTRYPOINT` over `CMD`** means `docker run image migrate` appends the argument, so the
   existing subcommands become the deployment's migration mechanism for free.
 - **Distroless breaks the usual HEALTHCHECK.** There is no shell and no curl, so
-  `HEALTHCHECK CMD curl -f` cannot run. The clean answer is a `healthcheck` subcommand on the
-  binary itself, in the family of `migrate` and `verify-audit`. Not yet written.
+  `HEALTHCHECK CMD curl -f` cannot run. The answer is a `healthcheck` subcommand on the binary
+  itself, in the family of `migrate` and `verify-audit`, invoked in exec form
+  (`["CMD", "/app/api", "healthcheck"]`) so Docker never looks for a shell.
 - **The official nginx image runs as root.** Verified rather than assumed: `User` is empty on
   `nginx:alpine` and `101` on `nginxinc/nginx-unprivileged:alpine`, which also listens on 8080.
 - **Build-time versus run-time config.** Vite inlines `VITE_API_URL` into the bundle at build
@@ -1134,9 +1137,36 @@ cache plus gzip on `/assets/`, and a real `404` for a missing asset that still c
   `index.html` hands the browser HTML where it expected JavaScript and hides the real problem.
 - **Measure what an image's size is made of.** 91.5 MB looked large until `docker history`
   showed 91.1 MB was the base image and our part was ~320 KB.
+- **Subcommand order follows dependencies.** `healthcheck` is an HTTP client of the running
+  server, so it sits before the `DATABASE_URL` check and never opens a connection pool. Tested
+  with no `DATABASE_URL` at all: it reached the HTTP call and reported "connection refused".
+- **An HTTP client needs a deadline.** `http.Get` has no timeout, so a hung server would hang
+  the health check too and never be marked unhealthy. A 2-second `http.Client` timeout, just
+  under Compose's 3-second limit, keeps the failure ours to report.
+- **Liveness and readiness are different questions.** `/healthz` asks "is the process serving?"
+  and `/readyz` adds "can it reach the database?". The container check uses liveness: a database
+  outage should not mark the API itself broken, and readiness belongs to the load balancer.
+- **Inside Compose, the host is the service name.** Containers share a private network with
+  DNS, so the API reaches Postgres at `db:5432`. `127.0.0.1` inside a container means that
+  container.
+- **`depends_on` has conditions, and the default is the weakest.** Plain `depends_on` waits only
+  for a container to start. `service_healthy` waits for its health check, and
+  `service_completed_successfully` waits for a one-shot job to exit 0, which is what turns
+  `migrate` into a gate the API cannot pass on a failed migration.
+- **Profiles let one file serve two workflows.** Services marked `profiles: ["app"]` start only
+  when asked for, so `docker compose up` kept its old meaning and nobody's native loop broke.
+- **The browser enforces CORS, not the server.** The API answered a preflight from `:5173` with
+  `Access-Control-Allow-Origin: http://localhost:8081`; it is the browser that compares that with
+  the page's real origin and refuses the response.
+- **Same-site ignores ports.** The session cookie is `SameSite=Lax`, yet a page on `:8081` calling
+  the API on `:8080` still sends it, because a site is scheme plus registrable domain, and ports
+  are not part of it. Two origins, one site: CORS separates them, `SameSite` does not.
+- **`docker compose config` prints secrets.** It renders the file with `.env` substituted, so it
+  would print the database password inside `DATABASE_URL`. `--quiet` and `--services` validate the
+  file without showing values.
 
-*(In progress on `feat/docker`. The compose services, the `healthcheck` subcommand, and
-end-to-end verification remain.)*
+*(Merged into `main` with the PR closing #20. The v0.2.0 release is confirmed by the owner
+separately.)*
 
 ---
 

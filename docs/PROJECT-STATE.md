@@ -4,16 +4,17 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-10-24 · **Current stage:** 🚧 **Containerization, IN PROGRESS on branch
-> `feat/docker`.** The API and frontend images are both built and verified; adding them to
-> `compose.yaml` is next. Full detail and the exact next step are in §6.
+> **Last updated:** 2026-10-24 · **Current stage:** ✅ **Containerization complete and on `main`**
+> (issue #20, milestone Containerization). Both images and the Compose `app` profile are built
+> and verified end to end. Next: release it as **v0.2.0** (owner confirms), then pick the next
+> stage. Full detail in §6.
 
 ---
 
 ## 1. How to resume on a new device
 
-1. Clone the repo and open the folder in VSCode. **Then check out the in-progress branch:**
-   `git fetch origin && git switch feat/docker` — `main` does NOT have the containerization work.
+1. Clone the repo and open the folder in VSCode. Run `git fetch origin` and
+   `git branch -r --no-merged main`: any branch it prints is unfinished work to check out first.
 2. Tell Claude: *"Read docs/WAYS-OF-WORKING.md and docs/PROJECT-STATE.md, then re-orient
    per the Session behavior section and continue."* (Re-paste the operating manual too if
    you have it — but WAYS-OF-WORKING.md captures all of it.)
@@ -264,17 +265,29 @@ not part of the repo. Every machine starts with an empty database.
    "empty, nothing to verify" rather than failing.
 
 The Mac's local database currently holds `jireh@example.com` (admin) and
-`mallory@example.com` (analyst), five seeded demo incidents, and six audit entries. None of
-that exists anywhere else. Test passwords in this project are disposable local-only strings
-and are never real credentials.
+`mallory@example.com` (analyst), five seeded demo incidents, and six audit entries. The second
+Windows machine's database holds `testuser@example.com` (reporter) plus two accounts created to
+smoke-test the containerized stack, `smoke-admin@example.test` (admin) and
+`smoke-user@example.test` (analyst), one incident, and four audit entries. None of that exists
+anywhere else. Test passwords in this project are disposable local-only strings and are never
+real credentials.
 
 ---
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### 🚧 IN PROGRESS: containerization (branch `feat/docker`)
+### ⏭️ NEXT STEP: release v0.2.0, then choose the next stage
 
-**Decisions already made, do not re-litigate:**
+Containerization is merged (issue #20). What remains of the stage is the release itself: move the
+`Unreleased` section of `CHANGELOG.md` into a dated `0.2.0` section, merge that, tag `v0.2.0` on the
+merge commit, publish the GitHub Release, and close milestone #1. **Every release is confirmed by
+the owner first** (WAYS-OF-WORKING §11). After that, the roadmap's next stage is CI hardening
+(dependency, secret, and static analysis scanning, including scanning these images), which starts
+with its own milestone and issue.
+
+### ✅ Containerization (merged, issue #20)
+
+**Decisions made, do not re-litigate:**
 - **Two images**, an API and a static frontend, matching the target diagram where a CDN fronts
   static assets and a load balancer fronts the API. (One image serving both would have killed
   CORS entirely; rejected in favour of matching the architecture.)
@@ -313,12 +326,32 @@ and `frontend/Dockerfile`. Build stage `node:22-alpine` (the CI Node version) ru
 **Open, owner's call:** responses carry `Server: nginx/1.31.7`. `server_tokens off;` would hide the
 version; it was not in the agreed spec, so it was left out.
 
-**⏭️ NEXT STEP: add `api` and `web` services to `compose.yaml`** (API needs `DATABASE_URL`,
-`FRONTEND_ORIGIN`, `SECURE_COOKIES`, and `depends_on` the healthy db; web needs `API_ORIGIN`), then
-verify end to end in containers, including that `/admin` survives a refresh. A `healthcheck`
-subcommand on the Go binary was proposed and not yet written: distroless has no shell or curl, so a
-normal `HEALTHCHECK CMD curl` cannot work, and a subcommand in the family of `migrate` and
-`verify-audit` is the clean answer.
+**Done and verified (commit `0722338`, written by the owner):** an `api healthcheck` subcommand at
+the top of `main()`, before any database setup. It GETs `http://127.0.0.1:8080/healthz` with a
+2-second client timeout and exits 0 on `200`, 1 otherwise. Probes liveness (`/healthz`), not
+readiness (`/readyz`): the migrate job already guarantees the database, and readiness belongs to the
+load balancer later. Proven natively: exit 1 with the server down (even with no `DATABASE_URL`), 0
+with it up.
+
+**Done and verified (commit `9dd997b`):** `compose.yaml` services, decided 2026-10-24:
+- **`app` profile.** `docker compose up -d` still starts only `db`, so the native loop and quickstart
+  are unchanged; `docker compose --profile app up -d --build` runs everything.
+- **One-shot `migrate` service** running `api migrate` from the same image; `api` waits on
+  `service_completed_successfully`, so it never starts against an old schema.
+- **`api`** on `127.0.0.1:8080`, `DATABASE_URL` assembled in compose from `.env` with host `db`
+  (service name), `FRONTEND_ORIGIN=http://localhost:8081`, `SECURE_COOKIES=false`, and a healthcheck
+  in exec form (`["CMD", "/app/api", "healthcheck"]`, no shell).
+- **`web`** on `127.0.0.1:8081`, `VITE_API_URL` as a build arg and `API_ORIGIN` at run time, starting
+  only once `api` is healthy.
+- The branch kept its pre-standard name `feat/docker`; the PR title uses `build:`.
+
+**End-to-end verification:** start order db healthy → migrate exited 0 → api healthy → web; api uid
+65532, nginx uid 101; CSP carried `connect-src 'self' http://localhost:8080`; the bundle contained
+`http://localhost:8080`; CORS preflight announced only `http://localhost:8081`; register, SQL admin
+bootstrap, login with an HttpOnly cookie, `/api/me`, incident create and list, an admin role change,
+401 without a cookie, and logout all behaved; in a browser on `:8081`, login worked with no CSP
+violations and a reload on `/admin` kept the admin screen; `verify-audit` from the image reported the
+chain intact with 4 entries.
 
 ---
 
@@ -408,6 +441,14 @@ go run .
 
 # 4) Run the frontend
 cd ../frontend && npm install && npm run dev
+```
+
+Or run the whole stack in containers (stop it before `go run .`, which also needs :8080):
+
+```bash
+docker compose --profile app up -d --build   # UI http://localhost:8081, API :8080
+docker compose --profile app run --rm --no-deps api verify-audit
+docker compose --profile app down
 ```
 
 Optional env vars (both have working local defaults, so no `.env` change is needed):
