@@ -43,6 +43,7 @@ Closes #
 - [ ] `npm run lint` and `npm run build` are clean, if the frontend changed
 - [ ] No secret, `.env`, or build artifact in the diff
 - [ ] `docs/PROJECT-STATE.md` and `docs/learning-log.md` match reality
+- [ ] `CHANGELOG.md` updated under `Unreleased`, if the change is user-visible or security-relevant
 - [ ] One concern only
 
 ## Screenshots
