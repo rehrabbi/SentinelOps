@@ -145,7 +145,10 @@ repo standards), each roadmap stage ending in the next minor release (Containeri
 hardened production deployment on AWS**. `CHANGELOG.md` is hand-written in Keep a Changelog
 format; every user-visible or security-relevant PR adds a line under `Unreleased`. Tags are
 annotated, never moved, and every release is confirmed by the owner before tagging (an
-approval gate in WAYS-OF-WORKING §11). Still planned: a README pass.
+approval gate in WAYS-OF-WORKING §11).
+The README now carries a release badge and status line, describes this workflow, and makes
+no claim about how the code was produced; the repo homepage points at the latest release.
+The repo standards work is complete.
 
 ## 5. What's built and working
 
