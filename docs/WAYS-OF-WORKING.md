@@ -203,16 +203,25 @@ git-ignored `.env`; a committed `.env.example` documents the shape.)
 
 - **Branching model — GitHub Flow.** `main` is protected (PR required to merge; direct
   pushes, force-push, and branch deletion blocked; enforced for admins too). Do all work on
-  short-lived `feat/<name>` branches, one concern each, merged into `main` via a Pull Request.
+  short-lived **typed** branches, `<type>/<short-name>`, where the type mirrors the commit
+  type: `feat/`, `fix/`, `docs/`, `build/`, `ci/`, `refactor/`, `chore/`. No issue number in
+  the name. One concern each, merged into `main` via a Pull Request.
+- **Issues first.** Every feature, fix, and stage starts as a GitHub issue; its PR says
+  `Closes #n`. Small `docs/` and `chore/` changes may skip the issue.
+- **Merge commits only** (squash and rebase are disabled on the repo). The merge commit takes
+  the PR's title and full description, so every PR description must be complete, follow the
+  template (linked issue, type, what, why, security, risk and rollback, verification,
+  screenshots), and be fit to live in `git log` permanently.
 - **NEVER delete a merged branch — keep it as `merged/<name>`.** On merge, do NOT
-  `--delete-branch`; instead create `merged/<name>` at the feature's tip, push it, and remove
-  the old `feat/<name>` name. Merged branches are archived under the `merged/` prefix, never
+  `--delete-branch`; instead create `merged/<name>` at the branch's tip, push it, and remove
+  the old `<type>/<name>` name. Merged branches are archived under the `merged/` prefix, never
   removed, so the full feature history stays in the repo (e.g. `merged/auth-middleware`,
   `merged/logout`).
 - **Do NOT push to remote unless I explicitly approve it.** Ask before every push.
 - **Commit messages:**
   - Conventional-commit subject line (e.g. `feat: ...`, `docs: ...`, `fix: ...`).
-  - Blank line, then a **body of short `- ` bullet points** — NOT prose paragraphs.
+  - Blank line, then a **body of short `- ` bullet points** — NOT prose paragraphs. The body
+    is required and should let a `git log` reader understand the commit without the diff.
   - **NO `Co-Authored-By` trailer.** Commits are authored solely by me.
   - **Do NOT describe internal implementation approach** in the message (e.g. omit
     "hand-written" — just say "validation").
