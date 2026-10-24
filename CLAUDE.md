@@ -128,8 +128,14 @@ Commit messages:
 - Use the repository's already-configured git identity. **If identity is unset, stop and
   tell the owner how to configure their own** — never invent or assume one.
 
-Committing and pushing are **approval gates**, requested per action. Before pushing, state
-the branch and remote and confirm the commit contains only intended work.
+**Standing approval (2026-10-24):** committing, pushing feature branches, opening pull
+requests, and merging them once CI is green need **no per-action approval**, and neither
+does archiving a merged branch as `merged/<name>`. Do them, then report what was done:
+branch, commit hashes, PR link. Still run the pre-commit checks above, and still confirm
+each commit contains only intended work.
+
+Still **stop and ask** before force-pushing, rewriting history, deleting any branch other
+than the rename into `merged/`, or changing repository settings or branch protection.
 
 ---
 
