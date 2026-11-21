@@ -15,18 +15,44 @@ terraform_image="hashicorp/terraform:1.17.2"
 infra_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(dirname "$infra_dir")"
 
-# The state backend's connection string. One already exported in the shell wins;
-# otherwise it is read out of .env as data. Sourcing .env would run it as shell
-# code, and the & in a connection string would silently background the
-# assignment, leaving PG_CONN_STR empty.
-if [ -z "${PG_CONN_STR:-}" ] && [ -f "$repo_dir/.env" ]; then
-  PG_CONN_STR="$(grep -m1 '^PG_CONN_STR=' "$repo_dir/.env" | cut -d= -f2- | tr -d '\r' || true)"
-fi
+# Reads one NAME=value line out of .env as data and prints the value. Sourcing
+# .env would run it as shell code, and the & in a connection string would
+# silently background the assignment, leaving the variable empty.
+env_file_value() {
+  [ -f "$repo_dir/.env" ] || return 0
+  grep -m1 "^$1=" "$repo_dir/.env" | cut -d= -f2- | tr -d '\r' || true
+}
+
+# Each setting is taken from the shell if already exported there, otherwise from
+# .env. Provider credentials keep their own names; Terraform inputs are renamed
+# to TF_VAR_<input>, which is how Terraform receives variables from outside.
+#   .env name               passed to Terraform as
+settings=(
+  "PG_CONN_STR            PG_CONN_STR"
+  "CLOUDFLARE_API_TOKEN   CLOUDFLARE_API_TOKEN"
+  "RENDER_API_KEY         RENDER_API_KEY"
+  "RENDER_OWNER_ID        RENDER_OWNER_ID"
+  "NEON_API_KEY           NEON_API_KEY"
+  "NEON_ORG_ID            TF_VAR_neon_org_id"
+  "CLOUDFLARE_ACCOUNT_ID  TF_VAR_cloudflare_account_id"
+  "PROD_DATABASE_URL      TF_VAR_prod_database_url"
+)
+env_flags=()
+for setting in "${settings[@]}"; do
+  read -r source_name target_name <<<"$setting"
+  value="${!source_name:-}"
+  [ -n "$value" ] || value="$(env_file_value "$source_name")"
+  if [ -n "$value" ]; then
+    export "$target_name=$value"
+    env_flags+=(--env "$target_name")
+  fi
+done
+
+# Without the state connection nothing works, so stop early with a clear reason.
 if [ -z "${PG_CONN_STR:-}" ]; then
   echo "PG_CONN_STR is not set and not in .env; see .env.example" >&2
   exit 1
 fi
-export PG_CONN_STR
 
 # Git Bash on Windows rewrites anything that looks like a path, including the
 # container-side paths below. Hand Docker a Windows path and turn that off.
@@ -42,18 +68,14 @@ if [ -t 0 ] && [ -t 1 ]; then
   tty_flags=(-it)
 fi
 
-# Secrets are passed by name only (-e NAME), so their values never appear on the
-# docker command line, where other processes could read them. A name that is
-# not set on the host is simply not passed. The plugin cache volume keeps
+# Secrets are passed by name only (--env NAME), so their values never appear on
+# the docker command line, where other processes could read them. A setting
+# that is empty everywhere is simply not passed. The plugin cache volume keeps
 # downloaded providers between runs; each is still checked against the lock file.
 exec docker run --rm "${tty_flags[@]}" \
   --volume "$mount_dir:/infra" \
   --workdir /infra \
   --volume sentinelops-terraform-plugins:/plugin-cache \
   --env TF_PLUGIN_CACHE_DIR=/plugin-cache \
-  --env PG_CONN_STR \
-  --env CLOUDFLARE_API_TOKEN \
-  --env RENDER_API_KEY \
-  --env RENDER_OWNER_ID \
-  --env NEON_API_KEY \
+  "${env_flags[@]}" \
   "$terraform_image" "$@"
