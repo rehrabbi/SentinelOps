@@ -4,10 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-10-24 · **Current stage:** ✅ **Containerization complete and on `main`**
-> (issue #20, milestone Containerization). Both images and the Compose `app` profile are built
-> and verified end to end. Next: release it as **v0.2.0** (owner confirms), then pick the next
-> stage. Full detail in §6.
+> **Last updated:** 2026-11-21 · **Current release:** ✅ **v0.2.0, Containerization** (issue #20,
+> PR #21). Both images and the Compose `app` profile are on `main`, verified end to end. Next:
+> start the **CI hardening** stage (v0.3.0) with its own milestone and issue. Full detail in §6.
 
 ---
 
@@ -276,16 +275,16 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ NEXT STEP: release v0.2.0, then choose the next stage
+### ⏭️ NEXT STEP: start the CI hardening stage (v0.3.0)
 
-Containerization is merged (issue #20). What remains of the stage is the release itself: move the
-`Unreleased` section of `CHANGELOG.md` into a dated `0.2.0` section, merge that, tag `v0.2.0` on the
-merge commit, publish the GitHub Release, and close milestone #1. **Every release is confirmed by
-the owner first** (WAYS-OF-WORKING §11). After that, the roadmap's next stage is CI hardening
-(dependency, secret, and static analysis scanning, including scanning these images), which starts
-with its own milestone and issue.
+Containerization shipped as **v0.2.0** on 2026-11-21 (PR #21 merged as `14f81a6`, release PR on top,
+milestone #1 closed). The next roadmap stage is **CI hardening**: dependency, secret, and static
+analysis scanning, including scanning the two container images, plus a scheduled `verify-audit` run
+and somewhere outside the database to anchor the audit chain head. Start it the standard way: a
+milestone, then an issue, then the decisions (which scanners, what fails the build, where results
+go), briefed to the owner before anything is written. Every tool must be free.
 
-### ✅ Containerization (merged, issue #20)
+### ✅ Containerization (released as v0.2.0, issue #20)
 
 **Decisions made, do not re-litigate:**
 - **Two images**, an API and a static frontend, matching the target diagram where a CDN fronts
