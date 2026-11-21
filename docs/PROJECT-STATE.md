@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-21 · **Current release:** ✅ **v0.2.0, Containerization** (issue #20,
-> PR #21). Both images and the Compose `app` profile are on `main`, verified end to end. Next:
-> start the **CI hardening** stage (v0.3.0) with its own milestone and issue. Full detail in §6.
+> **Last updated:** 2026-11-21 · **Current release:** v0.2.0 · **Current stage:** ✅ **CI hardening
+> complete on `main`** (issue #24, milestone #2). Security scanning runs on every PR, on `main`,
+> and weekly. Next: release it as **v0.3.0** (owner confirms). Full detail in §6.
 
 ---
 
@@ -275,14 +275,46 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ NEXT STEP: start the CI hardening stage (v0.3.0)
+### ⏭️ NEXT STEP: release v0.3.0, then plan the AWS stage
 
-Containerization shipped as **v0.2.0** on 2026-11-21 (PR #21 merged as `14f81a6`, release PR on top,
-milestone #1 closed). The next roadmap stage is **CI hardening**: dependency, secret, and static
-analysis scanning, including scanning the two container images, plus a scheduled `verify-audit` run
-and somewhere outside the database to anchor the audit chain head. Start it the standard way: a
-milestone, then an issue, then the decisions (which scanners, what fails the build, where results
-go), briefed to the owner before anything is written. Every tool must be free.
+CI hardening is merged (issue #24). What remains is the release: move `Unreleased` in
+`CHANGELOG.md` into a dated `0.3.0` section, merge it, tag `v0.3.0`, publish the release, and close
+milestone #2, all confirmed by the owner first. The next stage after that is **AWS architecture with
+Terraform**, which now also carries the scheduled `verify-audit` run and the off-database anchor for
+the audit chain head (moved out of CI hardening, see below). It starts with its own milestone, issue,
+and decisions, and everything must stay free, so the AWS free tier and its limits are the first thing
+to brief.
+
+### ✅ CI hardening (issue #24, milestone #2)
+
+**Decisions made 2026-11-21, do not re-litigate:**
+- **Scope: scanning only.** The scheduled `verify-audit` run and anchoring the chain head outside the
+  database moved to the AWS stage: CI's Postgres is empty on every run, so verifying it there proves
+  nothing.
+- **Scanners, best tool per job, all free:** `govulncheck` (Go dependencies, filters by reachability),
+  `npm audit` (frontend dependencies), CodeQL (static analysis, Go and TypeScript), Trivy (both images
+  plus Dockerfile and compose config), gitleaks (full history, checksum-verified binary).
+- **Fail policy:** block only on High or Critical findings with a fixed version; report everything
+  else. Go's vulnerability database has no severity scores, so for Go the filter is reachability: any
+  vulnerability the code actually calls fails the build.
+- **Results:** SARIF uploaded to Security → Code scanning, one category per scanner; npm findings are
+  tracked by Dependabot alerts instead, since `npm audit` has no SARIF output.
+- **GitHub settings switched on:** secret scanning, push protection, Dependabot alerts (alerts only,
+  no automatic fix PRs).
+- **Every action pinned to a full commit SHA** with the version in a comment, in `ci.yml` too.
+- **Workflow:** `.github/workflows/security.yml`, separate from `ci.yml`; runs on PRs to `main`, pushes
+  to `main`, Mondays 03:00 UTC, and by hand; default `contents: read`, `security-events: write` only on
+  the jobs that upload.
+
+**What the first scan run found, and the fixes (all merged before the workflow):**
+- **#26:** `backend/go.mod` line 3, Go 1.26.5 → 1.26.11; govulncheck 17 reachable stdlib
+  vulnerabilities → 0.
+- **#27:** `vite` 8.2.1 → 8.3.8 in `frontend/package-lock.json`; npm audit 1 High → 0.
+- **#28:** `frontend/Dockerfile` lines 30–37, `apk upgrade` plus `apk del curl` as root, back to uid 101;
+  Trivy 14 fixable High/Critical in the nginx base image → 0. Trade-off accepted: builds pick up newer
+  Alpine packages over time, which the weekly scan watches.
+- CodeQL and gitleaks were clean on the first run: no flagged code paths and no secret anywhere in the
+  history.
 
 ### ✅ Containerization (released as v0.2.0, issue #20)
 

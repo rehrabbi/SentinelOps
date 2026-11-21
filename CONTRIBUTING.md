@@ -93,6 +93,15 @@ cd backend && gofmt -l . && go vet ./... && go build ./... && go test ./...
 cd ../frontend && npm run lint && npm run build
 ```
 
+The two dependency scans from the security workflow also run locally, and catch most of
+what it would fail on. The image, CodeQL, and history scans run only in CI.
+
+```bash
+go install golang.org/x/vuln/cmd/govulncheck@v1.10.0   # once
+cd backend && govulncheck ./...                          # any finding here fails CI
+cd ../frontend && npm audit                              # fixable high or critical fails CI
+```
+
 Also check that no secret, `.env` file, or build artifact is in the diff, and that the
 documentation in `docs/` still matches reality.
 

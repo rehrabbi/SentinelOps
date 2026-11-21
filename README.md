@@ -129,6 +129,11 @@ the threat it answers.
 | Internal error disclosure | Generic client messages, real errors logged server side | all handlers |
 | Overly open CORS | One named origin with credentials, never a wildcard | `main.go` |
 | Malformed identifiers reaching the database | Path parameters are shape checked before any query runs | `internal/incident/handler.go` |
+| Known-vulnerable dependencies | `govulncheck` fails on any vulnerability the code actually calls; `npm audit` fails on fixable high or critical advisories; Dependabot alerts track both | `.github/workflows/security.yml` |
+| Known-vulnerable base images | Trivy scans both images and fails on fixable high or critical findings; the frontend image installs Alpine's fixes at build time | `.github/workflows/security.yml`, `frontend/Dockerfile` |
+| Exploitable code patterns | CodeQL static analysis of the Go and TypeScript code on every pull request | `.github/workflows/security.yml` |
+| Leaked credentials | Push protection rejects a push containing a recognised secret, and gitleaks scans the full history | GitHub settings, `.github/workflows/security.yml` |
+| Tampered CI dependencies | Every GitHub Action is pinned to a full commit SHA, and downloaded tools are checksum-verified before they run | `.github/workflows/` |
 
 ### Known gaps
 
@@ -307,11 +312,11 @@ and the whole stack running in Compose, with migrations as a one-shot job.
 
 Next up, each stage ending in a minor release.
 
-1. **CI hardening, v0.3.0.** Dependency, secret, and static analysis scanning, including the
-   container images, plus a scheduled `verify-audit` run and somewhere outside the database
-   to anchor the chain head
+1. **CI hardening, v0.3.0, in progress.** Dependency, secret, and static analysis scanning,
+   including the container images, with results in the repository's Security tab
 2. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
-   environment branches once there is somewhere to deploy
+   environment branches once there is somewhere to deploy, plus a scheduled `verify-audit`
+   run against the real database and somewhere outside it to anchor the chain head
 3. Observability, alerting, backups, and a cost review
 
 **1.0.0** is the first hardened production deployment on AWS.
