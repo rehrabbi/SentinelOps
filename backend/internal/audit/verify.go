@@ -3,13 +3,18 @@ package audit
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 // VerifyReport is the result of walking the hash chain.
 type VerifyReport struct {
 	Entries  int
 	FirstBad int64  // id of the earliest broken entry, 0 when the chain is intact
+	HeadID   int64  // id of the newest entry, 0 when there are no entries
 	HeadHash string // hex of the newest entry_hash, empty when there are no entries
 }
 
@@ -41,6 +46,7 @@ const verifyQuery = `
 		coalesce((SELECT min(id) FROM recomputed
 		          WHERE entry_hash IS DISTINCT FROM expected_hash
 		             OR prev_hash  IS DISTINCT FROM expected_prev), 0),
+		coalesce((SELECT max(id) FROM audit_log), 0),
 		coalesce((SELECT encode(entry_hash, 'hex') FROM audit_log
 		          ORDER BY id DESC LIMIT 1), '')`
 
@@ -51,13 +57,68 @@ const verifyQuery = `
 //
 // What it does NOT detect: a rebuild of the entire chain by someone able to
 // bypass the triggers, such as a database superuser, because they can recompute
-// every hash. The defence against that is recording HeadHash somewhere outside
-// this database and comparing it later.
+// every hash. The defence against that is recording HeadID and HeadHash
+// somewhere outside this database as an Anchor, and checking it with
+// CheckAnchor later.
 func Verify(ctx context.Context, db *sql.DB) (VerifyReport, error) {
 	var r VerifyReport
-	err := db.QueryRowContext(ctx, verifyQuery).Scan(&r.Entries, &r.FirstBad, &r.HeadHash)
+	err := db.QueryRowContext(ctx, verifyQuery).Scan(&r.Entries, &r.FirstBad, &r.HeadID, &r.HeadHash)
 	if err != nil {
 		return VerifyReport{}, fmt.Errorf("verify audit chain: %w", err)
 	}
 	return r, nil
+}
+
+// Anchor is an entry's hash recorded outside the database: "entry ID had hash
+// Hash". Every entry_hash covers the entry before it, so rewriting any entry
+// up to ID, even with every later hash recomputed, changes the hash at ID.
+type Anchor struct {
+	ID   int64
+	Hash string // 64 lowercase hex characters (SHA-256)
+}
+
+// String renders the anchor in the form ParseAnchor reads.
+func (a Anchor) String() string { return fmt.Sprintf("%d:%s", a.ID, a.Hash) }
+
+var sha256Hex = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// ParseAnchor reads "<id>:<sha256 hex>", as printed by verify-audit. It is
+// strict, because a malformed anchor that silently checked nothing would be
+// worse than an error.
+func ParseAnchor(s string) (Anchor, error) {
+	idText, hash, found := strings.Cut(strings.TrimSpace(s), ":")
+	if !found {
+		return Anchor{}, fmt.Errorf("anchor %q: want <id>:<hash>", s)
+	}
+	id, err := strconv.ParseInt(idText, 10, 64)
+	if err != nil || id < 1 {
+		return Anchor{}, fmt.Errorf("anchor %q: id must be a positive whole number", s)
+	}
+	if !sha256Hex.MatchString(hash) {
+		return Anchor{}, fmt.Errorf("anchor %q: hash must be 64 lowercase hex characters", s)
+	}
+	return Anchor{ID: id, Hash: hash}, nil
+}
+
+// ErrAnchorMismatch means the anchored entry is gone or its hash changed: the
+// chain was rewritten at or before the anchor, even if it verifies on its own.
+var ErrAnchorMismatch = errors.New("audit chain does not match its anchor")
+
+// CheckAnchor confirms that the anchored entry still exists with the anchored
+// hash. Run it alongside Verify: Verify proves the chain is consistent, and
+// CheckAnchor proves it is the same chain that was anchored.
+func CheckAnchor(ctx context.Context, db *sql.DB, a Anchor) error {
+	var got string
+	err := db.QueryRowContext(ctx,
+		`SELECT encode(entry_hash, 'hex') FROM audit_log WHERE id = $1`, a.ID).Scan(&got)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%w: entry %d no longer exists", ErrAnchorMismatch, a.ID)
+	}
+	if err != nil {
+		return fmt.Errorf("check audit anchor: %w", err)
+	}
+	if got != a.Hash {
+		return fmt.Errorf("%w: entry %d has hash %s, anchored %s", ErrAnchorMismatch, a.ID, got, a.Hash)
+	}
+	return nil
 }

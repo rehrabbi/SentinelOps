@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -85,19 +86,48 @@ func main() {
 	// Record the head hash somewhere outside this database: that is what turns
 	// tamper evidence into something an attacker with database access cannot
 	// quietly defeat by rebuilding the chain.
+	//
+	// With --anchor <id>:<hash>, an earlier head printed by this command, it
+	// also checks that entry still carries that hash, which catches a chain
+	// rebuilt from scratch. The scheduled audit-verify workflow passes the last
+	// anchor it recorded.
 	if len(os.Args) > 1 && os.Args[1] == "verify-audit" {
-		report, err := audit.Verify(context.Background(), db)
+		flags := flag.NewFlagSet("verify-audit", flag.ExitOnError)
+		anchorText := flags.String("anchor", "", "an earlier head, <id>:<hash>, that must still be in the chain")
+		_ = flags.Parse(os.Args[2:]) // ExitOnError: a bad flag exits before this returns
+
+		// Parse the anchor before touching the database, so a typo fails fast.
+		var anchor *audit.Anchor
+		if *anchorText != "" {
+			a, err := audit.ParseAnchor(*anchorText)
+			if err != nil {
+				log.Fatalf("audit verification failed: %v", err)
+			}
+			anchor = &a
+		}
+
+		ctx := context.Background()
+		report, err := audit.Verify(ctx, db)
 		if err != nil {
 			log.Fatalf("audit verification failed: %v", err)
+		}
+		if !report.Intact() {
+			log.Fatalf("audit chain BROKEN: %d entries, first bad id %d", report.Entries, report.FirstBad)
+		}
+		// Checked even when the table is empty: an anchored entry that vanished
+		// is exactly what a wiped or rebuilt log looks like.
+		if anchor != nil {
+			if err := audit.CheckAnchor(ctx, db, *anchor); err != nil {
+				log.Fatalf("audit chain BROKEN: %v", err)
+			}
+			log.Printf("anchor %s still holds", anchor)
 		}
 		if report.Entries == 0 {
 			log.Println("audit chain: empty, nothing to verify")
 			return
 		}
-		if !report.Intact() {
-			log.Fatalf("audit chain BROKEN: %d entries, first bad id %d", report.Entries, report.FirstBad)
-		}
-		log.Printf("audit chain intact: %d entries, head %s", report.Entries, report.HeadHash)
+		head := audit.Anchor{ID: report.HeadID, Hash: report.HeadHash}
+		log.Printf("audit chain intact: %d entries, head %s", report.Entries, head)
 		return
 	}
 

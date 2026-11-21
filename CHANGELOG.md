@@ -35,6 +35,11 @@ first hardened production deployment on AWS.
   about to be deployed, before Render is pointed at it.
 - A deploy workflow that builds the frontend and uploads it with its proxy to Cloudflare Pages
   on every change to `main`, using `wrangler` pinned in `package-lock.json`.
+- `verify-audit --anchor <id>:<hash>` checks that an earlier chain head is still in the audit
+  log, and the command now prints the head in that form. The first unit tests cover the anchor
+  parser.
+- A scheduled workflow that verifies the production audit chain every 6 hours against the last
+  recorded anchor, then records the current head on the `audit-anchors` branch.
 
 ### Security
 
@@ -52,6 +57,9 @@ first hardened production deployment on AWS.
   deploy an API image by a moving tag.
 - The deploy workflow's Cloudflare token is held in a GitHub environment that releases it only
   to deployments from `main`, never to pull requests.
+- The audit chain head is anchored outside the database, so a chain rebuilt by someone with
+  database access is detected. The scheduled check connects as `audit_verifier`, a role that
+  can only read `audit_log`.
 
 ## [0.3.0] - 2026-11-21
 

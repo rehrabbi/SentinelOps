@@ -117,7 +117,7 @@ the threat it answers.
 | Sensitive data exposure | The user directory is admin only, enforced by a `RequireRole` middleware chained inside `RequireAuth` | `internal/auth/middleware.go` |
 | Privilege escalation | Role changes are admin only, accept no field but `role`, and an admin cannot change their own, so at least one admin always remains | `internal/user/handler.go` |
 | Repudiation, "nobody did that" | Every login, failed login, logout and role change is recorded with the actor, target, outcome and source address | `internal/audit/` |
-| Covering tracks | The audit log refuses `UPDATE`, `DELETE` and `TRUNCATE`, and every row is SHA-256 chained to its predecessor by a database trigger, so edits are detectable with `go run . verify-audit` | `migrations/000005_create_audit_log.up.sql` |
+| Covering tracks | The audit log refuses `UPDATE`, `DELETE` and `TRUNCATE`, and every row is SHA-256 chained to its predecessor by a database trigger, so edits are detectable with `go run . verify-audit`. Every 6 hours a scheduled run checks the production chain against the head it recorded last time on the protected `audit-anchors` branch, so even a chain rebuilt from scratch is caught | `migrations/000005_create_audit_log.up.sql`, `.github/workflows/audit-verify.yml` |
 | An unrecorded privileged action | A role change and its audit entry share one transaction, so if the entry cannot be written the change is rolled back | `internal/user/handler.go` |
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
@@ -147,8 +147,9 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 - No automated test suite yet. Verification so far is scripted `curl` runs and manual
   browser checks, both recorded in the learning log.
 - The audit log is tamper evident, not tamper proof. A database superuser can drop the
-  triggers and rebuild the whole hash chain. Closing that means recording the head hash
-  outside this database, which is planned alongside deployment.
+  triggers and rebuild the whole hash chain. The scheduled anchor check catches any rebuild
+  that reaches back before the last anchor, but entries written since the last run, at most
+  about 6 hours, could still be rewritten undetected.
 - Authentication events are recorded on a best-effort basis, unlike role changes, which
   are transactional. A failed audit write is logged but does not fail the login.
 
