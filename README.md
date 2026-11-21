@@ -272,6 +272,8 @@ SentinelOps/
 │     └─ incident/                   incident domain and per-object authorization
 ├─ frontend/
 │  ├─ Dockerfile, nginx.conf.template  Vite build served by unprivileged nginx with a CSP
+│  ├─ functions/api/                 Cloudflare proxy that forwards /api to the API
+│  ├─ public/_headers                security headers when served by Cloudflare Pages
 │  └─ src/                           React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
 ├─ .github/workflows/ci.yml          format, vet, build, test, lint on every pull request

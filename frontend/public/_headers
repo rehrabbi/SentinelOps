@@ -1,0 +1,13 @@
+# Security headers for Cloudflare Pages, which serves the built frontend in
+# production. Keep these in step with frontend/nginx.conf.template, which
+# serves the same files from the container image. connect-src is 'self' here
+# because the API is reached through this site's own /api proxy.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Cache-Control: no-cache
+
+/assets/*
+  ! Cache-Control
+  Cache-Control: public, max-age=31536000, immutable
