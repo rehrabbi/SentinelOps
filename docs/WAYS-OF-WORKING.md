@@ -75,6 +75,14 @@ A good step: "Create the sessions table." A bad step: "Implement authentication.
 1. Claude tells me **exactly which file to open** (full path + how to find it in VSCode).
 2. For edits to an existing file, Claude tells me **which line number** to put new code on
    and where it goes (append at end / replace lines X–Y / after line N).
+
+   **No exceptions (2026-11-21):** every change I have to make, in code, config
+   (`compose.yaml`, Dockerfiles, CI workflows) or docs, starts with three things before any
+   code: the **file** (full repo-relative path, e.g. `backend/main.go`), **where it sits** in
+   the project (which folder or component, so I can find it in VSCode), and the **exact
+   line(s)** ("insert after line 22", "replace lines 40–48", or "new file"). Claude reads the
+   file first so the numbers are current, and re-checks them when an earlier edit in the
+   same step has shifted the lines.
 3. Claude explains **what I'm coding and its purpose** — what it is, why it exists, and
    the important concepts — *before* I type it.
 4. Claude gives me the exact code block to type (or paste for very long files).
