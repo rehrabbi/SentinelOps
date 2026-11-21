@@ -25,6 +25,12 @@ resource "cloudflare_pages_project" "web" {
         }
       }
     }
+    # Cloudflare requires fail_open to match in both environments. Previews
+    # still get no API_ORIGIN or PROXY_SECRET, so they cannot reach the API.
+    preview = {
+      compatibility_date = "2026-11-01"
+      fail_open          = false
+    }
   }
 
   lifecycle {
