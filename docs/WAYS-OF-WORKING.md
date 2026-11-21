@@ -198,8 +198,9 @@ commands.
 **Do not infer approval from previous steps.** Approval is per-action, per-session.
 
 **Standing exception (2026-10-24):** committing, pushing feature branches, opening PRs, and
-merging them once CI is green are pre-approved, as is archiving a merged branch as
-`merged/<name>`. Do them without asking and report what was done (branch, hashes, PR link).
+merging them once CI is green are pre-approved, including setting a PR to auto-merge, as is
+archiving a merged branch as `merged/<name>`. Do them without asking and report what was done
+(branch, hashes, PR link).
 
 ---
 
@@ -225,6 +226,10 @@ git-ignored `.env`; a committed `.env.example` documents the shape.)
   the PR's title and full description, so every PR description must be complete, follow the
   template (linked issue, type, what, why, security, risk and rollback, verification,
   screenshots), and be fit to live in `git log` permanently.
+- **Auto-merge (2026-11-21).** The repo allows auto-merge. Once a PR is open, set it to
+  auto-merge with the merge-commit method; GitHub merges it the moment every required check
+  passes, and never if one fails. Archive the branch as `merged/<name>` afterwards, since
+  GitHub does not do that part.
 - **NEVER delete a merged branch — keep it as `merged/<name>`.** On merge, do NOT
   `--delete-branch`; instead create `merged/<name>` at the branch's tip, push it, and remove
   the old `<type>/<name>` name. Merged branches are archived under the `merged/` prefix, never

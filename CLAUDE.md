@@ -132,8 +132,8 @@ Commit messages:
   tell the owner how to configure their own** — never invent or assume one.
 
 **Standing approval (2026-10-24):** committing, pushing feature branches, opening pull
-requests, and merging them once CI is green need **no per-action approval**, and neither
-does archiving a merged branch as `merged/<name>`. Do them, then report what was done:
+requests, and merging them once CI is green (setting them to auto-merge counts) need **no
+per-action approval**, and neither does archiving a merged branch as `merged/<name>`. Do them, then report what was done:
 branch, commit hashes, PR link. Still run the pre-commit checks above, and still confirm
 each commit contains only intended work.
 
