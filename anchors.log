@@ -1,0 +1,6 @@
+# SentinelOps audit chain anchors. Append-only: one line per scheduled run of
+# .github/workflows/audit-verify.yml, written only when the chain has grown.
+# Format: <UTC time> <entry id>:<entry_hash hex>
+# Each line must still match the production audit_log; a mismatch means the
+# chain was rewritten at or before that entry. Force-push and deletion of this
+# branch are blocked by a repository ruleset.
