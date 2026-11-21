@@ -320,14 +320,22 @@ GHCR, Singapore) and **Neon free** (Postgres 17, Singapore), all declared in Ter
 5. ✅ GitHub Environment `production` (branch rule: `main` only), secret `CLOUDFLARE_API_TOKEN` from
    a **separate** Pages-only token `sentinelops-github-deploy` (expires 2027-05-21, same as the
    Terraform token), variable `CLOUDFLARE_ACCOUNT_ID`. **Deploy frontend** runs when PR #37 merges.
-6. Register, then promote the first admin in SQL on the Neon database.
+6. ✅ First admin: the owner registered on the live site and was promoted with a guarded SQL
+   `UPDATE` (only if exactly one user existed). Production now holds one admin, one incident
+   ("Production smoke test") and four audit entries.
 
 On every Command Prompt, run the scripts as `"C:\Program Files\Git\bin\bash.exe" infra/<script>.sh`:
 plain `bash` there resolves to WSL, not Git Bash.
 
-Then step 6 (end-to-end test of the live site: login through the proxy, 403 on the API directly,
-the audit trail recording the visitor's address) and step 7 (audit chain anchor + scheduled
-`verify-audit`). Afterwards: make `Infrastructure (Terraform)` a required check, refresh the README
+**Step 6, end-to-end test (done 2026-11-21):** the site serves the security headers and immutable
+asset caching; `/admin` survives a reload; registration, login, logout, the admin screen, incident
+creation and a status change all work through the proxy; the API answers 403 when called directly,
+including login; a browser-sent `X-Proxy-Secret` or `X-Client-IP` is overwritten; every audit entry
+records the visitor's real address; the session cookie is first-party and invisible to JavaScript;
+`verify-audit` with the deployed image reports the chain intact (4 entries). The first request after
+15 idle minutes can return Render's 502 "currently unavailable" page while the free API wakes.
+
+**⏭️ Next: step 7** (audit chain anchor outside the database + scheduled `verify-audit`). Afterwards: make `Infrastructure (Terraform)` a required check, refresh the README
 roadmap, release v0.4.0.
 
 ### ✅ CI hardening (released as v0.3.0, issue #24, milestone #2)
@@ -547,6 +555,11 @@ format `.env.example` describes plus the provider credentials and IDs listed the
 `.env` holds the same values; move them with the clipboard routine, never through chat or git). Each device's `.env` gets the same `PG_CONN_STR`; copy it from
 Neon's Connect dialog (pooling off) and adjust it as described. Never `source` `.env`: the `&` in
 the connection string backgrounds the assignment and silently leaves the variable empty.
+
+**Second Windows machine, crash on 2026-11-21:** the machine lost power at 21:57 while git was
+checking out `main`, zeroing `.git/HEAD`, the index and 30-odd working files. Everything was already
+pushed, so `.git` was replaced from GitHub and the files reset to `main`. The damaged copy is kept as
+`.git-damaged-2026-11-21/` (ignored through `.git/info/exclude`) and can be deleted once unneeded.
 
 **Second Windows machine (Avast):** Avast's HTTPS scanning intercepts the local TLS connection
 between a native `terraform.exe` and its providers (`x509: certificate signed by unknown
