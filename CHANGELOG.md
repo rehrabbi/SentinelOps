@@ -18,9 +18,14 @@ first hardened production deployment on AWS.
   browser sent.
 - A `_headers` file giving the Cloudflare-hosted frontend the same security headers as the
   container image, with `connect-src 'self'` because the API is reached through the proxy.
+- A publish workflow that pushes the API image to GitHub Container Registry once the
+  security scans have passed on `main`, tagged `sha-<commit>` (immutable) and `main`.
 
 ### Security
 
+- Each published image carries a signed build provenance attestation binding its digest to
+  this repository, commit, and workflow, verifiable with `gh attestation verify`. The image
+  is scanned again before it is pushed, with the same fail policy as pull requests.
 - When `PROXY_SECRET` is set, the API answers only requests that carry it in `X-Proxy-Secret`,
   compared in constant time, apart from `/healthz`. This lets the API sit behind a proxy
   without being reachable around it. Unset, the check is off and the API logs that it is.
