@@ -304,16 +304,26 @@ GHCR, Singapore) and **Neon free** (Postgres 17, Singapore), all declared in Ter
   Its Cloudflare token lives in the GitHub **Environment `production`**, limited to `main`.
 - **Owner runs plan/apply**; Claude never applies.
 
-**First bring-up order** (step 5, nothing applied yet):
-1. `infra/terraform.sh apply -target=neon_project.app`: creates only the database.
-2. Neon console → project `sentinelops` → Connect, pooling **off** → copy into `.env` as
+**First bring-up order** (steps 1–5 done 2026-11-21; `plan` reports no changes):
+1. ✅ `infra/terraform.sh apply -target=neon_project.app`: creates only the database
+   (Neon project `aged-mud-98089037`).
+2. ✅ Neon console → project `sentinelops` → Connect, pooling **off** → copy into `.env` as
    `PROD_DATABASE_URL` (clipboard routine; never paste it in chat).
-3. `infra/migrate.sh`: schema to version 5.
-4. `infra/terraform.sh apply`: Render service and Pages project. The Pages project must come out at
-   `sentinelops.pages.dev` (a postcondition checks it).
-5. Create the GitHub Environment `production` (branch rule: `main`), with secret
-   `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`; then run **Deploy frontend**.
+3. ✅ `infra/migrate.sh`: schema at version 5, not dirty.
+4. ✅ `infra/terraform.sh apply`: Render service and Pages project. The API is at
+   `https://sentinelops-api-a61s.onrender.com` (Render suffixed the taken name), the site at
+   `https://sentinelops.pages.dev`. Two lessons: the Render key also needs **Workspaces → "Members,
+   notifications, webhooks, and log and metric streams": Read**, because the provider reads log stream
+   settings after every create (without it the service is created but not recorded, and was brought in
+   with `infra/terraform.sh import render_web_service.api <srv-id>`); and Cloudflare requires
+   `fail_open` to match in production and preview.
+5. ✅ GitHub Environment `production` (branch rule: `main` only), secret `CLOUDFLARE_API_TOKEN` from
+   a **separate** Pages-only token `sentinelops-github-deploy` (expires 2027-05-21, same as the
+   Terraform token), variable `CLOUDFLARE_ACCOUNT_ID`. **Deploy frontend** runs when PR #37 merges.
 6. Register, then promote the first admin in SQL on the Neon database.
+
+On every Command Prompt, run the scripts as `"C:\Program Files\Git\bin\bash.exe" infra/<script>.sh`:
+plain `bash` there resolves to WSL, not Git Bash.
 
 Then step 6 (end-to-end test of the live site: login through the proxy, 403 on the API directly,
 the audit trail recording the visitor's address) and step 7 (audit chain anchor + scheduled
