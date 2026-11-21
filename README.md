@@ -46,6 +46,8 @@ which will be released as v0.2.0. Every release is described in the [changelog](
 - Incident create, list, read, and partial update, each one scoped by owner and role
 - A React dashboard with severity and status badges and inline status editing
 - Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
+- The whole stack runnable in containers: a 20 MB distroless API image, an unprivileged
+  nginx image for the frontend, and a Compose profile that runs migrations first
 
 ## Screens
 
@@ -61,7 +63,9 @@ which will be released as v0.2.0. Every release is described in the [changelog](
 
 ## Architecture
 
-Today the application runs as a Go API and a React client against Postgres.
+Today the application runs as a Go API and a React client against Postgres, either
+natively for development or as two images, one for the API and one serving the built
+frontend, the same split the target deployment uses.
 
 ```mermaid
 flowchart LR
@@ -153,6 +157,7 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 | Frontend | React 19, Vite, TypeScript | Fast dev loop, typed API boundary |
 | Auth | Server side sessions, bcrypt, `HttpOnly` cookie | Instant revocation, and it teaches cookie security properly |
 | Config | 12 factor environment variables, git ignored `.env` | Secrets never reach the repository |
+| Containers | Multi-stage builds: distroless for the API, `nginx-unprivileged` for the frontend | Small, non-root images with no shell in the API image |
 
 ## Quickstart
 
@@ -204,6 +209,24 @@ so it suits a scheduled job.
 cd backend && go run . verify-audit
 ```
 
+### Or run the whole stack in containers
+
+The same `.env` is all the containerized stack needs. The `app` profile builds both images,
+waits for Postgres, runs migrations as a one-shot job, starts the API once that job has
+succeeded, and starts the frontend once the API reports healthy.
+
+```bash
+docker compose --profile app up -d --build   # UI on :8081, API on :8080
+docker compose --profile app ps              # migrate should show Exited (0), api (healthy)
+docker compose --profile app down            # stop it again
+```
+
+Open `http://localhost:8081`. Everything is published on `127.0.0.1` only. Plain
+`docker compose up -d` still starts just the database, so the native workflow above is
+unchanged; stop the containerized API before running `go run .`, since both use port 8080.
+Run any subcommand against the containerized database from the same image, for example
+`docker compose --profile app run --rm --no-deps api verify-audit`.
+
 Per device setup notes, including the macOS and Colima path, live in
 [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md).
 
@@ -229,6 +252,7 @@ Per device setup notes, including the macOS and Colima path, live in
 ```
 SentinelOps/
 ├─ backend/
+│  ├─ Dockerfile                     multi-stage build to a distroless, non-root image
 │  ├─ main.go, db.go, migrate.go     entry point, pool, migration runner
 │  ├─ migrations/                    versioned SQL, currently at version 5
 │  └─ internal/
@@ -238,11 +262,13 @@ SentinelOps/
 │     ├─ authctx/                    the authenticated caller, carried in the request context
 │     ├─ audit/                      append-only, hash-chained audit entries
 │     └─ incident/                   incident domain and per-object authorization
-├─ frontend/src/                     React app, api.ts is the typed API client
+├─ frontend/
+│  ├─ Dockerfile, nginx.conf.template  Vite build served by unprivileged nginx with a CSP
+│  └─ src/                           React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
 ├─ .github/workflows/ci.yml          format, vet, build, test, lint on every pull request
 ├─ CHANGELOG.md                      every release, in Keep a Changelog format
-└─ compose.yaml                      Postgres 17, localhost only, healthchecked
+└─ compose.yaml                      Postgres by default; migrate, api, and web with --profile app
 ```
 
 ## How this project is built

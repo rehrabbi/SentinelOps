@@ -1,0 +1,8 @@
+# Keep the build context minimal and keep secrets out of the image.
+# The context here is backend/, so the repo's .env is already excluded by
+# virtue of living one level up, but these patterns are defence in depth.
+bin/
+*.exe
+*.test
+.env
+.env.*

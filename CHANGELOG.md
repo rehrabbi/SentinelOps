@@ -10,6 +10,29 @@ first hardened production deployment on AWS.
 
 ## [Unreleased]
 
+### Added
+
+- Multi-stage container image for the API: a static binary on a distroless base, about
+  20 MB, with migrations embedded so image and schema cannot drift.
+- Multi-stage container image for the frontend: the Vite build served by unprivileged
+  nginx, with long-lived caching for fingerprinted assets and a fallback so client-side
+  routes such as `/admin` survive a refresh.
+- `api healthcheck` subcommand, which exits 0 when the running server answers `/healthz`
+  within two seconds, so container health checks work in an image with no shell or curl.
+- A Compose `app` profile that runs the whole stack: Postgres, a one-shot migration job,
+  the API once migrations succeed, and the frontend once the API is healthy. Plain
+  `docker compose up` still starts only the database.
+
+### Security
+
+- Both images run as non-root users, and the API image contains no shell or package
+  manager.
+- The frontend sends a Content Security Policy, `X-Content-Type-Options: nosniff`, and a
+  strict referrer policy on every response, including errors. The policy's API origin is
+  set when the container starts, not baked into the image.
+- Secrets reach containers only at run time from the git-ignored `.env`, never through
+  build arguments or image layers, and every published port is bound to `127.0.0.1`.
+
 ## [0.1.0] - 2026-10-24
 
 The application as it stood before containerization: authentication, role-based access,

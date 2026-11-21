@@ -1,5 +1,8 @@
 # Local development services for SentinelOps.
-# Start with:  docker compose up -d      Stop with:  docker compose down
+# Database only, for the native go run / npm run dev loop:
+#   docker compose up -d                         stop: docker compose down
+# Whole stack in containers (db, migrations, API on :8080, frontend on :8081):
+#   docker compose --profile app up -d --build   stop: docker compose --profile app down
 # Values wrapped in ${...} are read from the git-ignored .env file.
 services:
   db:
@@ -20,6 +23,60 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # One-shot job: applies pending migrations from the API image, then exits.
+  # Runs before every API start, the way a deployment runs migrations as a
+  # separate step rather than inside the server.
+  migrate:
+    profiles: ["app"]                    # only with --profile app
+    build: ./backend
+    image: sentinelops-api:dev           # same image as api; the second build is fully cached
+    command: ["migrate"]                 # appended to the image's ENTRYPOINT: /app/api migrate
+    environment:
+      # Containers reach each other by service name, so the host is "db", not 127.0.0.1.
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy       # wait for pg_isready, not just a started container
+    restart: "no"                        # a job that finished must stay finished
+
+  api:
+    profiles: ["app"]
+    build: ./backend
+    image: sentinelops-api:dev
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      FRONTEND_ORIGIN: http://localhost:8081   # must match the browser's address exactly, for CORS
+      SECURE_COOKIES: "false"                  # local traffic is plain http; production sets true
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully   # never start against an old schema
+    healthcheck:
+      # Exec form, no shell: the distroless image has none. The binary checks itself.
+      test: ["CMD", "/app/api", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  web:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8080    # BUILD time: baked into the JavaScript bundle
+    image: sentinelops-web:dev
+    restart: unless-stopped
+    environment:
+      API_ORIGIN: http://localhost:8080        # RUN time: rendered into the CSP at container start
+    ports:
+      - "127.0.0.1:8081:8080"                  # nginx listens on 8080 inside the container
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

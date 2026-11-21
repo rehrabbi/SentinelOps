@@ -4,15 +4,17 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-10-21 · **Current stage:** Audit logging complete — an append-only,
-> hash-chained `audit_log` with database-enforced immutability, auth + role-change events, and a
-> `verify-audit` command. Next: the production arc (Docker, CI hardening, AWS).
+> **Last updated:** 2026-10-24 · **Current stage:** ✅ **Containerization complete and on `main`**
+> (issue #20, milestone Containerization). Both images and the Compose `app` profile are built
+> and verified end to end. Next: release it as **v0.2.0** (owner confirms), then pick the next
+> stage. Full detail in §6.
 
 ---
 
 ## 1. How to resume on a new device
 
-1. Clone the repo and open the folder in VSCode.
+1. Clone the repo and open the folder in VSCode. Run `git fetch origin` and
+   `git branch -r --no-merged main`: any branch it prints is unfinished work to check out first.
 2. Tell Claude: *"Read docs/WAYS-OF-WORKING.md and docs/PROJECT-STATE.md, then re-orient
    per the Session behavior section and continue."* (Re-paste the operating manual too if
    you have it — but WAYS-OF-WORKING.md captures all of it.)
@@ -247,15 +249,111 @@ incident-UI PR. Merged branches are archived as `merged/*` (never deleted) — s
 
 **Runtime state:** container `sentinelops-db` (Postgres 17) runs the DB.
 ⚠️ **Database contents do NOT travel between devices** — `pgdata` is a local Docker volume,
-not part of the repo. The Windows box's users (`alice@`/`bob@` with fake hashes,
-`carol@example.com`) do **not** exist on other machines. On the Mac the DB was created fresh
-and holds one throwaway account, `testuser@example.com` (password
-`correct-horse-battery-staple` — disposable local test credential only), plus its sessions.
-After cloning anywhere new, register your own test user via `POST /api/users`.
+not part of the repo. Every machine starts with an empty database.
+
+**Bringing up a fresh device (do this in order):**
+1. `colima start` (macOS), then `docker compose up -d`, then `go run . migrate` from `backend/`.
+   Schema should report version 5, dirty = f.
+2. Register a user through the UI or `POST /api/users` (needs `fullName`, `email`, and a
+   password of at least 12 characters).
+3. **Promote that user to admin by hand**, because nothing else can: the admin screen is
+   admin-only, so the first admin always has to be created out of band. This is true in
+   production too and is a deliberate property, not a gap.
+   `UPDATE users SET role='admin' WHERE email='you@example.com';`
+4. The `audit_log` starts empty. It is append-only and hash-chained, so entries from another
+   machine cannot be imported, and `go run . verify-audit` on an empty table reports
+   "empty, nothing to verify" rather than failing.
+
+The Mac's local database currently holds `jireh@example.com` (admin) and
+`mallory@example.com` (analyst), five seeded demo incidents, and six audit entries. The second
+Windows machine's database holds `testuser@example.com` (reporter) plus two accounts created to
+smoke-test the containerized stack, `smoke-admin@example.test` (admin) and
+`smoke-user@example.test` (analyst), one incident, and four audit entries. None of that exists
+anywhere else. Test passwords in this project are disposable local-only strings and are never
+real credentials.
 
 ---
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
+
+### ⏭️ NEXT STEP: release v0.2.0, then choose the next stage
+
+Containerization is merged (issue #20). What remains of the stage is the release itself: move the
+`Unreleased` section of `CHANGELOG.md` into a dated `0.2.0` section, merge that, tag `v0.2.0` on the
+merge commit, publish the GitHub Release, and close milestone #1. **Every release is confirmed by
+the owner first** (WAYS-OF-WORKING §11). After that, the roadmap's next stage is CI hardening
+(dependency, secret, and static analysis scanning, including scanning these images), which starts
+with its own milestone and issue.
+
+### ✅ Containerization (merged, issue #20)
+
+**Decisions made, do not re-litigate:**
+- **Two images**, an API and a static frontend, matching the target diagram where a CDN fronts
+  static assets and a load balancer fronts the API. (One image serving both would have killed
+  CORS entirely; rejected in favour of matching the architecture.)
+- **`gcr.io/distroless/static-debian12:nonroot`** for the API runtime. Ships CA certificates for
+  TLS to a managed Postgres, runs as uid 65532, has no shell or package manager.
+- **`nginxinc/nginx-unprivileged:alpine`** for the frontend, because the official `nginx:alpine`
+  runs its master process as root (verified: `User` is empty on the official image, `101` on the
+  unprivileged one).
+- **The app services go into `compose.yaml`**, so the whole stack runs containerized locally.
+
+**Done and verified (commit `6068c7d`):** `backend/Dockerfile` and `backend/.dockerignore`.
+Multi-stage, `CGO_ENABLED=0` static binary (every dependency is pure Go), `-trimpath -ldflags="-s -w"`.
+**Final image 20 MB** against a 357 MB builder; the binary layer is 10.2 MB. Confirmed by running it:
+non-root uid 65532, **no `/bin/sh` in the image at all**, fails loudly without `DATABASE_URL`, and
+both `migrate` and `verify-audit` work from inside the container against the host database.
+Migrations are `go:embed`-ed, so the binary is the whole application and image and schema cannot drift.
+
+**Done and verified (commit `167ce27`):** `frontend/.dockerignore`, `frontend/nginx.conf.template`
+and `frontend/Dockerfile`. Build stage `node:22-alpine` (the CI Node version) runs `npm ci` and
+`npm run build`; runtime stage `nginxinc/nginx-unprivileged:alpine` serves only `dist/`.
+- **Build-time vs run-time config, the point of this step.** `VITE_API_URL` is an `ARG` that Vite
+  inlines into the bundle, so the bundle talks to one API origin forever. `API_ORIGIN` is an `ENV`
+  (default `http://localhost:8080`) that the image's envsubst renders into the CSP at container start,
+  so the same image works against any API. The default stops an unset variable from leaving a literal
+  `${API_ORIGIN}` in the CSP, which would make the browser block every API call.
+- **All `add_header` directives sit at server level**, with the cache policy picked by a `map` on
+  `$uri`. nginx drops every inherited `add_header` in a location that declares its own, so a
+  per-location `Cache-Control` would have silently stripped the security headers from that location.
+- **Measured, not assumed:** build context **130 KB** (versus ~88 MB of `node_modules` without the
+  `.dockerignore`); image 91.5 MB, of which 91.1 MB is the nginx base and ~320 KB is ours (299 KB
+  bundle + config). Running it: uid 101; the CSP carried a fake `API_ORIGIN` passed at `docker run`;
+  `/` and `index.html` send `no-cache`; `/assets/*.js` sends `max-age=31536000, immutable` and gzip;
+  `/admin` returns `200 text/html` (SPA fallback); a missing asset is a real `404` that still carries
+  the security headers (`always`).
+
+**Open, owner's call:** responses carry `Server: nginx/1.31.7`. `server_tokens off;` would hide the
+version; it was not in the agreed spec, so it was left out.
+
+**Done and verified (commit `0722338`, written by the owner):** an `api healthcheck` subcommand at
+the top of `main()`, before any database setup. It GETs `http://127.0.0.1:8080/healthz` with a
+2-second client timeout and exits 0 on `200`, 1 otherwise. Probes liveness (`/healthz`), not
+readiness (`/readyz`): the migrate job already guarantees the database, and readiness belongs to the
+load balancer later. Proven natively: exit 1 with the server down (even with no `DATABASE_URL`), 0
+with it up.
+
+**Done and verified (commit `9dd997b`):** `compose.yaml` services, decided 2026-10-24:
+- **`app` profile.** `docker compose up -d` still starts only `db`, so the native loop and quickstart
+  are unchanged; `docker compose --profile app up -d --build` runs everything.
+- **One-shot `migrate` service** running `api migrate` from the same image; `api` waits on
+  `service_completed_successfully`, so it never starts against an old schema.
+- **`api`** on `127.0.0.1:8080`, `DATABASE_URL` assembled in compose from `.env` with host `db`
+  (service name), `FRONTEND_ORIGIN=http://localhost:8081`, `SECURE_COOKIES=false`, and a healthcheck
+  in exec form (`["CMD", "/app/api", "healthcheck"]`, no shell).
+- **`web`** on `127.0.0.1:8081`, `VITE_API_URL` as a build arg and `API_ORIGIN` at run time, starting
+  only once `api` is healthy.
+- The branch kept its pre-standard name `feat/docker`; the PR title uses `build:`.
+
+**End-to-end verification:** start order db healthy → migrate exited 0 → api healthy → web; api uid
+65532, nginx uid 101; CSP carried `connect-src 'self' http://localhost:8080`; the bundle contained
+`http://localhost:8080`; CORS preflight announced only `http://localhost:8081`; register, SQL admin
+bootstrap, login with an HttpOnly cookie, `/api/me`, incident create and list, an admin role change,
+401 without a cookie, and logout all behaved; in a browser on `:8081`, login worked with no CSP
+violations and a reload on `/admin` kept the admin screen; `verify-audit` from the image reported the
+chain intact with 4 entries.
+
+---
 
 **✅ Audit logging shipped 2026-10-21.** `audit_log` records `user.login`,
 `user.login_failed`, `user.logout` and `user.role_changed` with actor, target, outcome,
@@ -343,6 +441,14 @@ go run .
 
 # 4) Run the frontend
 cd ../frontend && npm install && npm run dev
+```
+
+Or run the whole stack in containers (stop it before `go run .`, which also needs :8080):
+
+```bash
+docker compose --profile app up -d --build   # UI http://localhost:8081, API :8080
+docker compose --profile app run --rm --no-deps api verify-audit
+docker compose --profile app down
 ```
 
 Optional env vars (both have working local defaults, so no `.env` change is needed):

@@ -1078,6 +1078,98 @@ Fault injection on the audit insert proved the role change rolls back.
 
 ---
 
+## Stage: Containerization (complete, issue #20)
+
+**Decisions:** two images rather than one (matches the target diagram; the rejected
+single-image option would have removed CORS entirely by making everything same-origin);
+`distroless/static-debian12:nonroot` for the API; `nginxinc/nginx-unprivileged:alpine` for the
+frontend; app services added to `compose.yaml` so the local stack runs containerized.
+
+**Built:** `backend/Dockerfile` and `backend/.dockerignore`; `frontend/Dockerfile`,
+`frontend/.dockerignore` and `frontend/nginx.conf.template`; an `api healthcheck` subcommand,
+written by the owner; and `migrate`, `api`, and `web` services in `compose.yaml` behind an `app`
+profile.
+
+**Measured, not assumed:** final image **20 MB** versus a **357 MB** builder, with the binary
+layer at 10.2 MB. `docker inspect` confirms uid 65532. Attempting `--entrypoint /bin/sh`
+fails with "no such file or directory", so there is genuinely no shell to pivot with. The
+container exits loudly without `DATABASE_URL`, and `migrate` and `verify-audit` both run from
+inside it.
+
+Frontend: build context **130 KB** with the `.dockerignore`. The image is 91.5 MB, but 91.1 MB
+of that is the nginx base; our layers are ~320 KB. Running it confirmed uid 101, a CSP carrying an
+`API_ORIGIN` passed only at `docker run`, `/admin` served as `200 text/html`, a year-long immutable
+cache plus gzip on `/assets/`, and a real `404` for a missing asset that still carries the headers.
+
+**Concepts learned:**
+- **Multi-stage builds exist to throw the toolchain away.** The builder needs 357 MB of Go
+  compiler; the runtime needs one 10 MB binary. Measuring both makes the point concrete.
+- **Copy manifests before source.** Docker caches per instruction, keyed on the files it
+  touched, so `COPY go.mod go.sum` then `go mod download` means editing Go source never
+  re-downloads modules. The same pattern applies to `package.json` and `npm ci`.
+- **`CGO_ENABLED=0` is what unlocks distroless.** Every dependency here is pure Go, so a fully
+  static binary needs no libc, which is why a base image with no libc works at all.
+- **`ENTRYPOINT` over `CMD`** means `docker run image migrate` appends the argument, so the
+  existing subcommands become the deployment's migration mechanism for free.
+- **Distroless breaks the usual HEALTHCHECK.** There is no shell and no curl, so
+  `HEALTHCHECK CMD curl -f` cannot run. The answer is a `healthcheck` subcommand on the binary
+  itself, in the family of `migrate` and `verify-audit`, invoked in exec form
+  (`["CMD", "/app/api", "healthcheck"]`) so Docker never looks for a shell.
+- **The official nginx image runs as root.** Verified rather than assumed: `User` is empty on
+  `nginx:alpine` and `101` on `nginxinc/nginx-unprivileged:alpine`, which also listens on 8080.
+- **Build-time versus run-time config.** Vite inlines `VITE_API_URL` into the bundle at build
+  time, so that image is environment-specific. nginx renders `/etc/nginx/templates/*` with
+  envsubst at container start, so `${API_ORIGIN}` in the CSP is run-time config. Same program,
+  two different kinds of configuration, and the distinction decides whether you ship one image
+  or one per environment.
+- **An image is not a secret store.** `DATABASE_URL` arrives at run time; anyone who can pull
+  an image can read every layer of it.
+- **nginx `add_header` does not merge.** A location that declares any `add_header` loses every
+  one it would have inherited. Declaring one `Cache-Control` in `location /assets/` would have
+  silently stripped the CSP and `nosniff` from all JavaScript. Choosing the value with a `map` and
+  keeping every header at server level avoids the trap. `always` extends them to error responses.
+- **envsubst only replaces variables that exist.** The nginx image limits substitution to defined
+  environment variables, which is why `$uri` survives rendering. The flip side: an unset
+  `API_ORIGIN` would survive too, as literal text in the CSP, so the Dockerfile sets a default.
+- **`npm ci`, not `npm install`, in images.** It installs exactly what `package-lock.json` pins
+  and fails if the lockfile and `package.json` disagree, so every build is reproducible.
+- **A missing asset should 404.** Letting the SPA fallback answer `/assets/old.js` with
+  `index.html` hands the browser HTML where it expected JavaScript and hides the real problem.
+- **Measure what an image's size is made of.** 91.5 MB looked large until `docker history`
+  showed 91.1 MB was the base image and our part was ~320 KB.
+- **Subcommand order follows dependencies.** `healthcheck` is an HTTP client of the running
+  server, so it sits before the `DATABASE_URL` check and never opens a connection pool. Tested
+  with no `DATABASE_URL` at all: it reached the HTTP call and reported "connection refused".
+- **An HTTP client needs a deadline.** `http.Get` has no timeout, so a hung server would hang
+  the health check too and never be marked unhealthy. A 2-second `http.Client` timeout, just
+  under Compose's 3-second limit, keeps the failure ours to report.
+- **Liveness and readiness are different questions.** `/healthz` asks "is the process serving?"
+  and `/readyz` adds "can it reach the database?". The container check uses liveness: a database
+  outage should not mark the API itself broken, and readiness belongs to the load balancer.
+- **Inside Compose, the host is the service name.** Containers share a private network with
+  DNS, so the API reaches Postgres at `db:5432`. `127.0.0.1` inside a container means that
+  container.
+- **`depends_on` has conditions, and the default is the weakest.** Plain `depends_on` waits only
+  for a container to start. `service_healthy` waits for its health check, and
+  `service_completed_successfully` waits for a one-shot job to exit 0, which is what turns
+  `migrate` into a gate the API cannot pass on a failed migration.
+- **Profiles let one file serve two workflows.** Services marked `profiles: ["app"]` start only
+  when asked for, so `docker compose up` kept its old meaning and nobody's native loop broke.
+- **The browser enforces CORS, not the server.** The API answered a preflight from `:5173` with
+  `Access-Control-Allow-Origin: http://localhost:8081`; it is the browser that compares that with
+  the page's real origin and refuses the response.
+- **Same-site ignores ports.** The session cookie is `SameSite=Lax`, yet a page on `:8081` calling
+  the API on `:8080` still sends it, because a site is scheme plus registrable domain, and ports
+  are not part of it. Two origins, one site: CORS separates them, `SameSite` does not.
+- **`docker compose config` prints secrets.** It renders the file with `.env` substituted, so it
+  would print the database password inside `DATABASE_URL`. `--quiet` and `--services` validate the
+  file without showing values.
+
+*(Merged into `main` with the PR closing #20. The v0.2.0 release is confirmed by the owner
+separately.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
