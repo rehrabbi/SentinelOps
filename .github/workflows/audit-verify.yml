@@ -1,0 +1,83 @@
+name: Audit verify
+
+# Every 6 hours: checks that the production audit chain is intact AND still
+# contains the head recorded by the previous run, then records the current
+# head on the audit-anchors branch. Someone able to rewrite the database could
+# recompute every hash, but not the anchors kept here, so a rebuilt chain fails
+# this check. GitHub emails the owner when a scheduled run fails.
+on:
+  schedule:
+    - cron: "23 */6 * * *" # 23 minutes past, avoiding the top-of-hour rush
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Runs one at a time, so two runs never race to append an anchor.
+concurrency:
+  group: audit-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify and anchor the audit chain
+    runs-on: ubuntu-latest
+    # Holds AUDIT_DATABASE_URL, the read-only audit_verifier login, and releases
+    # it only to runs from main.
+    environment: audit
+    permissions:
+      contents: write # to append to audit-anchors; main stays protected
+    steps:
+      # Only the file naming the image Render runs is needed from main.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/api-image-tag.txt
+          sparse-checkout-cone-mode: false
+
+      # The anchor history. Credentials are kept here, as this checkout pushes.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: audit-anchors
+          path: anchors
+
+      # The exact API image that serves production runs the check, so the
+      # verification logic is the deployed code.
+      - name: Verify against the last anchor
+        id: verify
+        env:
+          DATABASE_URL: ${{ secrets.AUDIT_DATABASE_URL }}
+        run: |
+          image="ghcr.io/rehrabbi/sentinelops-api:$(tr -d '\r\n' < infra/api-image-tag.txt)"
+          # anchors.log lines are "<UTC time> <id>:<hash>"; # lines are comments.
+          last="$(grep -v '^#' anchors/anchors.log | awk 'NF { a = $2 } END { print a }')"
+          args=(verify-audit)
+          if [ -n "$last" ]; then args+=(--anchor "$last"); fi
+          docker run --rm --env DATABASE_URL "$image" "${args[@]}" 2>&1 | tee verify.log
+          # An image older than --anchor ignores the flag and still says
+          # "intact", so require the explicit confirmation, never assume it.
+          if [ -n "$last" ] && ! grep -qF "anchor $last still holds" verify.log; then
+            echo "::error::the anchor was not confirmed; is the pinned image older than --anchor support?"
+            exit 1
+          fi
+          head="$(grep -oE 'head [0-9]+:[0-9a-f]{64}' verify.log | cut -d' ' -f2 || true)"
+          if [ -z "$head" ] && ! grep -qF 'audit chain: empty' verify.log; then
+            echo "::error::could not read the chain head from the output"
+            exit 1
+          fi
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+
+      # Only when the chain has grown, so quiet periods add no commits.
+      - name: Anchor the current head
+        if: steps.verify.outputs.head != '' && steps.verify.outputs.head != steps.verify.outputs.last
+        working-directory: anchors
+        env:
+          HEAD_ANCHOR: ${{ steps.verify.outputs.head }}
+        run: |
+          printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$HEAD_ANCHOR" >> anchors.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add anchors.log
+          git commit --quiet -m "chore: anchor audit chain at entry ${HEAD_ANCHOR%%:*}"
+          git push --quiet origin HEAD:audit-anchors
