@@ -132,6 +132,10 @@ wait for a check that no longer exists.
 - Merge commits are the only merge method because they keep every commit, and its hash,
   on `main`. Squash and rebase merges rewrite those hashes, which would break every
   reference to a commit in `docs/`.
+- Auto-merge is enabled. Set each pull request to auto-merge (`gh pr merge <n> --auto
+  --merge`) once it is open, and GitHub merges it as soon as all required checks pass. It
+  never merges a failing pull request. Archiving the branch under `merged/` stays a manual
+  step after the merge.
 
 ## Releases
 

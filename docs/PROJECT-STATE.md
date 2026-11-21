@@ -127,7 +127,8 @@ to be created only once there is real infrastructure to deploy to (after Docker,
 fixes, and stages start as an **issue** that the PR closes; small docs/chore changes may skip it.
 The repo allows **merge commits only** (squash and rebase disabled in GitHub settings), and the
 merge commit uses the **PR title and description** as its message, so PR write-ups live in
-`git log`. Merge commits were chosen because they keep commit hashes valid on `main`, which the
+`git log`. **Auto-merge** was enabled on 2026-11-21 (owner-approved settings change): PRs are
+set to merge themselves once all required checks pass, and branches are archived afterwards. Merge commits were chosen because they keep commit hashes valid on `main`, which the
 docs cite. The PR template gained a linked issue, type of change, risk and rollback, and
 screenshots. **Eight jobs are required checks** on `main` (the two `ci.yml` jobs, plus the six
 `security.yml` jobs added in CI hardening, approved 2026-11-21), reported by GitHub Actions only
