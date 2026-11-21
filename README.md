@@ -204,9 +204,11 @@ The first admin has to be created the same way, with
 application can do it, because the admin screen is itself admin only. That is deliberate,
 and it holds in production too.
 
-Two optional variables both have working local defaults. `FRONTEND_ORIGIN` defaults to
+Three optional variables all have working local defaults. `FRONTEND_ORIGIN` defaults to
 `http://localhost:5173`, and `SECURE_COOKIES` defaults to `false`, which must become
-`true` in production or the session cookie travels in cleartext.
+`true` in production or the session cookie travels in cleartext. `PROXY_SECRET` is unset
+locally; in production it must hold the secret the proxy sends, or the API can be reached
+around the proxy.
 
 Check the audit log's integrity at any time. It exits non-zero when the chain is broken,
 so it suits a scheduled job.

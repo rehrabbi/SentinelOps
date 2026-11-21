@@ -10,6 +10,15 @@ first hardened production deployment on AWS.
 
 ## [Unreleased]
 
+### Security
+
+- When `PROXY_SECRET` is set, the API answers only requests that carry it in `X-Proxy-Secret`,
+  compared in constant time, apart from `/healthz`. This lets the API sit behind a proxy
+  without being reachable around it. Unset, the check is off and the API logs that it is.
+- Behind that proxy, the audit trail records the visitor's address that the proxy reports in
+  `X-Client-IP`, trusted only on requests that passed the secret check and parsed before use.
+  Everywhere else it still records the direct connection's address.
+
 ## [0.3.0] - 2026-11-21
 
 CI hardening: every pull request is now scanned for vulnerable dependencies, exploitable

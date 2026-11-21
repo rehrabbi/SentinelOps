@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -51,6 +52,13 @@ func main() {
 	// defaults to false — but production MUST set SECURE_COOKIES=true, or the
 	// session cookie would travel in cleartext.
 	secureCookies := envBool("SECURE_COOKIES", false)
+
+	// The secret the Cloudflare proxy sends with every request. Empty means
+	// there is no proxy (local development), and the check is switched off.
+	proxySecret := os.Getenv("PROXY_SECRET")
+	if proxySecret == "" {
+		log.Println("PROXY_SECRET not set: direct requests allowed (local development only)")
+	}
 
 	// Open the connection pool. This does NOT connect yet — it just prepares
 	// the pool; the first real connection happens on the first query/ping.
@@ -157,8 +165,9 @@ func main() {
 		authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Update)))
 
 	// Wrap the router in CORS middleware so our browser frontend (and only
-	// that origin) is allowed to read API responses.
-	handler := withCORS(mux, frontendOrigin)
+	// that origin) is allowed to read API responses, and wrap that in the
+	// proxy check, so nothing at all is answered without the proxy's secret.
+	handler := requireProxySecret(withCORS(mux, frontendOrigin), proxySecret)
 
 	// The address the server listens on. ":8080" means "all network
 	// interfaces on this machine, port 8080".
@@ -231,6 +240,49 @@ func withCORS(next http.Handler, allowedOrigin string) http.Handler {
 		}
 
 		// Hand off to the wrapped handler (our router).
+		next.ServeHTTP(w, r)
+	})
+}
+
+// proxySecretHeader carries the secret shared with the Cloudflare proxy, and
+// clientIPHeader the visitor's address, which the proxy always sets itself.
+const (
+	proxySecretHeader = "X-Proxy-Secret"
+	clientIPHeader    = "X-Client-IP"
+)
+
+// requireProxySecret is middleware that lets a request through only if it
+// carries the secret shared with the Cloudflare proxy. In production the API's
+// own address is public, so without this anyone could skip the proxy and talk
+// to the API directly. /healthz stays open because Render's health checks do
+// not come through the proxy.
+//
+// An empty secret switches the check off, for local development and compose,
+// where there is no proxy. Production must always set PROXY_SECRET.
+func requireProxySecret(next http.Handler, secret string) http.Handler {
+	if secret == "" {
+		return next
+	}
+	want := []byte(secret)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		got := []byte(r.Header.Get(proxySecretHeader))
+		// ConstantTimeCompare takes the same time however many bytes match,
+		// so the secret cannot be guessed one byte at a time by timing replies.
+		if subtle.ConstantTimeCompare(got, want) != 1 {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		// The proxy reports the visitor's address in a header it sets itself.
+		// It is believed only here, after the secret proved the request came
+		// through the proxy; a client calling the API directly never gets this
+		// far. ClientIP still parses it before it reaches the audit log.
+		if ip := r.Header.Get(clientIPHeader); ip != "" {
+			r = r.WithContext(audit.WithTrustedClientIP(r.Context(), ip))
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -101,12 +101,38 @@ func write(ctx context.Context, q execer, e Entry) error {
 	return nil
 }
 
-// ClientIP returns the direct peer address, without its port. RemoteAddr is
-// trustworthy because the kernel supplies it. X-Forwarded-For is deliberately
-// ignored: it is client-controlled, so trusting it unconditionally lets anyone
-// forge the source address in the audit trail. Once a proxy sits in front, this
-// must be revisited to trust that specific proxy and nothing else.
+// trustedClientIPKey marks a visitor address that the trusted proxy vouched
+// for. The type is unexported, so no other package can set or forge the value.
+type trustedClientIPKey struct{}
+
+// WithTrustedClientIP records the visitor's address as reported by the trusted
+// proxy. Only middleware that has already verified the proxy's secret may call
+// it; anything else would let a client choose its own audit address.
+func WithTrustedClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, trustedClientIPKey{}, ip)
+}
+
+// ClientIP returns the address recorded in the audit trail.
+//
+// Behind the proxy, every connection comes from the platform's load balancer,
+// so RemoteAddr says nothing about the visitor. The proxy's report of the real
+// address is used instead, but only when middleware attached it after checking
+// the proxy's secret. X-Forwarded-For is never read: it is client-controlled,
+// so trusting it would let anyone forge the source address in the audit trail.
+//
+// Without a trusted report, RemoteAddr is used. The kernel supplies it, so it
+// is trustworthy, and it is the right answer when there is no proxy.
+//
+// The reported value is parsed before use. The audit column is inet, so a
+// malformed string would make the insert fail, and because a role change and
+// its audit entry share a transaction, it would roll the change back too.
 func ClientIP(r *http.Request) *string {
+	if reported, ok := r.Context().Value(trustedClientIPKey{}).(string); ok {
+		if ip := net.ParseIP(reported); ip != nil {
+			s := ip.String()
+			return &s
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return nil

@@ -483,9 +483,11 @@ docker compose --profile app run --rm --no-deps api verify-audit
 docker compose --profile app down
 ```
 
-Optional env vars (both have working local defaults, so no `.env` change is needed):
-`FRONTEND_ORIGIN` (default `http://localhost:5173`) and `SECURE_COOKIES` (default `false`;
-**must be `true` in production**, or the session cookie travels in cleartext).
+Optional env vars (all have working local defaults, so no `.env` change is needed):
+`FRONTEND_ORIGIN` (default `http://localhost:5173`), `SECURE_COOKIES` (default `false`;
+**must be `true` in production**, or the session cookie travels in cleartext), and
+`PROXY_SECRET` (unset locally, which switches the proxy check off; **must be set in
+production** to the secret the Cloudflare proxy sends, see issue #30).
 
 ---
 
