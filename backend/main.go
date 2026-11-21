@@ -244,8 +244,12 @@ func withCORS(next http.Handler, allowedOrigin string) http.Handler {
 	})
 }
 
-// proxySecretHeader carries the secret shared with the Cloudflare proxy.
-const proxySecretHeader = "X-Proxy-Secret"
+// proxySecretHeader carries the secret shared with the Cloudflare proxy, and
+// clientIPHeader the visitor's address, which the proxy always sets itself.
+const (
+	proxySecretHeader = "X-Proxy-Secret"
+	clientIPHeader    = "X-Client-IP"
+)
 
 // requireProxySecret is middleware that lets a request through only if it
 // carries the secret shared with the Cloudflare proxy. In production the API's
@@ -271,6 +275,13 @@ func requireProxySecret(next http.Handler, secret string) http.Handler {
 		if subtle.ConstantTimeCompare(got, want) != 1 {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
+		}
+		// The proxy reports the visitor's address in a header it sets itself.
+		// It is believed only here, after the secret proved the request came
+		// through the proxy; a client calling the API directly never gets this
+		// far. ClientIP still parses it before it reaches the audit log.
+		if ip := r.Header.Get(clientIPHeader); ip != "" {
+			r = r.WithContext(audit.WithTrustedClientIP(r.Context(), ip))
 		}
 		next.ServeHTTP(w, r)
 	})
