@@ -85,3 +85,32 @@ jobs:
       # Runs tsc -b and then the Vite production build, so a type error fails CI.
       - name: Type check and build
         run: npm run build
+
+  infrastructure:
+    name: Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # The same Terraform version used locally. The wrapper is off so that
+      # commands behave exactly as they do on a developer's machine.
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.2
+          terraform_wrapper: false
+
+      # Lists any file that is not in canonical format, and fails if there is one.
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+      # -backend=false installs the providers, checked against the lock file's
+      # hashes, without contacting the state backend, so CI needs no database
+      # and no secret. -lockfile=readonly fails if the lock file would change.
+      - name: Install providers
+        run: terraform init -backend=false -input=false -lockfile=readonly
+
+      - name: Validate
+        run: terraform validate
