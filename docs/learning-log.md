@@ -1215,7 +1215,7 @@ before the workflow merged. CodeQL and gitleaks found nothing.
   back after another PR merged, and had to bring `main` in and pass again. That is the gap the rule
   exists to close: two changes that each pass alone, tested together.
 
-*(In progress on `ci/security-scanning`, PR #25.)*
+*(Merged into `main` by PR #25, closing #24, with all eight jobs required. Released as v0.3.0 once the owner confirms.)*
 
 ---
 

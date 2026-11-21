@@ -105,12 +105,15 @@ cd ../frontend && npm audit                              # fixable high or criti
 Also check that no secret, `.env` file, or build artifact is in the diff, and that the
 documentation in `docs/` still matches reality.
 
-Both CI jobs, `Backend (Go)` and `Frontend (React, TypeScript)`, are **required checks** on
-`main`: a pull request cannot merge until both pass, only results reported by GitHub
-Actions count, and the branch must be up to date with `main` first. When `main` has moved,
-use "Update branch" and let CI run again. Required checks are matched by job name, so
-renaming a job in `ci.yml` means updating the branch protection in the same change, or
-every pull request will wait for a check that no longer exists.
+Eight jobs are **required checks** on `main`: `Backend (Go)` and
+`Frontend (React, TypeScript)` from `ci.yml`, and `Go dependencies (govulncheck)`,
+`Frontend dependencies (npm audit)`, `CodeQL (go)`, `CodeQL (javascript-typescript)`,
+`Images and config (Trivy)`, and `Secrets in history (gitleaks)` from `security.yml`. A pull
+request cannot merge until all eight pass, only results reported by GitHub Actions count, and
+the branch must be up to date with `main` first. When `main` has moved, use "Update branch"
+and let CI run again. Required checks are matched by job name, so renaming a job in either
+workflow means updating the branch protection in the same change, or every pull request will
+wait for a check that no longer exists.
 
 ## Pull requests
 

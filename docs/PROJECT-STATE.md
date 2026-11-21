@@ -129,9 +129,10 @@ The repo allows **merge commits only** (squash and rebase disabled in GitHub set
 merge commit uses the **PR title and description** as its message, so PR write-ups live in
 `git log`. Merge commits were chosen because they keep commit hashes valid on `main`, which the
 docs cite. The PR template gained a linked issue, type of change, risk and rollback, and
-screenshots. Both CI jobs are now **required checks** on `main`, reported by GitHub Actions
-only (app id 15368) and with branches required to be up to date before merging; the rule lives
-in the classic branch protection alongside the existing PR, admin, and conversation rules.
+screenshots. **Eight jobs are required checks** on `main` (the two `ci.yml` jobs, plus the six
+`security.yml` jobs added in CI hardening, approved 2026-11-21), reported by GitHub Actions only
+(app id 15368) and with branches required to be up to date before merging; the rule lives in the
+classic branch protection alongside the existing PR, admin, and conversation rules.
 Routine commits, pushes, PRs, and merges on green CI are **pre-approved** (see WAYS-OF-WORKING
 §11). Labels are prefixed `type:` (mirrors branch and commit types), `area:` and `priority:`,
 replacing GitHub's defaults except `duplicate`, `wontfix` and `question`. Milestones are one per
