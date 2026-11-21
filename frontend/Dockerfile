@@ -27,6 +27,14 @@ RUN npm run build
 # official nginx:alpine runs its master process as root.
 FROM nginxinc/nginx-unprivileged:alpine
 
+# The base image can lag behind Alpine's security fixes, so pull them in at build
+# time. curl is removed as well: nginx never uses it, and inside a container it is
+# mainly a tool for an attacker to fetch more code. Root is needed only for apk;
+# the image drops straight back to the unprivileged nginx user.
+USER root
+RUN apk upgrade --no-cache && apk del --no-cache curl
+USER 101
+
 # RUN-TIME config, substituted into the CSP when the container starts. The
 # default keeps a forgotten variable from leaving a literal ${API_ORIGIN} in
 # the header, which would make the browser block every API call.
