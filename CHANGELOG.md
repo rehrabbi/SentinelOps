@@ -23,6 +23,10 @@ first hardened production deployment on AWS.
 - A Terraform configuration in `infra/` with its state in a separate Neon database, provider
   versions pinned and locked for Windows, macOS, and Linux, and a CI job that checks its
   formatting and validates it on every pull request.
+- `infra/terraform.sh`, which runs Terraform from HashiCorp's official container image so
+  every machine uses the same version, reading the state connection string from `.env` and
+  passing secrets to the container by name only. The state connection verifies Neon's
+  certificate (`sslmode=verify-full`).
 
 ### Security
 

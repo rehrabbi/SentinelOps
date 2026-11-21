@@ -498,6 +498,18 @@ production** to the secret the Cloudflare proxy sends, see issue #30).
 admin). PowerShell subprocess PATH can be stale — refresh from Machine+User env, or prepend
 `.../Go/bin` to PATH in the shell.
 
+**Terraform, every device:** run it through `infra/terraform.sh` (Docker, `hashicorp/terraform:1.17.2`),
+not a local install. It needs Docker running and `PG_CONN_STR` in `.env`, in the Terraform-ready
+format `.env.example` describes. Each device's `.env` gets the same `PG_CONN_STR`; copy it from
+Neon's Connect dialog (pooling off) and adjust it as described. Never `source` `.env`: the `&` in
+the connection string backgrounds the assignment and silently leaves the variable empty.
+
+**Second Windows machine (Avast):** Avast's HTTPS scanning intercepts the local TLS connection
+between a native `terraform.exe` and its providers (`x509: certificate signed by unknown
+authority`), and a file exception for `terraform.exe` does not stop it. The Docker wrapper avoids
+it. The same scanning breaks winget's `msstore` source, so use `--source winget`. Terraform 1.17.2
+is also installed natively at `D:\Program Files\Terraform`, useful only for `terraform fmt`.
+
 **macOS (Apple Silicon) — set up 2026-08-16:**
 - Toolchain via Homebrew: `brew install go colima docker docker-compose node`.
   Homebrew installs to `/opt/homebrew` and writes `/etc/paths.d/homebrew`, so **a new
