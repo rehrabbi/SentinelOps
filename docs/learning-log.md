@@ -1078,7 +1078,7 @@ Fault injection on the audit insert proved the role change rolls back.
 
 ---
 
-## Stage: Containerization (complete, issue #20)
+## Stage: Containerization (complete, issue #20, released as v0.2.0)
 
 **Decisions:** two images rather than one (matches the target diagram; the rejected
 single-image option would have removed CORS entirely by making everything same-origin);
@@ -1165,8 +1165,7 @@ cache plus gzip on `/assets/`, and a real `404` for a missing asset that still c
   would print the database password inside `DATABASE_URL`. `--quiet` and `--services` validate the
   file without showing values.
 
-*(Merged into `main` with the PR closing #20. The v0.2.0 release is confirmed by the owner
-separately.)*
+*(Merged into `main` by PR #21, closing #20, and released as v0.2.0 on 2026-11-21.)*
 
 ---
 

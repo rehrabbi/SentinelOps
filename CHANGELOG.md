@@ -10,6 +10,12 @@ first hardened production deployment on AWS.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-21
+
+Containerization: the whole stack now runs in containers, as an API image and a frontend
+image matching the target architecture, with migrations as a one-shot job and health checks
+that work without a shell.
+
 ### Added
 
 - Multi-stage container image for the API: a static binary on a distroless base, about
@@ -84,5 +90,6 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rehrabbi/SentinelOps/releases/tag/v0.1.0
