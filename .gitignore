@@ -12,6 +12,20 @@
 # required variables with no real values:
 !.env.example
 
+# --- Terraform working files ----------------------------------
+# .terraform/ holds downloaded providers. State, plan, and variable
+# files can contain secrets: state lives in the Neon backend, so a
+# local copy only ever appears by accident. The lock file
+# (.terraform.lock.hcl) is NOT ignored; it is committed.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+
 # --- Dependencies (reproducible from lockfiles) ---------------
 node_modules/
 

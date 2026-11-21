@@ -276,6 +276,7 @@ SentinelOps/
 │  ├─ public/_headers                security headers when served by Cloudflare Pages
 │  └─ src/                           React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
+├─ infra/                            Terraform: providers, lock file, state in Neon
 ├─ .github/workflows/ci.yml          format, vet, build, test, lint on every pull request
 ├─ CHANGELOG.md                      every release, in Keep a Changelog format
 └─ compose.yaml                      Postgres by default; migrate, api, and web with --profile app

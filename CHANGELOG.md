@@ -20,6 +20,9 @@ first hardened production deployment on AWS.
   container image, with `connect-src 'self'` because the API is reached through the proxy.
 - A publish workflow that pushes the API image to GitHub Container Registry once the
   security scans have passed on `main`, tagged `sha-<commit>` (immutable) and `main`.
+- A Terraform configuration in `infra/` with its state in a separate Neon database, provider
+  versions pinned and locked for Windows, macOS, and Linux, and a CI job that checks its
+  formatting and validates it on every pull request.
 
 ### Security
 
