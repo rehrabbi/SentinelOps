@@ -32,9 +32,10 @@ infrastructure as code, and cloud architecture.
 It is built incrementally, and the git history is meant to read as an engineering story,
 one concern per branch and one concern per pull request.
 
-**Status:** the current release is [v0.2.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.2.0),
-which runs the whole stack in containers. Next is CI hardening, to be released as v0.3.0.
-Every release is described in the [changelog](CHANGELOG.md).
+**Status:** the current release is [v0.3.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.3.0),
+which scans every pull request for vulnerable dependencies, code, images, and leaked secrets.
+Next is the AWS deployment with Terraform. Every release is described in the
+[changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -310,14 +311,16 @@ management behind an admin only screen, and a tamper-evident audit log.
 **v0.2.0, released.** Containerization: multi-stage images for the API and the frontend,
 and the whole stack running in Compose, with migrations as a one-shot job.
 
+**v0.3.0, released.** CI hardening: dependency, static analysis, image, and secret scanning
+on every pull request, all required to pass, with results in the repository's Security tab.
+
 Next up, each stage ending in a minor release.
 
-1. **CI hardening, v0.3.0, in progress.** Dependency, secret, and static analysis scanning,
-   including the container images, with results in the repository's Security tab
-2. AWS architecture provisioned with Terraform, then `dev`, `staging`, and `prod`
-   environment branches once there is somewhere to deploy, plus a scheduled `verify-audit`
-   run against the real database and somewhere outside it to anchor the chain head
-3. Observability, alerting, backups, and a cost review
+1. **AWS deployment, v0.4.0.** Architecture provisioned with Terraform, then `dev`,
+   `staging`, and `prod` environment branches once there is somewhere to deploy, plus a
+   scheduled `verify-audit` run against the real database and somewhere outside it to anchor
+   the chain head
+2. Observability, alerting, backups, and a cost review
 
 **1.0.0** is the first hardened production deployment on AWS.
 

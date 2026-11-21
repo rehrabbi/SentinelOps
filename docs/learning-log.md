@@ -1169,7 +1169,7 @@ cache plus gzip on `/assets/`, and a real `404` for a missing asset that still c
 
 ---
 
-## Stage: CI hardening (issue #24)
+## Stage: CI hardening (issue #24, released as v0.3.0)
 
 **Decisions:** scanning only, with the scheduled `verify-audit` and the chain-head anchor moved to
 the AWS stage; the best free tool per job (`govulncheck`, `npm audit`, CodeQL, Trivy, gitleaks);
@@ -1215,7 +1215,7 @@ before the workflow merged. CodeQL and gitleaks found nothing.
   back after another PR merged, and had to bring `main` in and pass again. That is the gap the rule
   exists to close: two changes that each pass alone, tested together.
 
-*(Merged into `main` by PR #25, closing #24, with all eight jobs required. Released as v0.3.0 once the owner confirms.)*
+*(Merged into `main` by PR #25, closing #24, with all eight jobs required, and released as v0.3.0 on 2026-11-21.)*
 
 ---
 
