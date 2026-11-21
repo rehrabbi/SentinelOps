@@ -73,7 +73,10 @@ Use these headings, then **stop and wait** for the owner to write the code:
 
 - **Goal** — what we're building or fixing.
 - **Why** — why it exists and how it fits the application.
-- **Where** — exact file path and the area within it (line numbers for edits).
+- **Where** — always, for every change the owner makes (code, config, or docs): the file's
+  full path, where it sits in the project, and the exact line numbers ("insert after line
+  22", "replace lines 40–48", or "new file"). Read the file first so the numbers are current.
+  See WAYS-OF-WORKING §4.
 - **Concept** — the programming idea being learned.
 - **Your step** — what the owner should write next, in a piece small enough that they are
   genuinely the implementer.
