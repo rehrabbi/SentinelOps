@@ -10,6 +10,12 @@ first hardened production deployment on AWS.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
+CI hardening: every pull request is now scanned for vulnerable dependencies, exploitable
+code, vulnerable image packages, and leaked secrets, and the first scans found and fixed
+three real problems before the scanning itself was merged.
+
 ### Added
 
 - A security workflow that runs on every pull request, on `main`, and weekly: `govulncheck`
@@ -33,6 +39,8 @@ first hardened production deployment on AWS.
 - GitHub secret scanning, push protection, and Dependabot alerts are switched on.
 - Every GitHub Action is pinned to a full commit SHA, so a moved tag cannot change the code a
   workflow runs.
+- All six scanning jobs are required checks on `main`, alongside the build and lint jobs, so
+  nothing merges without passing them.
 
 ## [0.2.0] - 2026-11-21
 
@@ -114,6 +122,7 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rehrabbi/SentinelOps/releases/tag/v0.1.0

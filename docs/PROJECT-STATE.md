@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-21 · **Current release:** v0.2.0 · **Current stage:** ✅ **CI hardening
-> complete on `main`** (issue #24, milestone #2). Security scanning runs on every PR, on `main`,
-> and weekly. Next: release it as **v0.3.0** (owner confirms). Full detail in §6.
+> **Last updated:** 2026-11-21 · **Current release:** ✅ **v0.3.0, CI hardening** (issue #24, PRs
+> #25–#28). Security scanning runs on every PR, on `main`, and weekly, with all eight checks
+> required. Next: plan the **AWS deployment** stage (v0.4.0), free tier first. Full detail in §6.
 
 ---
 
@@ -276,17 +276,17 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ NEXT STEP: release v0.3.0, then plan the AWS stage
+### ⏭️ NEXT STEP: plan the AWS deployment stage (v0.4.0)
 
-CI hardening is merged (issue #24). What remains is the release: move `Unreleased` in
-`CHANGELOG.md` into a dated `0.3.0` section, merge it, tag `v0.3.0`, publish the release, and close
-milestone #2, all confirmed by the owner first. The next stage after that is **AWS architecture with
-Terraform**, which now also carries the scheduled `verify-audit` run and the off-database anchor for
-the audit chain head (moved out of CI hardening, see below). It starts with its own milestone, issue,
-and decisions, and everything must stay free, so the AWS free tier and its limits are the first thing
-to brief.
+CI hardening shipped as **v0.3.0** on 2026-11-21 (PR #25 merged as `d0b918e`, release PR on top,
+milestone #2 closed). The next stage is **AWS architecture with Terraform**, which also carries the
+scheduled `verify-audit` run and the off-database anchor for the audit chain head (moved out of CI
+hardening, see below). It starts the standard way: a milestone, an issue, and the decisions briefed
+to the owner before anything is written. Everything must stay free, so the first brief is the AWS
+free tier: what it covers, its time limits, and how to make sure nothing can start charging (billing
+alarms, budgets, and teardown).
 
-### ✅ CI hardening (issue #24, milestone #2)
+### ✅ CI hardening (released as v0.3.0, issue #24, milestone #2)
 
 **Decisions made 2026-11-21, do not re-litigate:**
 - **Scope: scanning only.** The scheduled `verify-audit` run and anchoring the chain head outside the
