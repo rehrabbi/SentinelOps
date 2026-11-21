@@ -10,6 +10,15 @@ first hardened production deployment on AWS.
 
 ## [Unreleased]
 
+### Added
+
+- A Cloudflare Pages Function that forwards `/api/*` from the frontend's own address to the
+  API, so the deployed site stays same-origin and the session cookie stays first-party. It
+  always sets the proxy secret and the visitor's address itself, never passing on values the
+  browser sent.
+- A `_headers` file giving the Cloudflare-hosted frontend the same security headers as the
+  container image, with `connect-src 'self'` because the API is reached through the proxy.
+
 ### Security
 
 - When `PROXY_SECRET` is set, the API answers only requests that carry it in `X-Proxy-Secret`,
