@@ -10,6 +10,30 @@ first hardened production deployment on AWS.
 
 ## [Unreleased]
 
+### Added
+
+- A security workflow that runs on every pull request, on `main`, and weekly: `govulncheck`
+  for Go dependencies, `npm audit` for frontend dependencies, CodeQL static analysis of the
+  Go and TypeScript code, Trivy for both container images and the container configuration,
+  and gitleaks across the full git history. Findings are uploaded to the repository's
+  Security tab.
+
+### Fixed
+
+- The Go toolchain moves to 1.26.11, removing 17 standard library vulnerabilities that the
+  API's own code reaches.
+- `vite` moves to 8.3.8, resolving a high severity advisory in the development server.
+- The frontend image now installs Alpine's security fixes at build time and no longer ships
+  `curl`, removing 14 fixable high and critical vulnerabilities from the base image.
+
+### Security
+
+- A build fails on any high or critical finding that has a fixed version; everything else is
+  reported without blocking.
+- GitHub secret scanning, push protection, and Dependabot alerts are switched on.
+- Every GitHub Action is pinned to a full commit SHA, so a moved tag cannot change the code a
+  workflow runs.
+
 ## [0.2.0] - 2026-11-21
 
 Containerization: the whole stack now runs in containers, as an API image and a frontend

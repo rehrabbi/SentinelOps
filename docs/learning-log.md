@@ -1169,6 +1169,56 @@ cache plus gzip on `/assets/`, and a real `404` for a missing asset that still c
 
 ---
 
+## Stage: CI hardening (issue #24)
+
+**Decisions:** scanning only, with the scheduled `verify-audit` and the chain-head anchor moved to
+the AWS stage; the best free tool per job (`govulncheck`, `npm audit`, CodeQL, Trivy, gitleaks);
+fail only on High or Critical findings that have a fix; results in the Security tab as SARIF;
+GitHub secret scanning, push protection, and Dependabot alerts on; every action pinned to a SHA.
+
+**What the scanners found on their first run:** 17 Go standard library vulnerabilities the code
+actually calls (Go 1.26.5), one High advisory in `vite`, and 14 fixable High or Critical
+vulnerabilities in the nginx base image. All three were fixed in their own PRs (#26, #27, #28)
+before the workflow merged. CodeQL and gitleaks found nothing.
+
+**Concepts learned:**
+- **A scanner earns its place on its first run.** Three real problems surfaced before the workflow
+  was even merged, none of them visible to the existing build, vet, lint, and test checks. A build
+  being green says nothing about whether what it builds is safe.
+- **Reachability beats severity for Go.** The Go vulnerability database has no CVSS scores, so
+  `govulncheck` filters differently: it reports only vulnerabilities in functions the code calls.
+  It found 17 that matter and set aside 9 that exist in the dependency tree but are never reached.
+- **The standard library is a dependency too.** All 17 Go findings were in the toolchain itself,
+  not in any module. The `go` line in `go.mod` decides which toolchain CI and every developer
+  build with, so it is a security setting, not just a compatibility one.
+- **"Fixable" is half of a sane fail policy.** Blocking on every High finding in a base image
+  stalls every pull request on problems nobody downstream can fix. `ignore-unfixed` in Trivy and
+  the `fixAvailable` filter on `npm audit` keep the gate about things we can act on.
+- **Base images lag their own distribution.** Every vulnerable package in the nginx image already
+  had a fixed version in Alpine's repository; the image had not been rebuilt yet. `apk upgrade` at
+  build time closes the gap, at the cost of builds that drift with time, which is why the scan
+  also runs weekly.
+- **Remove what is not used.** `curl` was removed rather than upgraded: nginx never needed it, and
+  after a break-in it is the first tool an attacker reaches for.
+- **A tag is a pointer someone else controls.** `uses: actions/checkout@v4` runs whatever `v4`
+  points to today. Pinning to a full commit SHA, with the version in a comment, makes the workflow
+  run exactly the code that was reviewed. Downloaded binaries get the same treatment through
+  checksum verification.
+- **Least privilege applies to CI tokens.** The workflow defaults to `contents: read`; only the
+  jobs that upload SARIF get `security-events: write`, and none can push code.
+- **History is part of the attack surface.** A deleted secret is still in every clone, so gitleaks
+  fetches every commit (`fetch-depth: 0`) and `--redact` keeps anything it finds out of the
+  public job log.
+- **Push protection acts before the leak; scanning acts after.** Secret scanning in CI can only
+  report a secret that is already on GitHub. Push protection refuses the push, so it never is.
+- **"Up to date before merging" in practice.** A PR that passed CI against an older `main` was held
+  back after another PR merged, and had to bring `main` in and pass again. That is the gap the rule
+  exists to close: two changes that each pass alone, tested together.
+
+*(Merged into `main` by PR #25, closing #24, with all eight jobs required. Released as v0.3.0 once the owner confirms.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

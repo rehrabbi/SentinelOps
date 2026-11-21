@@ -1,0 +1,253 @@
+name: Security
+
+# Security scanning, separate from the correctness checks in ci.yml. Runs on every pull
+# request and push to main, and weekly, because new vulnerabilities are published against
+# code that has not changed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"   # Mondays 03:00 UTC
+  workflow_dispatch:      # run by hand from the Actions tab
+
+# Least privilege. Jobs that upload results to the Security tab add security-events: write
+# for themselves; nothing else can write anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Fail policy, decided in #24: a finding blocks only when it is High or Critical AND a fixed
+# version exists. Everything else is still reported, but cannot stall a pull request on an
+# upstream issue nobody can fix yet.
+#
+# Every third-party action is pinned to a full commit SHA, with its version in a comment.
+# A tag such as @v4 can be moved to different code; a SHA cannot.
+
+jobs:
+  go-deps:
+    name: Go dependencies (govulncheck)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+
+      # The Go vulnerability database has no severity scores. govulncheck filters by
+      # reachability instead: it reports only vulnerabilities in functions this code
+      # actually calls, so every finding is one that affects the API.
+      - name: Report to the Security tab
+        run: govulncheck -format sarif ./... > ../govulncheck.sarif
+
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: govulncheck.sarif
+          category: govulncheck
+
+      # Text mode exits non-zero when a called function is vulnerable, which fails the job.
+      - name: Fail on reachable vulnerabilities
+        run: govulncheck ./...
+
+  npm-deps:
+    name: Frontend dependencies (npm audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      # npm audit reads package-lock.json; nothing needs installing. It has no "only
+      # fixable" switch, so the JSON report is filtered here to apply the fail policy.
+      # Dependabot alerts track the same packages in the Security tab.
+      - name: Audit dependencies
+        run: |
+          npm audit || true
+          npm audit --json > audit.json || true
+          blocking=$(jq -c '[.vulnerabilities // {} | to_entries[]
+            | select((.value.severity == "high" or .value.severity == "critical")
+                     and .value.fixAvailable != false)
+            | .key]' audit.json)
+          if [ "$blocking" != "[]" ]; then
+            echo "High or critical vulnerabilities with a fix available: $blocking"
+            exit 1
+          fi
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # CodeQL watches the Go compiler to see the code. The module lives in backend/,
+      # so the build is run there explicitly rather than left to guesswork.
+      - if: matrix.language == 'go'
+        name: Build the API for analysis
+        run: go build ./...
+        working-directory: backend
+
+      - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          category: /language:${{ matrix.language }}
+
+  images:
+    name: Images and config (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Build both images
+        run: |
+          docker build -t sentinelops-api:ci backend
+          docker build -t sentinelops-web:ci frontend
+
+      # Report steps first, with every severity, so the Security tab sees everything even
+      # when a later gate step fails the job.
+      - name: Report API image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          image-ref: sentinelops-api:ci
+          format: sarif
+          output: trivy-api.sarif
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: trivy-api.sarif
+          category: trivy-api-image
+
+      - name: Report frontend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          image-ref: sentinelops-web:ci
+          format: sarif
+          output: trivy-web.sarif
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: trivy-web.sarif
+          category: trivy-web-image
+
+      # Dockerfiles and compose.yaml: running as root, missing health checks, and similar.
+      - name: Report container config
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+      - uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      # Gates. ignore-unfixed drops vulnerabilities with no fixed version, which applies
+      # the "only when a fix exists" half of the policy.
+      - name: Fail on fixable High or Critical in the API image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          image-ref: sentinelops-api:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Fail on fixable High or Critical in the frontend image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          image-ref: sentinelops-web:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Fail on High or Critical config issues
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.76.2
+          skip-setup-trivy: true
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  secrets:
+    name: Secrets in history (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      # fetch-depth: 0 fetches every commit, so a secret added and later deleted is
+      # still found. It stays in history either way.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      # The release binary, checked against the project's published checksums before it
+      # is allowed to run.
+      - name: Install gitleaks
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSfLO "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing "gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+
+      # --redact keeps any secret it finds out of the job log, which is public.
+      - name: Scan every commit
+        run: ./gitleaks git --redact --report-format sarif --report-path gitleaks.sarif --exit-code 1 .
+
+      - if: always()
+        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
