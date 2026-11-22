@@ -294,7 +294,8 @@ SentinelOps/
 │  └─ src/                           React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
 ├─ infra/                            Terraform for Neon, Render and Pages; terraform.sh,
-│                                    migrate.sh, deploy-api.sh, restore-drill.sh; the pinned
+│                                    migrate.sh, deploy-api.sh, restore-drill.sh, rotation
+│                                    scripts; the pinned
 │                                    API image tag and the backups' public key
 ├─ .github/workflows/                CI and security scans on every pull request; publish,
 │                                    deploy frontend, nightly encrypted backups, and the
@@ -363,6 +364,7 @@ Next up, each stage ending in a minor release.
 | File | What it holds |
 |---|---|
 | [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md) | Where the project stands, every locked decision, the exact next step |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | What to do when production breaks: a failed audit check, a failed backup, restores, outages, leaked secrets |
 | [docs/learning-log.md](docs/learning-log.md) | Decisions and why, concepts, security and debugging lessons |
 | [docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md) | The collaboration contract behind how this is built |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
