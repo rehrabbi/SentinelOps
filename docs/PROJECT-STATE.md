@@ -5,8 +5,8 @@
 > has the blow-by-blow history.
 >
 > **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.4.0, free cloud deployment**, live at
-> https://sentinelops.pages.dev, with all nine checks required. Next: plan the next stage. Full
-> detail in §6.
+> https://sentinelops.pages.dev, with all nine checks required. In progress: **Harden the live app**
+> (v0.5.0, issue #45). Full detail in §6.
 
 ---
 
@@ -279,16 +279,23 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ NEXT STEP: plan the next stage
+### ⏭️ IN PROGRESS: Harden the live app (v0.5.0, issue #45, milestone #4)
 
-v0.4.0 was released on 2026-11-22, closing issue #30 and milestone #3. The next stage starts the
-standard way: a milestone, an issue, and the decisions briefed to the owner before anything is
-written. Candidates, in the README roadmap's order:
-1. **Observability, alerting and backups** for the deployed stack (logs, uptime checks, Neon's
-   restore window, what to do when the audit check fails).
-2. **The known gaps:** rate limiting on login, pruning expired sessions, registration's
-   account enumeration, and a real test suite.
-3. **Environments** (`dev`, `staging`, `prod`) once there is more than one deployment.
+Chosen 2026-11-22 over observability and environments, because the public deployment made the
+known gaps real. In scope: an integration test suite, login rate limiting, registration that does
+not reveal existing accounts, and pruning expired sessions. Observability/backups and environments
+stay on the roadmap after it.
+
+**Step 1, integration tests (decided 2026-11-22):** HTTP end to end through `newHandler`
+(`backend/server.go`, extracted from `main()` with no behaviour change) against a throwaway Postgres:
+the Compose database locally, a `postgres:17-alpine` service in CI's `Backend (Go)` job. Each run
+creates and drops `sentinelops_test_<random>` (a fresh database, because `audit_log` refuses
+`TRUNCATE`); tests refuse non-localhost URLs, skip locally without `TEST_DATABASE_URL`, and fail in CI
+without it. Written in `backend/integration_test.go`; two deliberate regressions (cookie not
+`HttpOnly`, 403 instead of 404) were both caught before merging.
+
+**⏭️ Next:** step 2, login rate limiting: brief its decisions (where it lives, limits, key, behaviour
+on a single restarting free instance) before writing anything.
 
 Small follow-ups that need no stage:
 - Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.
