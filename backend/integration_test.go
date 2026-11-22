@@ -1,0 +1,496 @@
+package main
+
+// Integration tests: real HTTP requests through the real router (newHandler),
+// its middleware and its SQL, against a throwaway Postgres database.
+//
+// They need TEST_DATABASE_URL pointing at a LOCAL Postgres whose user may
+// create databases, for example the Compose one:
+//
+//	TEST_DATABASE_URL=postgres://sentinel:change-me-locally@localhost:5432/sentinelops?sslmode=disable go test ./...
+//
+// Each run creates its own database (sentinelops_test_<random>), migrates it,
+// and drops it afterwards. A fresh database, rather than emptying tables, is
+// required because audit_log refuses TRUNCATE and DELETE by design. Without
+// TEST_DATABASE_URL these tests skip locally and fail in CI.
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"strings"
+	"sync/atomic"
+	"testing"
+
+	"sentinelops/internal/audit"
+)
+
+// testDB is the migrated throwaway database, or nil when tests are skipped.
+var testDB *sql.DB
+
+func TestMain(m *testing.M) {
+	os.Exit(runWithTestDatabase(m))
+}
+
+func runWithTestDatabase(m *testing.M) int {
+	base := os.Getenv("TEST_DATABASE_URL")
+	if base == "" {
+		// GitHub Actions sets CI=true. A suite that silently skips in CI is
+		// worse than one that fails, because a green check would mean nothing.
+		if os.Getenv("CI") != "" {
+			fmt.Fprintln(os.Stderr, "TEST_DATABASE_URL must be set in CI")
+			return 1
+		}
+		fmt.Println("TEST_DATABASE_URL not set: integration tests skip (see CONTRIBUTING.md)")
+		return m.Run()
+	}
+
+	// Never anywhere but this machine: a mistyped variable must not be able
+	// to point the tests at the production database.
+	u, err := url.Parse(base)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TEST_DATABASE_URL is not a URL: %v\n", err)
+		return 1
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+	default:
+		fmt.Fprintf(os.Stderr, "TEST_DATABASE_URL must point at localhost, not %q\n", u.Hostname())
+		return 1
+	}
+
+	admin, err := sql.Open("pgx", base)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open test server: %v\n", err)
+		return 1
+	}
+	defer admin.Close()
+
+	suffix := make([]byte, 6)
+	if _, err := rand.Read(suffix); err != nil {
+		fmt.Fprintf(os.Stderr, "random name: %v\n", err)
+		return 1
+	}
+	// The name is generated here, never taken from input, so building the
+	// statement from it is safe (CREATE DATABASE takes no parameters).
+	name := "sentinelops_test_" + hex.EncodeToString(suffix)
+	ctx := context.Background()
+	if _, err := admin.ExecContext(ctx, "CREATE DATABASE "+name); err != nil {
+		fmt.Fprintf(os.Stderr, "create %s: %v\n", name, err)
+		return 1
+	}
+	defer func() {
+		if _, err := admin.ExecContext(ctx, "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
+			fmt.Fprintf(os.Stderr, "drop %s: %v\n", name, err)
+		}
+	}()
+
+	u.Path = "/" + name
+	db, err := openDB(u.String())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open %s: %v\n", name, err)
+		return 1
+	}
+	defer db.Close()
+	if err := runMigrateUp(db); err != nil {
+		fmt.Fprintf(os.Stderr, "migrate %s: %v\n", name, err)
+		return 1
+	}
+
+	testDB = db
+	return m.Run()
+}
+
+// ---- helpers ----------------------------------------------------------------
+
+func requireDB(t *testing.T) {
+	t.Helper()
+	if testDB == nil {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+}
+
+const testPassword = "correct-horse-battery" // 21 characters, local-only test value
+
+// newServer serves the real API for one test and closes it afterwards.
+func newServer(t *testing.T, cfg serverConfig) *httptest.Server {
+	t.Helper()
+	requireDB(t)
+	if cfg.FrontendOrigin == "" {
+		cfg.FrontendOrigin = "http://localhost:5173"
+	}
+	srv := httptest.NewServer(newHandler(testDB, cfg))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// client is one browser: its own cookie jar, plus headers it sends every time.
+type client struct {
+	t      *testing.T
+	base   string
+	http   *http.Client
+	header http.Header
+	last   *http.Response // the most recent response, for header and cookie checks
+}
+
+func newClient(t *testing.T, srv *httptest.Server) *client {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &client{t: t, base: srv.URL, http: &http.Client{Jar: jar}, header: http.Header{}}
+}
+
+// do sends a request with an optional JSON body and returns the status and body.
+func (c *client) do(method, path string, body any) (int, string) {
+	c.t.Helper()
+	var reader io.Reader
+	if body != nil {
+		if raw, ok := body.(string); ok {
+			reader = strings.NewReader(raw) // already JSON, possibly malformed on purpose
+		} else {
+			b, err := json.Marshal(body)
+			if err != nil {
+				c.t.Fatal(err)
+			}
+			reader = bytes.NewReader(b)
+		}
+	}
+	req, err := http.NewRequest(method, c.base+path, reader)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range c.header {
+		req.Header[k] = v
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatalf("%s %s: %v", method, path, err)
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	c.last = resp
+	return resp.StatusCode, string(b)
+}
+
+// expect fails the test unless the status matches.
+func (c *client) expect(want int, method, path string, body any) string {
+	c.t.Helper()
+	got, text := c.do(method, path, body)
+	if got != want {
+		c.t.Fatalf("%s %s: status %d, want %d; body %q", method, path, got, want, text)
+	}
+	return text
+}
+
+var emailCounter atomic.Int64
+
+// uniqueEmail keeps tests independent inside one shared database.
+func uniqueEmail(prefix string) string {
+	return fmt.Sprintf("%s-%d@example.test", prefix, emailCounter.Add(1))
+}
+
+type testUser struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Role  string `json:"role"`
+}
+
+// signUp registers, optionally promotes (the way the first admin is made in
+// production, directly in SQL), and logs in, returning a logged-in client.
+func signUp(t *testing.T, srv *httptest.Server, prefix, role string) (*client, testUser) {
+	t.Helper()
+	c := newClient(t, srv)
+	email := uniqueEmail(prefix)
+	text := c.expect(http.StatusCreated, "POST", "/api/users",
+		map[string]string{"fullName": prefix, "email": email, "password": testPassword})
+	var u testUser
+	if err := json.Unmarshal([]byte(text), &u); err != nil {
+		t.Fatalf("decode user: %v", err)
+	}
+	if role != "" && role != "reporter" {
+		if _, err := testDB.Exec(`UPDATE users SET role = $1 WHERE id = $2`, role, u.ID); err != nil {
+			t.Fatal(err)
+		}
+		u.Role = role
+	}
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": email, "password": testPassword})
+	return c, u
+}
+
+// auditIP returns the address recorded on the newest audit entry for an actor.
+func auditIP(t *testing.T, actorEmail, action string) string {
+	t.Helper()
+	var ip sql.NullString
+	err := testDB.QueryRow(`SELECT ip::text FROM audit_log WHERE actor_email = $1 AND action = $2
+	                        ORDER BY id DESC LIMIT 1`, actorEmail, action).Scan(&ip)
+	if err != nil {
+		t.Fatalf("audit entry %s for %s: %v", action, actorEmail, err)
+	}
+	return strings.TrimSuffix(ip.String, "/32")
+}
+
+// ---- tests ------------------------------------------------------------------
+
+func TestHealthAndReadiness(t *testing.T) {
+	c := newClient(t, newServer(t, serverConfig{}))
+	c.expect(http.StatusOK, "GET", "/healthz", nil)
+	c.expect(http.StatusOK, "GET", "/readyz", nil)
+}
+
+func TestRegistration(t *testing.T) {
+	c := newClient(t, newServer(t, serverConfig{}))
+	email := uniqueEmail("reg")
+	valid := map[string]string{"fullName": "Reg User", "email": email, "password": testPassword}
+
+	text := c.expect(http.StatusCreated, "POST", "/api/users", valid)
+	if strings.Contains(strings.ToLower(text), "password") {
+		t.Errorf("registration response mentions a password: %s", text)
+	}
+	var u testUser
+	if err := json.Unmarshal([]byte(text), &u); err != nil || u.Role != "reporter" {
+		t.Errorf("new user = %+v (%v), want role reporter", u, err)
+	}
+
+	var hash string
+	if err := testDB.QueryRow(`SELECT password_hash FROM users WHERE email = $1`, email).Scan(&hash); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(hash, "$2") || strings.Contains(hash, testPassword) {
+		t.Errorf("password not stored as a bcrypt hash")
+	}
+
+	// Current behaviour, and a known gap: a taken email is reported as such.
+	c.expect(http.StatusConflict, "POST", "/api/users", valid)
+
+	c.expect(http.StatusBadRequest, "POST", "/api/users",
+		map[string]string{"fullName": "Short", "email": uniqueEmail("short"), "password": "elevenchars"})
+	c.expect(http.StatusBadRequest, "POST", "/api/users",
+		map[string]string{"fullName": "Bad Email", "email": "not-an-email", "password": testPassword})
+	c.expect(http.StatusBadRequest, "POST", "/api/users",
+		`{"fullName":"X","email":"x@example.test","password":"correct-horse-battery","role":"admin"}`)
+}
+
+func TestLoginSessionAndLogout(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	_, u := signUp(t, srv, "login", "")
+	c := newClient(t, srv)
+
+	// A wrong password and an unknown email must be indistinguishable.
+	_, wrongPassword := c.do("POST", "/api/sessions", map[string]string{"email": u.Email, "password": "wrong-password-123"})
+	status, unknownEmail := c.do("POST", "/api/sessions", map[string]string{"email": uniqueEmail("ghost"), "password": testPassword})
+	if status != http.StatusUnauthorized || wrongPassword != unknownEmail {
+		t.Errorf("unknown email: %d %q, wrong password: %q; want identical 401s", status, unknownEmail, wrongPassword)
+	}
+	c.expect(http.StatusUnauthorized, "GET", "/api/me", nil)
+
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
+	var session *http.Cookie
+	for _, ck := range c.last.Cookies() {
+		if ck.Name == "sentinelops_session" {
+			session = ck
+		}
+	}
+	if session == nil {
+		t.Fatal("login set no session cookie")
+	}
+	if !session.HttpOnly || session.SameSite != http.SameSiteLaxMode || session.Path != "/" || session.MaxAge != 7*24*60*60 {
+		t.Errorf("cookie = %+v; want HttpOnly, SameSite=Lax, Path=/, seven days", session)
+	}
+
+	// Only the token's SHA-256 is stored, never the token itself.
+	var stored int
+	if err := testDB.QueryRow(`SELECT count(*) FROM sessions WHERE token_hash = $1`, session.Value).Scan(&stored); err != nil || stored != 0 {
+		t.Errorf("raw token found in sessions (%d, %v)", stored, err)
+	}
+
+	text := c.expect(http.StatusOK, "GET", "/api/me", nil)
+	if !strings.Contains(text, u.Email) || strings.Contains(strings.ToLower(text), "password") {
+		t.Errorf("/api/me = %s", text)
+	}
+
+	c.expect(http.StatusNoContent, "DELETE", "/api/sessions/current", nil)
+	c.expect(http.StatusUnauthorized, "GET", "/api/me", nil)
+	c.expect(http.StatusNoContent, "DELETE", "/api/sessions/current", nil) // idempotent
+}
+
+func TestSecureCookieFlag(t *testing.T) {
+	srv := newServer(t, serverConfig{SecureCookies: true})
+	c := newClient(t, srv)
+	email := uniqueEmail("secure")
+	c.expect(http.StatusCreated, "POST", "/api/users", map[string]string{"fullName": "S", "email": email, "password": testPassword})
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": email, "password": testPassword})
+	for _, ck := range c.last.Cookies() {
+		if ck.Name == "sentinelops_session" && !ck.Secure {
+			t.Error("SecureCookies is on but the session cookie is not Secure")
+		}
+	}
+}
+
+func TestIncidentAuthorization(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	owner, ownerUser := signUp(t, srv, "owner", "")
+	other, _ := signUp(t, srv, "other", "")
+	analyst, _ := signUp(t, srv, "analyst", "analyst")
+
+	newClient(t, srv).expect(http.StatusUnauthorized, "GET", "/api/incidents", nil)
+
+	text := owner.expect(http.StatusCreated, "POST", "/api/incidents",
+		map[string]string{"title": "Phishing email", "description": "Reported by finance", "severity": "high"})
+	var inc struct {
+		ID     string `json:"id"`
+		UserID string `json:"userId"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal([]byte(text), &inc); err != nil {
+		t.Fatal(err)
+	}
+	if inc.UserID != ownerUser.ID || inc.Status != "open" {
+		t.Errorf("created incident = %+v; want owner %s and status open", inc, ownerUser.ID)
+	}
+
+	// The client cannot choose the owner or the starting status.
+	owner.expect(http.StatusBadRequest, "POST", "/api/incidents",
+		`{"title":"x","severity":"low","status":"closed"}`)
+	owner.expect(http.StatusBadRequest, "POST", "/api/incidents",
+		map[string]string{"title": "x", "severity": "catastrophic"})
+
+	path := "/api/incidents/" + inc.ID
+
+	// Another reporter gets 404, never 403, so the incident's existence leaks nothing.
+	other.expect(http.StatusNotFound, "GET", path, nil)
+	other.expect(http.StatusNotFound, "PATCH", path, map[string]string{"status": "closed"})
+	if list := other.expect(http.StatusOK, "GET", "/api/incidents", nil); strings.Contains(list, inc.ID) {
+		t.Error("another reporter's list includes the incident")
+	}
+
+	analyst.expect(http.StatusOK, "GET", path, nil)
+	if list := analyst.expect(http.StatusOK, "GET", "/api/incidents", nil); !strings.Contains(list, inc.ID) {
+		t.Error("an analyst's list is missing the incident")
+	}
+
+	owner.expect(http.StatusOK, "PATCH", path, map[string]string{"status": "investigating"})
+	if got := owner.expect(http.StatusOK, "GET", path, nil); !strings.Contains(got, `"status":"investigating"`) {
+		t.Errorf("status change did not persist: %s", got)
+	}
+	owner.expect(http.StatusBadRequest, "PATCH", path, map[string]string{"status": "done"})
+	owner.expect(http.StatusBadRequest, "PATCH", path, map[string]string{})
+
+	// A malformed id is a 404 too, and never reaches Postgres as a 500.
+	owner.expect(http.StatusNotFound, "GET", "/api/incidents/not-a-uuid", nil)
+}
+
+func TestRoleManagement(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	admin, adminUser := signUp(t, srv, "admin", "admin")
+	reporter, reporterUser := signUp(t, srv, "reporter", "")
+
+	reporter.expect(http.StatusForbidden, "GET", "/api/users", nil)
+	reporter.expect(http.StatusForbidden, "PATCH", "/api/users/"+adminUser.ID, map[string]string{"role": "reporter"})
+	admin.expect(http.StatusOK, "GET", "/api/users", nil)
+
+	admin.expect(http.StatusOK, "PATCH", "/api/users/"+reporterUser.ID, map[string]string{"role": "analyst"})
+	// Roles are read from the database on every request: the same session sees it at once.
+	if me := reporter.expect(http.StatusOK, "GET", "/api/me", nil); !strings.Contains(me, `"role":"analyst"`) {
+		t.Errorf("role change not visible to the existing session: %s", me)
+	}
+
+	admin.expect(http.StatusForbidden, "PATCH", "/api/users/"+adminUser.ID, map[string]string{"role": "reporter"})
+	admin.expect(http.StatusBadRequest, "PATCH", "/api/users/"+reporterUser.ID, map[string]string{"role": "superuser"})
+
+	var target string
+	err := testDB.QueryRow(`SELECT target_id FROM audit_log WHERE action = $1 AND actor_email = $2
+	                        ORDER BY id DESC LIMIT 1`, audit.ActionRoleChanged, adminUser.Email).Scan(&target)
+	if err != nil || target != reporterUser.ID {
+		t.Errorf("role change audit entry: target %q, err %v; want %s", target, err, reporterUser.ID)
+	}
+}
+
+func TestAuditLogIsAppendOnlyAndChained(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	c := newClient(t, srv)
+	ghost := uniqueEmail("audit-ghost")
+	c.expect(http.StatusUnauthorized, "POST", "/api/sessions", map[string]string{"email": ghost, "password": testPassword})
+	if ip := auditIP(t, ghost, audit.ActionLoginFailed); ip != "127.0.0.1" {
+		t.Errorf("failed login recorded from %q, want 127.0.0.1", ip)
+	}
+
+	for _, stmt := range []string{
+		`UPDATE audit_log SET actor_email = 'someone-else@example.test'`,
+		`DELETE FROM audit_log`,
+		`TRUNCATE audit_log`,
+	} {
+		if _, err := testDB.Exec(stmt); err == nil {
+			t.Errorf("%q succeeded; the audit log must refuse it", stmt)
+		}
+	}
+
+	report, err := audit.Verify(context.Background(), testDB)
+	if err != nil || !report.Intact() || report.Entries == 0 {
+		t.Fatalf("audit chain: %+v, %v", report, err)
+	}
+	head := audit.Anchor{ID: report.HeadID, Hash: report.HeadHash}
+	if err := audit.CheckAnchor(context.Background(), testDB, head); err != nil {
+		t.Errorf("the current head does not hold as an anchor: %v", err)
+	}
+	wrong := audit.Anchor{ID: report.HeadID, Hash: strings.Repeat("0", 64)}
+	if err := audit.CheckAnchor(context.Background(), testDB, wrong); err == nil {
+		t.Error("a wrong anchor was accepted")
+	}
+}
+
+func TestProxySecret(t *testing.T) {
+	const secret = "test-proxy-secret-local-only"
+	srv := newServer(t, serverConfig{ProxySecret: secret})
+
+	direct := newClient(t, srv)
+	direct.expect(http.StatusOK, "GET", "/healthz", nil) // exempt, for Render's health check
+	direct.expect(http.StatusForbidden, "GET", "/api/me", nil)
+	direct.header.Set("X-Proxy-Secret", "wrong")
+	direct.expect(http.StatusForbidden, "GET", "/api/me", nil)
+
+	proxied := newClient(t, srv)
+	proxied.header.Set("X-Proxy-Secret", secret)
+	proxied.expect(http.StatusUnauthorized, "GET", "/api/me", nil) // through the check, to auth
+
+	// Behind the secret, the forwarded visitor address is what gets audited...
+	proxied.header.Set("X-Client-IP", "203.0.113.9")
+	ghost := uniqueEmail("proxied-ghost")
+	proxied.expect(http.StatusUnauthorized, "POST", "/api/sessions", map[string]string{"email": ghost, "password": testPassword})
+	if ip := auditIP(t, ghost, audit.ActionLoginFailed); ip != "203.0.113.9" {
+		t.Errorf("proxied failed login recorded from %q, want 203.0.113.9", ip)
+	}
+
+	// ...but a value that is not an address falls back to the connection's.
+	proxied.header.Set("X-Client-IP", "not-an-ip")
+	ghost = uniqueEmail("garbage-ip")
+	proxied.expect(http.StatusUnauthorized, "POST", "/api/sessions", map[string]string{"email": ghost, "password": testPassword})
+	if ip := auditIP(t, ghost, audit.ActionLoginFailed); ip != "127.0.0.1" {
+		t.Errorf("unparseable X-Client-IP recorded as %q, want 127.0.0.1", ip)
+	}
+
+	// Without a proxy secret configured, X-Client-IP is never trusted.
+	open := newClient(t, newServer(t, serverConfig{}))
+	open.header.Set("X-Client-IP", "198.51.100.7")
+	ghost = uniqueEmail("spoofed")
+	open.expect(http.StatusUnauthorized, "POST", "/api/sessions", map[string]string{"email": ghost, "password": testPassword})
+	if ip := auditIP(t, ghost, audit.ActionLoginFailed); ip != "127.0.0.1" {
+		t.Errorf("spoofed X-Client-IP was trusted: recorded %q", ip)
+	}
+}
