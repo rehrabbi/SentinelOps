@@ -129,6 +129,55 @@ export async function acceptInvite(token: string, fullName: string, password: st
     return res.json()
 }
 
+// changePassword replaces the current user's password. The server ends every
+// other session of theirs; this one stays logged in. A wrong current password
+// is a 403, not a 401, because the session itself is still valid.
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const res = await request('/api/me/password', {
+        method: 'PUT',
+        body: JSON.stringify({ currentPassword, newPassword }),
+    })
+    if (res.status === 429) {
+        throw new ApiError(429, tooManyAttemptsMessage(res.headers.get('Retry-After')))
+    }
+    if (!res.ok) throw await textError(res, 'Could not change the password')
+}
+
+// logoutEverywhere ends every session of the current user, this one included.
+export async function logoutEverywhere(): Promise<void> {
+    const res = await request('/api/sessions', { method: 'DELETE' })
+    if (!res.ok) throw await textError(res, 'Could not log out everywhere')
+}
+
+// IssuedReset is what an admin gets back: whose password the link resets, until
+// when, and the one-time token, which is shown once and never stored.
+export type IssuedReset = {
+    email: string
+    expiresAt: string
+    token: string
+}
+
+// createPasswordReset issues a one-time reset link for another user (admins
+// only). Issuing a new one makes any earlier, unused link for them stop working.
+export async function createPasswordReset(userId: string): Promise<IssuedReset> {
+    const res = await request(`/api/users/${userId}/password-reset`, { method: 'POST' })
+    if (!res.ok) throw await textError(res, 'Could not create the reset link')
+    return res.json()
+}
+
+// acceptPasswordReset sets a new password through a reset link. Every session
+// of that account ends; it does not log anyone in.
+export async function acceptPasswordReset(token: string, newPassword: string): Promise<void> {
+    const res = await request('/api/password-resets/accept', {
+        method: 'POST',
+        body: JSON.stringify({ token, newPassword }),
+    })
+    if (res.status === 429) {
+        throw new ApiError(429, tooManyAttemptsMessage(res.headers.get('Retry-After')))
+    }
+    if (!res.ok) throw await textError(res, 'Could not reset the password')
+}
+
 // Incident status/severity mirror the DB CHECK enums. Using unions (not plain
 // string) gives autocomplete and lets te UI map each value to a badge color.
 export type IncidentStatus = 'open' | 'investigating' | 'resolved' | 'closed'

@@ -367,6 +367,7 @@
 
 .user-row {
   display: flex;
+  flex-wrap: wrap; /* lets a one-time reset link take a full line below */
   justify-content: space-between;
   align-items: center;
   gap: 12px;
@@ -467,7 +468,26 @@
 
   .user-controls {
     justify-content: space-between;
+    flex-wrap: wrap;
   }
+}
+
+/* A reset link issued for one user spans the whole row, under its controls. */
+.user-reset {
+  flex-basis: 100%;
+}
+
+/* Success messages, the counterpart of .status.error. */
+.status.success {
+  color: #16a34a; /* green */
+  font-size: 14px;
+  margin-top: -4px;
+}
+
+/* A lone button in a card, not inside a form, spans the card like one does. */
+.auth-card button.full-width {
+  width: 100%;
+  margin-top: 12px;
 }
 /* Invite form on the admin screen. It reuses the .incident-form card; these
    rules only lay out its row and the one-time link. */
