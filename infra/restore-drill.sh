@@ -42,8 +42,13 @@ if [ ! -f "$identity" ]; then
   exit 1
 fi
 
-# Git Bash on Windows rewrites container paths; Docker gets them untouched.
+# Git Bash on Windows rewrites anything that looks like a path. Container paths
+# must reach Docker untouched, so that is switched off; host paths handed to a
+# Windows program (gh, docker cp) are then converted explicitly with host().
 export MSYS_NO_PATHCONV=1
+host() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi
+}
 
 work="$(mktemp -d)"
 name="sentinelops-restore-drill-$$"
@@ -65,7 +70,7 @@ if [ -z "$file" ]; then
   run_id="${artifact%% *}"
   artifact_name="${artifact#* }"
   echo "Newest backup: $artifact_name (workflow run $run_id)"
-  gh run download "$run_id" --repo "$repo" --name "$artifact_name" --dir "$work"
+  gh run download "$run_id" --repo "$repo" --name "$artifact_name" --dir "$(host "$work")"
   file="$work/sentinelops.dump.age"
 fi
 echo "Encrypted dump: $(wc -c <"$file") bytes"
@@ -86,8 +91,8 @@ sleep 2
 # ever a pipe inside it. A full restore loads every row before creating any
 # trigger (triggers live in the dump's last section), so the audit rows arrive
 # exactly as stored, hashes included, and are not re-sealed on the way in.
-docker cp "$file" "$name:/tmp/backup.dump.age"
-docker cp "$identity" "$name:/tmp/backup-key.txt"
+docker cp "$(host "$file")" "$name:/tmp/backup.dump.age"
+docker cp "$(host "$identity")" "$name:/tmp/backup-key.txt"
 docker exec "$name" sh -c '
   set -e
   apk add --quiet --no-progress age >/dev/null
