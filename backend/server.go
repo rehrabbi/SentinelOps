@@ -8,6 +8,7 @@ import (
 	"sentinelops/internal/audit"
 	"sentinelops/internal/auth"
 	"sentinelops/internal/incident"
+	"sentinelops/internal/invite"
 	"sentinelops/internal/ratelimit"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
@@ -47,11 +48,17 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	userHandler := user.NewHandler(userRepo, db, auditRepo)
 	// GET /api/users is registered further down: it is admin-only, so it needs
 	// authHandler, which does not exist yet at this point.
-	// Registration is limited per visitor: at most 5 accounts created (or
-	// taken emails probed) per hour. Validation errors do not count.
+	// There is no open sign-up (see internal/invite): accounts come only from
+	// invites. Accepting one is public, because the invitee has no account
+	// yet, and limited per visitor to 5 an hour, counting accounts created
+	// (201), taken addresses (409) and unusable tokens (404); a mistyped name
+	// or a too-short password (400) does not count.
+	inviteHandler := invite.NewHandler(db, userRepo, auditRepo)
 	signupLimit := ratelimit.New(5, time.Hour)
-	mux.Handle("POST /api/users", signupLimit.Wrap(http.HandlerFunc(userHandler.Create), visitorKey,
-		func(status int) bool { return status == http.StatusCreated || status == http.StatusConflict }))
+	mux.Handle("POST /api/invites/accept", signupLimit.Wrap(http.HandlerFunc(inviteHandler.Accept), visitorKey,
+		func(status int) bool {
+			return status == http.StatusCreated || status == http.StatusConflict || status == http.StatusNotFound
+		}))
 
 	// Auth feature: login reads a user AND writes a session, so it takes both
 	// repositories. This is why auth is its own package rather than living
@@ -82,6 +89,11 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// admin changing their OWN role, which keeps at least one admin alive.
 	mux.Handle("PATCH /api/users/{id}",
 		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(userHandler.UpdateRole))))
+
+	// Issuing an invite is admin-only: it decides who gets an account, and
+	// with which role.
+	mux.Handle("POST /api/invites",
+		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(inviteHandler.Create))))
 
 	// Logout: destroy the current session and clear the cookie. Public and
 	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth.

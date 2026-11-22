@@ -52,8 +52,8 @@ between continuing this project and accidentally restarting a stage that is alre
 
 3. **Expect an empty database.** `pgdata` is a local Docker volume and never travels, so a new
    machine has no users, no incidents, and an empty audit log. Bring-up is in
-   `docs/PROJECT-STATE.md` §5, including the first admin, which has to be created by hand in
-   SQL because the admin screen is itself admin-only.
+   `docs/PROJECT-STATE.md` §5, including the first admin, whose invite comes from the
+   command line (`go run . invite --email … --role admin`), because there is no open sign-up.
 
 4. Summarize concisely: where the project stands, what is done, what is unfinished, and the
    logical next step. Say which branch you would continue on and why.

@@ -1,9 +1,11 @@
 import { Link } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
+  createInvite,
   getUsers,
   updateUserRole,
   ApiError,
+  type IssuedInvite,
   type Role,
   type User,
 } from "./api";
@@ -58,6 +60,7 @@ export function AdminPage({ currentUserId }: { currentUserId: string }) {
             <p className="admin-link">
         <Link to="/">Back to incidents</Link>
       </p>
+      <InviteForm />
       <ul className="user-list">
         {list.users.map((u) => (
           <UserRow
@@ -135,5 +138,99 @@ function UserRow({
         </button>
       </div>
     </li>
+  );
+}
+// InviteForm issues a one-time invite and shows its link, once. Accounts exist
+// only through invites: there is no open sign-up, so nobody can learn which
+// emails have accounts by trying to register them.
+function InviteForm() {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<Role>("reporter");
+  const [status, setStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "submitting" }
+    | { kind: "error"; message: string }
+    | { kind: "issued"; invite: IssuedInvite; copied: boolean }
+  >({ kind: "idle" });
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setStatus({ kind: "submitting" });
+    try {
+      const invite = await createInvite(email, role);
+      setStatus({ kind: "issued", invite, copied: false });
+      setEmail("");
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "Could not create the invite";
+      setStatus({ kind: "error", message });
+    }
+  }
+
+  // The token goes after "#": browsers never send that part to any server, so
+  // the credential stays out of request logs and Referer headers.
+  const link =
+    status.kind === "issued"
+      ? `${window.location.origin}/invite#${status.invite.token}`
+      : "";
+
+  async function copyLink() {
+    if (status.kind !== "issued") return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setStatus({ ...status, copied: true });
+    } catch {
+      // Clipboard access can be refused; the link stays visible to copy by hand.
+    }
+  }
+
+  return (
+    <form className="incident-form invite-form" onSubmit={handleSubmit}>
+      <h3>Invite someone</h3>
+      <div className="invite-fields">
+        <label>
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="off"
+          />
+        </label>
+        <label>
+          Role
+          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit" disabled={status.kind === "submitting"}>
+          {status.kind === "submitting" ? "Creating…" : "Create invite"}
+        </button>
+      </div>
+      {status.kind === "error" && (
+        <p className="status error">{status.message}</p>
+      )}
+      {status.kind === "issued" && (
+        <div className="invite-issued">
+          <p>
+            Invite for <strong>{status.invite.email}</strong> as{" "}
+            {status.invite.role}, valid until{" "}
+            {new Date(status.invite.expiresAt).toLocaleString()}. Send this link
+            only to them; it is shown once and works once.
+          </p>
+          <div className="invite-link">
+            <input type="text" readOnly value={link} aria-label="Invite link" />
+            <button type="button" onClick={copyLink}>
+              {status.copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
+    </form>
   );
 }

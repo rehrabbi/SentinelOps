@@ -13,22 +13,36 @@ first hardened production deployment.
 ### Added
 
 - Integration tests that drive the real API, its router, middleware and SQL, against a
-  throwaway Postgres on every pull request. They cover registration, login, sessions and the
+  throwaway Postgres on every pull request. They cover invites, login, sessions and the
   cookie's flags, RBAC, per-object authorization, role changes, the append-only audit chain,
   and the proxy secret. Each run uses its own database, and the tests refuse any host but
   `localhost`.
+- One-time invites: an admin issues one from the admin screen, and the person it is for opens
+  the link, chooses a name and password, and is logged in. Invites last 24 hours, work once,
+  and are audited when issued and when accepted.
+- `invite`, a command-line subcommand that issues an invite with database access instead of an
+  admin session. It is how the first admin of a fresh database gets an account.
 
 ### Changed
 
 - When login is rate limited, the login form says so ("Too many failed attempts") and, on the
   deployed site, how many minutes to wait, instead of a generic "Login failed (429)".
 
+### Removed
+
+- Open sign-up: `POST /api/users` and the registration form. Accounts now come only from
+  invites.
+
 ### Security
 
+- Account enumeration is closed: with no open sign-up, no endpoint reveals whether an email has
+  an account. Invite tokens are 256-bit, stored only as SHA-256 hashes, returned once with
+  `Cache-Control: no-store`, and carried after `#` in the link so they never reach a server log.
 - Login is rate limited per visitor: after 10 failed attempts in 15 minutes, further attempts get
   `429 Too Many Requests` with `Retry-After`, before any password is checked. Correct logins never
   count, and a success does not reset the count.
-- Registration is limited to 5 accounts created (or taken emails probed) per visitor per hour.
+- Accepting invites is limited to 5 per visitor per hour, counting accounts created, taken
+  addresses, and unusable tokens.
 - Visitors are identified only by the address the proxy reports behind its secret, or the
   connection's own; IPv6 addresses are grouped by /64. Concurrent requests cannot exceed a limit,
   and the limiter's memory is bounded, failing closed if it fills.

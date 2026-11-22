@@ -256,13 +256,13 @@ not part of the repo. Every machine starts with an empty database.
 
 **Bringing up a fresh device (do this in order):**
 1. `colima start` (macOS), then `docker compose up -d`, then `go run . migrate` from `backend/`.
-   Schema should report version 5, dirty = f.
-2. Register a user through the UI or `POST /api/users` (needs `fullName`, `email`, and a
-   password of at least 12 characters).
-3. **Promote that user to admin by hand**, because nothing else can: the admin screen is
-   admin-only, so the first admin always has to be created out of band. This is true in
-   production too and is a deliberate property, not a gap.
-   `UPDATE users SET role='admin' WHERE email='you@example.com';`
+   Schema should report version 6, dirty = f.
+2. **Invite yourself as the first admin from the command line**, because there is no open
+   sign-up and the admin screen is admin-only: from `backend/`,
+   `go run . invite --email you@example.com --role admin --site http://localhost:5173`.
+3. Open the printed link (valid 24 hours, single use), choose a name and a password of at least
+   12 characters, and you are logged in as an admin. Invite anyone else from the admin screen.
+   (Before v0.5.0 this was "register, then promote in SQL"; that path no longer exists.)
 4. The `audit_log` starts empty. It is append-only and hash-chained, so entries from another
    machine cannot be imported, and `go run . verify-audit` on an empty table reports
    "empty, nothing to verify" rather than failing.
@@ -305,8 +305,24 @@ guesses cannot exceed the limit; memory is capped at 100,000 keys and fails clos
 limit was rejected because it lets anyone lock a victim out. Four deliberate regressions were caught
 by the tests before merging.
 
-**⏭️ Next:** step 3, registration that does not reveal whether an email has an account: brief the
-decisions (what replaces `409` with no email service) before writing anything.
+Merged in #47; the login form's 429 message in #48.
+
+**Step 3, invite-only accounts (decided 2026-11-22):** with open sign-up and no email, enumeration
+cannot be hidden (sign up, then log in with the chosen password), so open sign-up was removed. Admins
+issue one-time invites (`POST /api/invites`, admin only): 24 hours, single use, token stored as a
+SHA-256 hash, response `Cache-Control: no-store`, link `<site>/invite#<token>` (the fragment never
+reaches a server; the page wipes it after reading). `POST /api/invites/accept` is public, rate limited
+(5 per visitor per hour, counting 201/409/404), and creates the account, uses the invite and writes
+`user.invite_accepted` in one transaction; issuing writes `user.invited`. Bootstrap: the `invite`
+subcommand (`backend/cli.go`), audited as `command-line`. Migration 000006 adds `invites`. Email
+verification was rejected because sending mail needs a paid domain. Five deliberate regressions were
+caught by the tests.
+
+**Production rollout for step 3 (not done yet):** bump `infra/api-image-tag.txt` to the merge's image,
+`infra/migrate.sh` (adds migration 6) **before** `infra/deploy-api.sh`; the frontend deploys itself on
+merge. The live site has no Register link from then on; the owner's admin account is unaffected.
+
+**⏭️ Next:** step 4, pruning expired sessions: brief the decisions before writing anything.
 
 Small follow-ups that need no stage:
 - Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.
@@ -544,8 +560,8 @@ project set out to learn.
 **Recommendation:** if you want to keep deepening security/authz, **A** (admin + role middleware).
 If you're ready for the cloud/DevSecOps arc, start **C** with a Dockerfile + CI.
 
-**Security to revisit:** account-enumeration inconsistency (login is timing-safe; registration's
-409 leaks whether an email exists); keep per-object scoping on every new incident-by-id op
+**Security to revisit:** account enumeration was closed in v0.5.0 by removing open sign-up (invites
+only); keep per-object scoping on every new incident-by-id op
 (never trust a client-supplied id).
 
 

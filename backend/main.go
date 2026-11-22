@@ -127,6 +127,16 @@ func main() {
 		return
 	}
 
+	// Subcommand: "invite" issues a one-time invite from the command line and
+	// prints its link (see cli.go). With no open sign-up, this is how the first
+	// admin of a fresh database gets an account.
+	if len(os.Args) > 1 && os.Args[1] == "invite" {
+		if err := runInvite(context.Background(), db, os.Args[2:], os.Stdout); err != nil {
+			log.Fatalf("invite failed: %v", err)
+		}
+		return
+	}
+
 	// Every route, middleware and dependency is wired in newHandler (server.go),
 	// so the integration tests serve exactly the same API this process does.
 	handler := newHandler(db, serverConfig{

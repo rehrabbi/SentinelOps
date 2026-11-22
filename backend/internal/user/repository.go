@@ -64,22 +64,24 @@ func (r *Repository) List(ctx context.Context) ([]User, error) {
 // case and respond 409 — instead of fragile string-matching on the DB message.
 var ErrEmailTaken = errors.New("email already taken")
 
-// Create inserts a new user and returns the stored row.
+// Create inserts a new user with the given role and returns the stored row. It
+// runs on q, so accepting an invite can create the account inside the same
+// transaction that marks the invite used and records the audit entry.
 //
 // IMPORTANT: passwordHash must ALREADY be hashed (bcrypt). The repository never
 // sees or handles plaintext passwords — that keeps the secret-handling in one
 // place (the handler) and the data layer dumb about crypto.
-func (r *Repository) Create(ctx context.Context, email, fullName, passwordHash string) (User, error) {
+func (r *Repository) Create(ctx context.Context, q rowQuerier, email, fullName, passwordHash, role string) (User, error) {
 	const query = `
-		INSERT INTO users (email, full_name, password_hash)
-		VALUES ($1, $2, $3)
+		INSERT INTO users (email, full_name, password_hash, role)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, email, full_name, role, created_at, updated_at`
 
 	var u User
 	// QueryRowContext runs the INSERT and reads the single RETURNING row back in
 	// one round-trip. Every value is a $N parameter — never string-concatenated —
 	// so SQL injection is impossible here.
-	err := r.db.QueryRowContext(ctx, query, email, fullName, passwordHash).
+	err := q.QueryRowContext(ctx, query, email, fullName, passwordHash, role).
 		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		// Did our UNIQUE index on lower(email) reject a duplicate? Inspect the
