@@ -179,3 +179,35 @@ func (r *Repository) UpdateRole(ctx context.Context, q rowQuerier, id, role stri
 	}
 	return u, previousRole, nil
 }
+
+// PasswordHash returns the stored bcrypt hash for a user, for checking a
+// current password. It is the only read besides login that loads the hash.
+func (r *Repository) PasswordHash(ctx context.Context, id string) (string, error) {
+	var hash string
+	err := r.db.QueryRowContext(ctx, `SELECT password_hash FROM users WHERE id = $1`, id).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrUserNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("get password hash: %w", err)
+	}
+	return hash, nil
+}
+
+// SetPasswordHash replaces a user's password hash, on q so the change can share
+// a transaction with ending sessions and its audit entry. passwordHash must
+// already be bcrypt-hashed. It returns the user's email, for the audit entry.
+func (r *Repository) SetPasswordHash(ctx context.Context, q rowQuerier, id, passwordHash string) (string, error) {
+	var email string
+	err := q.QueryRowContext(ctx, `
+		UPDATE users SET password_hash = $2, updated_at = now()
+		WHERE id = $1
+		RETURNING email`, id, passwordHash).Scan(&email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrUserNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("set password hash: %w", err)
+	}
+	return email, nil
+}

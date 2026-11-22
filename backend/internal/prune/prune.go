@@ -1,10 +1,11 @@
 // Package prune deletes rows that have outlived their purpose: expired
-// sessions, and invites a week after they were used or expired.
+// sessions, and invites and password resets a week after they were used or
+// expired.
 //
 // Nothing here closes a security hole. Expired sessions are already refused
 // (the lookup only matches expires_at > now()), and spent invites can no longer
-// be accepted. It is data minimisation: those rows still record who logged in
-// or was invited, and when, long after they mattered, and without pruning the
+// be accepted. It is data minimisation: those rows still record who logged in,
+// was invited or had a password reset, and when, long after they mattered, and without pruning the
 // tables only ever grow. The audit log keeps the permanent record.
 package prune
 
@@ -18,28 +19,41 @@ import (
 	"time"
 )
 
-// InviteGrace is how long a used or expired invite is kept, so "did they ever
-// accept it?" can be answered without the audit log for a week.
+// InviteGrace is how long a used or expired invite or password reset is kept,
+// so "did they ever use it?" can be answered without the audit log for a week.
 const InviteGrace = 7 * 24 * time.Hour
 
-// Run deletes expired sessions and spent invites, returning how many of each.
-func Run(ctx context.Context, db *sql.DB) (sessions, invites int64, err error) {
+// Counts is how many rows one run deleted from each table.
+type Counts struct {
+	Sessions, Invites, Resets int64
+}
+
+// Run deletes expired sessions, spent invites and spent password resets.
+func Run(ctx context.Context, db *sql.DB) (Counts, error) {
+	var c Counts
 	res, err := db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= now()`)
 	if err != nil {
-		return 0, 0, fmt.Errorf("prune sessions: %w", err)
+		return c, fmt.Errorf("prune sessions: %w", err)
 	}
-	sessions, _ = res.RowsAffected()
+	c.Sessions, _ = res.RowsAffected()
 
+	// Invites and resets share one rule: gone a week after use or expiry. The
+	// table names are constants, never input.
 	grace := fmt.Sprintf("%d seconds", int(InviteGrace.Seconds()))
-	res, err = db.ExecContext(ctx, `
-		DELETE FROM invites
-		WHERE (used_at IS NOT NULL AND used_at < now() - $1::interval)
-		   OR expires_at < now() - $1::interval`, grace)
-	if err != nil {
-		return sessions, 0, fmt.Errorf("prune invites: %w", err)
+	for _, t := range []struct {
+		table string
+		count *int64
+	}{{"invites", &c.Invites}, {"password_resets", &c.Resets}} {
+		res, err = db.ExecContext(ctx, `
+			DELETE FROM `+t.table+`
+			WHERE (used_at IS NOT NULL AND used_at < now() - $1::interval)
+			   OR expires_at < now() - $1::interval`, grace)
+		if err != nil {
+			return c, fmt.Errorf("prune %s: %w", t.table, err)
+		}
+		*t.count, _ = res.RowsAffected()
 	}
-	invites, _ = res.RowsAffected()
-	return sessions, invites, nil
+	return c, nil
 }
 
 // Pruner runs the cleanup at most once per interval, so a burst of logins does
@@ -59,9 +73,10 @@ func New(db *sql.DB, every time.Duration) *Pruner {
 		every: every,
 		now:   time.Now,
 		run: func(ctx context.Context) error {
-			sessions, invites, err := Run(ctx, db)
-			if sessions > 0 || invites > 0 {
-				log.Printf("prune: deleted %d expired sessions and %d spent invites", sessions, invites)
+			c, err := Run(ctx, db)
+			if c.Sessions > 0 || c.Invites > 0 || c.Resets > 0 {
+				log.Printf("prune: deleted %d expired sessions, %d spent invites and %d spent password resets",
+					c.Sessions, c.Invites, c.Resets)
 			}
 			return err
 		},
