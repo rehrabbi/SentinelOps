@@ -18,6 +18,16 @@ first hardened production deployment.
   and the proxy secret. Each run uses its own database, and the tests refuse any host but
   `localhost`.
 
+### Security
+
+- Login is rate limited per visitor: after 10 failed attempts in 15 minutes, further attempts get
+  `429 Too Many Requests` with `Retry-After`, before any password is checked. Correct logins never
+  count, and a success does not reset the count.
+- Registration is limited to 5 accounts created (or taken emails probed) per visitor per hour.
+- Visitors are identified only by the address the proxy reports behind its secret, or the
+  connection's own; IPv6 addresses are grouped by /64. Concurrent requests cannot exceed a limit,
+  and the limiter's memory is bounded, failing closed if it fills.
+
 ## [0.4.0] - 2026-11-22
 
 Free cloud deployment: SentinelOps is live at https://sentinelops.pages.dev on the free plans
