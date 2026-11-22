@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.3.0, CI hardening**. In progress:
-> **free cloud deployment** (v0.4.0, issue #30), live at https://sentinelops.pages.dev, with all
-> nine checks required. Next: release **v0.4.0**. Full detail in §6.
+> **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.4.0, free cloud deployment**, live at
+> https://sentinelops.pages.dev, with all nine checks required. Next: plan the next stage. Full
+> detail in §6.
 
 ---
 
@@ -146,7 +146,7 @@ Contributor Covenant 2.0 template, with bernardojirehrabbi@gmail.com as the repo
 **Releases:** semantic versioning, with today's `main` as **`v0.1.0`** (everything up to the
 repo standards), each roadmap stage ending in the next minor release (Containerization →
 `v0.2.0`), patch releases for fixes between stages, and **`1.0.0` reserved for the first
-hardened production deployment on AWS**. `CHANGELOG.md` is hand-written in Keep a Changelog
+hardened production deployment** (first written as "on AWS"; AWS was dropped in v0.4.0). `CHANGELOG.md` is hand-written in Keep a Changelog
 format; every user-visible or security-relevant PR adds a line under `Unreleased`. Tags are
 annotated, never moved, and every release is confirmed by the owner before tagging (an
 approval gate in WAYS-OF-WORKING §11).
@@ -278,7 +278,26 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ IN PROGRESS: Free cloud deployment (v0.4.0, issue #30, milestone #3)
+### ⏭️ NEXT STEP: plan the next stage
+
+v0.4.0 was released on 2026-11-22, closing issue #30 and milestone #3. The next stage starts the
+standard way: a milestone, an issue, and the decisions briefed to the owner before anything is
+written. Candidates, in the README roadmap's order:
+1. **Observability, alerting and backups** for the deployed stack (logs, uptime checks, Neon's
+   restore window, what to do when the audit check fails).
+2. **The known gaps:** rate limiting on login, pruning expired sessions, registration's
+   account enumeration, and a real test suite.
+3. **Environments** (`dev`, `staging`, `prod`) once there is more than one deployment.
+
+Small follow-ups that need no stage:
+- Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.
+- When render-oss/terraform-provider-render#105 ships, return API deploys to `terraform apply`
+  and delete `infra/deploy-api.sh`.
+- Owner: enable 2FA on Render and the Neon organisations; keep every provider key in the
+  password manager; optionally remove the unused Avast exception for `terraform.exe`; delete
+  `.git-damaged-2026-11-21/` on the Windows machine once it is no longer wanted.
+
+### ✅ Free cloud deployment (released as v0.4.0, issue #30, milestone #3)
 
 **AWS was dropped** (its free plan now ends after six months and may want a card). The stage
 deploys to **Cloudflare Pages** (frontend + `/api` proxy function), **Render free** (API image from
@@ -356,7 +375,7 @@ with `deploy-api.sh` (#40); **Audit verify** recorded the first anchor (`4:6b9c9
 `Infrastructure (Terraform)` became the ninth required check on `main` on 2026-11-22 (owner-approved
 branch protection change; every other protection setting unchanged).
 
-**⏭️ Next:** prepare **v0.4.0** (release confirmed by the owner before tagging) and close milestone #3.
+Released as **v0.4.0** on 2026-11-22.
 
 ### ✅ CI hardening (released as v0.3.0, issue #24, milestone #2)
 

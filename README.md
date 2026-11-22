@@ -32,11 +32,9 @@ infrastructure as code, and cloud architecture.
 It is built incrementally, and the git history is meant to read as an engineering story,
 one concern per branch and one concern per pull request.
 
-**Status:** the current release is [v0.3.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.3.0),
-which scans every pull request for vulnerable dependencies, code, images, and leaked secrets.
-The free cloud deployment that will become v0.4.0 is **live at
-[sentinelops.pages.dev](https://sentinelops.pages.dev)**, provisioned with Terraform. Every
-release is described in the [changelog](CHANGELOG.md).
+**Status:** the current release is [v0.4.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.4.0),
+the free cloud deployment, **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)** and
+provisioned with Terraform. Every release is described in the [changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -331,7 +329,7 @@ and the whole stack running in Compose, with migrations as a one-shot job.
 **v0.3.0, released.** CI hardening: dependency, static analysis, image, and secret scanning
 on every pull request, all required to pass, with results in the repository's Security tab.
 
-**v0.4.0, in progress.** Free cloud deployment, live at
+**v0.4.0, released.** Free cloud deployment, live at
 [sentinelops.pages.dev](https://sentinelops.pages.dev): Cloudflare Pages, Render and Neon
 declared in Terraform, a same-origin proxy for the API, published and attested images, and the
 audit chain anchored outside the database every 6 hours. AWS was the original target, but its

@@ -1219,7 +1219,7 @@ before the workflow merged. CodeQL and gitleaks found nothing.
 
 ---
 
-## Stage: Free cloud deployment (issue #30, milestone #3)
+## Stage: Free cloud deployment (issue #30, milestone #3, released as v0.4.0)
 
 **Decisions:** AWS was dropped: since July 2025 its free plan is a six-month credit that may ask
 for a card. The stage deploys to free platform services instead, with no card anywhere:
@@ -1296,8 +1296,8 @@ verifies. Four surprises came from outside the code:
   index and 30 files. Because every commit had been pushed, recovery meant swapping in a fresh
   `.git` and resetting, with the damaged copy kept, not deleted. "Push early" is a backup strategy.
 
-*(Infrastructure in #37, the end-to-end test in #38, the audit anchor in #39, and the anchor-capable
-image in #40.)*
+*(Infrastructure in #37, the end-to-end test in #38, the audit anchor in #39, the anchor-capable
+image in #40, and the required Terraform check in #42; released as v0.4.0 on 2026-11-22.)*
 
 ---
 
