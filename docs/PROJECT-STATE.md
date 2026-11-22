@@ -322,7 +322,16 @@ caught by the tests.
 `infra/migrate.sh` (adds migration 6) **before** `infra/deploy-api.sh`; the frontend deploys itself on
 merge. The live site has no Register link from then on; the owner's admin account is unaffected.
 
-**⏭️ Next:** step 4, pruning expired sessions: brief the decisions before writing anything.
+**Step 4, pruning (decided 2026-11-22):** `backend/internal/prune`, wrapped around the login route in
+`server.go`. After a successful login (200), at most once per hour per process: `DELETE` expired
+sessions, and invites used or expired more than 7 days ago (the audit log keeps the record). A failure
+is logged and never affects the login. Not a security fix (expired sessions were already refused);
+data minimisation and bounded growth. Rejected: a background timer (only runs while awake anyway),
+a GitHub Actions job (would need a delete-capable credential in GitHub), `pg_cron` (Neon's free
+compute suspends). Four deliberate regressions were caught by the tests.
+
+**⏭️ Next:** close the stage: deploy the step 4 image (no migration; bump, `migrate.sh`,
+`deploy-api.sh`, `apply -refresh-only`), write the stage's learning-log entry, then prepare **v0.5.0**.
 
 Small follow-ups that need no stage:
 - Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.
