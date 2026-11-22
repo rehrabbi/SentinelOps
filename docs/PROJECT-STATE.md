@@ -318,9 +318,13 @@ subcommand (`backend/cli.go`), audited as `command-line`. Migration 000006 adds 
 verification was rejected because sending mail needs a paid domain. Five deliberate regressions were
 caught by the tests.
 
-**Production rollout for step 3 (not done yet):** bump `infra/api-image-tag.txt` to the merge's image,
-`infra/migrate.sh` (adds migration 6) **before** `infra/deploy-api.sh`; the frontend deploys itself on
-merge. The live site has no Register link from then on; the owner's admin account is unaffected.
+**Production rollout (done 2026-11-22, at the owner's request):** image `sha-cc576af…` (#49, provenance
+verified) via `migrate.sh` (production at version 6, `invites` present) → `deploy-api.sh` (live,
+healthy) → `apply -refresh-only` → `plan` "No changes". Live checks: `POST /api/users` 405, `POST
+/api/invites` 401 when logged out, an unknown invite token 404, direct API calls 403; the deployed
+bundle has the invite screens and the 429 message and no registration form. This also shipped steps 1
+and 2 (rate limiting) to production. Not yet observed live: a 429 and its "Try again in N minutes"
+wording, which would lock the owner's own network out of login for 15 minutes.
 
 **Step 4, pruning (decided 2026-11-22):** `backend/internal/prune`, wrapped around the login route in
 `server.go`. After a successful login (200), at most once per hour per process: `DELETE` expired
@@ -356,8 +360,9 @@ GHCR, Singapore) and **Neon free** (Postgres 17, Singapore), all declared in Ter
 - **Tokens:** Render key, Cloudflare Pages-only token (expires 2027-05-21), Neon key for the
   **SentinelOps App** org only. All live in `.env`; the wrapper passes them by name.
 - **API releases:** the image is pinned by `infra/api-image-tag.txt` (`sha-<commit>`, never `main`).
-  To ship a new API: bump that file → `infra/migrate.sh` → **`infra/deploy-api.sh`** → `infra/terraform.sh
-  plan` must say "No changes". Not `apply`: Render's provider 1.9.1 cannot update a free-plan service
+  To ship a new API: bump that file → `infra/migrate.sh` → **`infra/deploy-api.sh`** →
+  `infra/terraform.sh apply -refresh-only` (records the image output; changes no resource) →
+  `infra/terraform.sh plan` must say "No changes". Not `apply`: Render's provider 1.9.1 cannot update a free-plan service
   ("maintenance mode can only be configured for non-free tier services", upstream
   render-oss/terraform-provider-render#80, fix pending in #105), so the script deploys the pinned image
   through Render's API. Any other change to the API service (env vars included) hits the same bug.
