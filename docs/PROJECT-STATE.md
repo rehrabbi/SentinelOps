@@ -332,7 +332,17 @@ alert email**, proving the real down path end to end; it is now paused (not dele
 also has a "Test Notification" button for a quicker check. The UptimeRobot setup was made
 by hand in its dashboard, not in Terraform (no provider was evaluated); this note is the record of it.
 
-**⏭️ Next:** step 4, the runbook (`docs/RUNBOOK.md`): what to do for each alert this stage introduced.
+**Step 4, runbook (decided 2026-11-22):** `docs/RUNBOOK.md` covers a failed Audit verify (treated as a
+security incident: preserve evidence, find the last good backup, rotate the owner login), a failed backup,
+restores at three scales (Neon's 6-hour window; a backup into a new database, then recording the restore
+in the anchor log by hand; a full rebuild), outages (triage, logs by request ID, rollback), and rotating
+every secret. Rotation helpers: `infra/rotate-readonly-role.sh` and `infra/set-render-env.sh` (Render's
+API, because Terraform cannot update the free service). **Exercised live 2026-11-22:** both read-only
+passwords rotated, then Audit verify and Backup passed with the new ones. `PROXY_SECRET` rotation
+accepts about a minute of 403s and is written down but **not yet exercised**; its order avoids a trap
+(targeting the Pages project would also try to update Render, which fails).
+
+**⏭️ Next:** close the stage: the stage's learning-log entry, then prepare **v0.6.0**.
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner

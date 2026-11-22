@@ -24,6 +24,11 @@ first hardened production deployment.
   database, so frequent checks do not keep it awake.
 - Uptime monitoring with UptimeRobot's free plan: the site and `/api/healthz` (through the proxy) are
   checked every 5 minutes, with an email to the owner when either stops answering.
+- `docs/RUNBOOK.md`: what to do when Audit verify or Backup fails, how to restore data at three
+  scales, how to handle an outage, and how to rotate each secret.
+- `infra/rotate-readonly-role.sh`, which gives `audit_verifier` or `backup_reader` a new password and
+  stores the new connection string in its GitHub environment, and `infra/set-render-env.sh`, which
+  sets `PROXY_SECRET` or `DATABASE_URL` on Render from a pipe. Secrets pass only through pipes.
 - `infra/restore-drill.sh`, which restores the newest backup into a throwaway database, checks
   its schema version, and verifies its audit chain against the newest anchor it should contain.
 
