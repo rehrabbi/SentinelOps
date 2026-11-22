@@ -9,7 +9,9 @@
 # script changes only the image. Delete it once a provider release has the fix.
 #
 # Order for a new API version: bump api-image-tag.txt, run infra/migrate.sh,
-# then this script. `infra/terraform.sh plan` afterwards should show no changes.
+# then this script, then `infra/terraform.sh apply -refresh-only` to record the
+# new image in Terraform's state (it only reads the providers; it changes
+# nothing). `infra/terraform.sh plan` must then say "No changes".
 #
 # Usage, from anywhere in the repository:
 #   infra/deploy-api.sh
