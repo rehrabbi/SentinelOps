@@ -6,7 +6,7 @@ All notable changes to SentinelOps are recorded here. The format follows
 
 While the version is `0.y.z` the project is in initial development: each roadmap stage
 ends in a minor release, and fixes between stages are patch releases. `1.0.0` will be the
-first hardened production deployment on AWS.
+first hardened production deployment.
 
 ## [Unreleased]
 
