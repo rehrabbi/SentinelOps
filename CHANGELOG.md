@@ -19,6 +19,9 @@ first hardened production deployment.
   bytes, visitor key, and the user ID when logged in. The request ID is returned to the caller as
   `X-Request-ID`, so a reported problem can be matched to its line. The server's other log
   messages use the same JSON format.
+- `GET /api/healthz`, a liveness check that requires the proxy secret, so one external check fetched
+  through the site covers Cloudflare, the proxy, the secret, Render and the API. It never touches the
+  database, so frequent checks do not keep it awake.
 - `infra/restore-drill.sh`, which restores the newest backup into a throwaway database, checks
   its schema version, and verifies its audit chain against the newest anchor it should contain.
 

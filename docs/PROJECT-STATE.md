@@ -313,8 +313,16 @@ is logged (owner's choice). The server's other messages go through the same JSON
 subcommands keep plain text. Logs stay in Render's dashboard; shipping them elsewhere is deferred.
 Five deliberate regressions were caught by the tests.
 
-**⏭️ Next:** step 3, uptime alerts: brief the decisions (needs an UptimeRobot account) before writing
-anything. The new image also needs deploying (no migration).
+**Step 3, uptime alerts (decided 2026-11-22):** UptimeRobot free (5-minute checks, email alerts to the
+owner), account created by the owner and monitors configured in the owner's browser. Two monitors:
+`https://sentinelops.pages.dev/` and `https://sentinelops.pages.dev/api/healthz` (new route, proxy
+secret required, no database), so one check covers Cloudflare, the proxy, the secret, Render and the
+API. Nothing monitored touches the database: Neon's free 100 compute-hours a month would not survive
+checks every 5 minutes. A side effect accepted: the checks keep the free Render instance awake. No
+public status page.
+
+**⏭️ Next:** deploy the image with request logs and `/api/healthz` (no migration); then the owner
+creates the UptimeRobot account and the monitors are configured.
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner

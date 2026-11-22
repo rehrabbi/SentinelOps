@@ -834,3 +834,31 @@ func TestRequestLogsCarryNoSecrets(t *testing.T) {
 		t.Error("no line for the /api/incidents request")
 	}
 }
+
+func TestAPIHealthzRequiresTheProxy(t *testing.T) {
+	const secret = "test-proxy-secret-for-healthz"
+	srv := newServer(t, serverConfig{ProxySecret: secret})
+
+	direct := newClient(t, srv)
+	direct.expect(http.StatusOK, "GET", "/healthz", nil)            // exempt, for Render
+	direct.expect(http.StatusForbidden, "GET", "/api/healthz", nil) // not exempt
+
+	proxied := newClient(t, srv)
+	proxied.header.Set("X-Proxy-Secret", secret)
+	if body := proxied.expect(http.StatusOK, "GET", "/api/healthz", nil); !strings.Contains(body, "ok") {
+		t.Errorf("/api/healthz body = %q", body)
+	}
+
+	// It never touches the database: it answers even with the pool closed.
+	closed, err := openDB("postgres://nobody:nothing@127.0.0.1:1/none?sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed.Close()
+	h := newHandler(closed, serverConfig{})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/healthz", nil))
+	if rec.Code != http.StatusOK {
+		t.Errorf("/api/healthz with no database answered %d, want 200", rec.Code)
+	}
+}
