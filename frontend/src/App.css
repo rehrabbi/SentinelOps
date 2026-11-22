@@ -469,3 +469,42 @@
     justify-content: space-between;
   }
 }
+/* Invite form on the admin screen. It reuses the .incident-form card; these
+   rules only lay out its row and the one-time link. */
+.invite-form {
+  text-align: left;
+}
+
+.invite-form h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-h);
+}
+
+.invite-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.invite-fields label:first-child {
+  flex: 1 1 220px;
+}
+
+.invite-issued p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.invite-link {
+  display: flex;
+  gap: 8px;
+}
+
+.invite-link input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+}

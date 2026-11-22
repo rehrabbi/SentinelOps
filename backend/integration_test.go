@@ -27,11 +27,16 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"sentinelops/internal/audit"
+	"sentinelops/internal/invite"
+	"sentinelops/internal/session"
+	"sentinelops/internal/user"
 )
 
 // testDB is the migrated throwaway database, or nil when tests are skipped.
@@ -212,25 +217,32 @@ type testUser struct {
 	Role  string `json:"role"`
 }
 
-// signUp registers, optionally promotes (the way the first admin is made in
-// production, directly in SQL), and logs in, returning a logged-in client.
+// createAccount makes an account the only way there is: issue an invite (as
+// the command line would) and accept it. It goes straight to the invite
+// package rather than HTTP, so helper accounts never use up the per-visitor
+// accept limit that the invite tests exercise.
+func createAccount(t *testing.T, prefix, role string) testUser {
+	t.Helper()
+	requireDB(t)
+	ctx := context.Background()
+	token, _, err := invite.Issue(ctx, testDB, audit.NewRepository(testDB), uniqueEmail(prefix), role, nil, nil)
+	if err != nil {
+		t.Fatalf("issue invite: %v", err)
+	}
+	u, err := invite.Accept(ctx, testDB, user.NewRepository(testDB), audit.NewRepository(testDB), token, prefix, testPassword, nil)
+	if err != nil {
+		t.Fatalf("accept invite: %v", err)
+	}
+	return testUser{ID: u.ID, Email: u.Email, Role: u.Role}
+}
+
+// signUp creates an account with role ("" means reporter) and returns a
+// client logged in as it.
 func signUp(t *testing.T, srv *httptest.Server, prefix, role string) (*client, testUser) {
 	t.Helper()
+	u := createAccount(t, prefix, role)
 	c := newClient(t, srv)
-	email := uniqueEmail(prefix)
-	text := c.expect(http.StatusCreated, "POST", "/api/users",
-		map[string]string{"fullName": prefix, "email": email, "password": testPassword})
-	var u testUser
-	if err := json.Unmarshal([]byte(text), &u); err != nil {
-		t.Fatalf("decode user: %v", err)
-	}
-	if role != "" && role != "reporter" {
-		if _, err := testDB.Exec(`UPDATE users SET role = $1 WHERE id = $2`, role, u.ID); err != nil {
-			t.Fatal(err)
-		}
-		u.Role = role
-	}
-	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": email, "password": testPassword})
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
 	return c, u
 }
 
@@ -254,37 +266,161 @@ func TestHealthAndReadiness(t *testing.T) {
 	c.expect(http.StatusOK, "GET", "/readyz", nil)
 }
 
-func TestRegistration(t *testing.T) {
+func TestOpenSignUpIsGone(t *testing.T) {
 	c := newClient(t, newServer(t, serverConfig{}))
-	email := uniqueEmail("reg")
-	valid := map[string]string{"fullName": "Reg User", "email": email, "password": testPassword}
+	// Only GET /api/users (admin-only) remains on that path.
+	c.expect(http.StatusMethodNotAllowed, "POST", "/api/users",
+		map[string]string{"fullName": "X", "email": uniqueEmail("open"), "password": testPassword})
+}
 
-	text := c.expect(http.StatusCreated, "POST", "/api/users", valid)
-	if strings.Contains(strings.ToLower(text), "password") {
-		t.Errorf("registration response mentions a password: %s", text)
-	}
-	var u testUser
-	if err := json.Unmarshal([]byte(text), &u); err != nil || u.Role != "reporter" {
-		t.Errorf("new user = %+v (%v), want role reporter", u, err)
-	}
+func TestInvites(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	admin, adminUser := signUp(t, srv, "inviter", "admin")
+	reporter, reporterUser := signUp(t, srv, "plain", "")
+	anonymous := newClient(t, srv)
 
-	var hash string
-	if err := testDB.QueryRow(`SELECT password_hash FROM users WHERE email = $1`, email).Scan(&hash); err != nil {
+	email := uniqueEmail("invitee")
+	body := map[string]string{"email": email, "role": "analyst"}
+	anonymous.expect(http.StatusUnauthorized, "POST", "/api/invites", body)
+	reporter.expect(http.StatusForbidden, "POST", "/api/invites", body)
+	admin.expect(http.StatusBadRequest, "POST", "/api/invites", map[string]string{"email": "not-an-email"})
+	admin.expect(http.StatusBadRequest, "POST", "/api/invites", map[string]string{"email": email, "role": "superuser"})
+	admin.expect(http.StatusBadRequest, "POST", "/api/invites", `{"email":"x@example.test","expiresAt":"2099-01-01T00:00:00Z"}`)
+	admin.expect(http.StatusConflict, "POST", "/api/invites", map[string]string{"email": reporterUser.Email})
+
+	text := admin.expect(http.StatusCreated, "POST", "/api/invites", map[string]string{"email": strings.ToUpper(email), "role": "analyst"})
+	if cc := admin.last.Header.Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("invite response Cache-Control = %q, want no-store", cc)
+	}
+	var issued struct {
+		Email, Role, Token string
+		ExpiresAt          time.Time
+	}
+	if err := json.Unmarshal([]byte(text), &issued); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(hash, "$2") || strings.Contains(hash, testPassword) {
-		t.Errorf("password not stored as a bcrypt hash")
+	if issued.Email != email || issued.Role != "analyst" || len(issued.Token) != 64 {
+		t.Errorf("issued = %+v; want the normalised email, role analyst, a 64-character token", issued)
+	}
+	if left := time.Until(issued.ExpiresAt); left < 23*time.Hour || left > 25*time.Hour {
+		t.Errorf("invite expires in %v, want about 24h", left)
 	}
 
-	// Current behaviour, and a known gap: a taken email is reported as such.
-	c.expect(http.StatusConflict, "POST", "/api/users", valid)
+	// Only the token's hash is stored.
+	var raw, hashed int
+	testDB.QueryRow(`SELECT count(*) FROM invites WHERE token_hash = $1`, issued.Token).Scan(&raw)
+	testDB.QueryRow(`SELECT count(*) FROM invites WHERE token_hash = $1`, session.HashToken(issued.Token)).Scan(&hashed)
+	if raw != 0 || hashed != 1 {
+		t.Errorf("invites rows by raw token: %d, by hash: %d; want 0 and 1", raw, hashed)
+	}
 
-	c.expect(http.StatusBadRequest, "POST", "/api/users",
-		map[string]string{"fullName": "Short", "email": uniqueEmail("short"), "password": "elevenchars"})
-	c.expect(http.StatusBadRequest, "POST", "/api/users",
-		map[string]string{"fullName": "Bad Email", "email": "not-an-email", "password": testPassword})
-	c.expect(http.StatusBadRequest, "POST", "/api/users",
-		`{"fullName":"X","email":"x@example.test","password":"correct-horse-battery","role":"admin"}`)
+	invitee := newClient(t, srv)
+	accept := func(token, password string) map[string]string {
+		return map[string]string{"token": token, "fullName": "New Analyst", "password": password}
+	}
+	// A rule violation leaves the invite usable.
+	invitee.expect(http.StatusBadRequest, "POST", "/api/invites/accept", accept(issued.Token, "too-short"))
+	text = invitee.expect(http.StatusCreated, "POST", "/api/invites/accept", accept(issued.Token, testPassword))
+	var created testUser
+	if err := json.Unmarshal([]byte(text), &created); err != nil || created.Email != email || created.Role != "analyst" {
+		t.Errorf("accepted account = %+v (%v); want %s as analyst", created, err, email)
+	}
+	if strings.Contains(strings.ToLower(text), "password") {
+		t.Errorf("accept response mentions a password: %s", text)
+	}
+	var hash string
+	testDB.QueryRow(`SELECT password_hash FROM users WHERE email = $1`, email).Scan(&hash)
+	if !strings.HasPrefix(hash, "$2") {
+		t.Error("password not stored as a bcrypt hash")
+	}
+	invitee.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": email, "password": testPassword})
+
+	// Single use.
+	invitee.expect(http.StatusNotFound, "POST", "/api/invites/accept", accept(issued.Token, testPassword))
+
+	for action, actor := range map[string]string{audit.ActionInvited: adminUser.Email, audit.ActionInviteAccepted: email} {
+		var target string
+		err := testDB.QueryRow(`SELECT target_id FROM audit_log WHERE action = $1 AND actor_email = $2 ORDER BY id DESC LIMIT 1`,
+			action, actor).Scan(&target)
+		if err != nil || target != email {
+			t.Errorf("audit %s by %s: target %q, err %v", action, actor, target, err)
+		}
+	}
+}
+
+func TestInviteEdgeCases(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	c := newClient(t, srv)
+	ctx := context.Background()
+	auditLog := audit.NewRepository(testDB)
+	accept := func(token string) map[string]string {
+		return map[string]string{"token": token, "fullName": "Edge", "password": testPassword}
+	}
+
+	// Expired, malformed, and unknown tokens all look the same.
+	expired, _, err := invite.Issue(ctx, testDB, auditLog, uniqueEmail("expired"), "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.Exec(`UPDATE invites SET expires_at = now() - interval '1 minute' WHERE token_hash = $1`, session.HashToken(expired)); err != nil {
+		t.Fatal(err)
+	}
+	a := c.expect(http.StatusNotFound, "POST", "/api/invites/accept", accept(expired))
+	b := c.expect(http.StatusNotFound, "POST", "/api/invites/accept", accept("not-a-token"))
+	d := c.expect(http.StatusNotFound, "POST", "/api/invites/accept", accept(strings.Repeat("ab", 32)))
+	if a != b || b != d {
+		t.Errorf("unusable tokens are distinguishable: %q %q %q", a, b, d)
+	}
+
+	// Two invites for one address: the second cannot create a duplicate, and
+	// stays unused because the failed acceptance is rolled back.
+	email := uniqueEmail("twice")
+	first, _, err := invite.Issue(ctx, testDB, auditLog, email, "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := invite.Issue(ctx, testDB, auditLog, email, "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.expect(http.StatusCreated, "POST", "/api/invites/accept", accept(first))
+	c.expect(http.StatusConflict, "POST", "/api/invites/accept", accept(second))
+	var used sql.NullTime
+	testDB.QueryRow(`SELECT used_at FROM invites WHERE token_hash = $1`, session.HashToken(second)).Scan(&used)
+	if used.Valid {
+		t.Error("a rejected acceptance marked the invite used")
+	}
+}
+
+func TestInviteCommand(t *testing.T) {
+	requireDB(t)
+	ctx := context.Background()
+	var out bytes.Buffer
+	email := uniqueEmail("cli-admin")
+	if err := runInvite(ctx, testDB, []string{"--email", email, "--role", "admin", "--site", "https://example.test/"}, &out); err != nil {
+		t.Fatalf("invite command: %v", err)
+	}
+	link := regexp.MustCompile(`https://example\.test/invite#([0-9a-f]{64})`).FindStringSubmatch(out.String())
+	if link == nil {
+		t.Fatalf("no invite link in output: %q", out.String())
+	}
+	u, err := invite.Accept(ctx, testDB, user.NewRepository(testDB), audit.NewRepository(testDB), link[1], "First Admin", testPassword, nil)
+	if err != nil || u.Role != "admin" {
+		t.Fatalf("accepting the command-line invite: %+v, %v", u, err)
+	}
+	var actor string
+	testDB.QueryRow(`SELECT actor_email FROM audit_log WHERE action = $1 AND target_id = $2`, audit.ActionInvited, email).Scan(&actor)
+	if actor != "command-line" {
+		t.Errorf("command-line invite audited as %q", actor)
+	}
+
+	out.Reset()
+	if err := runInvite(ctx, testDB, []string{"--role", "admin"}, &out); err == nil {
+		t.Error("invite without --email succeeded")
+	}
+	if err := runInvite(ctx, testDB, []string{"--email", uniqueEmail("x"), "--role", "root"}, &out); err == nil {
+		t.Error("invite with an invalid role succeeded")
+	}
 }
 
 func TestLoginSessionAndLogout(t *testing.T) {
@@ -332,10 +468,9 @@ func TestLoginSessionAndLogout(t *testing.T) {
 
 func TestSecureCookieFlag(t *testing.T) {
 	srv := newServer(t, serverConfig{SecureCookies: true})
+	u := createAccount(t, "secure", "")
 	c := newClient(t, srv)
-	email := uniqueEmail("secure")
-	c.expect(http.StatusCreated, "POST", "/api/users", map[string]string{"fullName": "S", "email": email, "password": testPassword})
-	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": email, "password": testPassword})
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
 	for _, ck := range c.last.Cookies() {
 		if ck.Name == "sentinelops_session" && !ck.Secure {
 			t.Error("SecureCookies is on but the session cookie is not Secure")
@@ -543,18 +678,16 @@ func TestLoginRateLimitIsPerProxiedVisitor(t *testing.T) {
 	bystander.expect(http.StatusUnauthorized, "POST", "/api/sessions", ghost)
 }
 
-func TestRegistrationRateLimit(t *testing.T) {
+func TestInviteAcceptRateLimit(t *testing.T) {
 	c := newClient(t, newServer(t, serverConfig{}))
-	// Validation errors do not count...
+	// Malformed requests do not count...
 	for i := 0; i < 8; i++ {
-		c.expect(http.StatusBadRequest, "POST", "/api/users",
-			map[string]string{"fullName": "X", "email": "not-an-email", "password": testPassword})
+		c.expect(http.StatusBadRequest, "POST", "/api/invites/accept", `{"token":`)
 	}
-	// ...accounts created do, five per hour per visitor.
+	// ...guessed tokens do, five per hour per visitor.
+	guess := map[string]string{"token": strings.Repeat("cd", 32), "fullName": "G", "password": testPassword}
 	for i := 0; i < 5; i++ {
-		c.expect(http.StatusCreated, "POST", "/api/users",
-			map[string]string{"fullName": "Bulk", "email": uniqueEmail("bulk"), "password": testPassword})
+		c.expect(http.StatusNotFound, "POST", "/api/invites/accept", guess)
 	}
-	c.expect(http.StatusTooManyRequests, "POST", "/api/users",
-		map[string]string{"fullName": "Bulk", "email": uniqueEmail("bulk"), "password": testPassword})
+	c.expect(http.StatusTooManyRequests, "POST", "/api/invites/accept", guess)
 }

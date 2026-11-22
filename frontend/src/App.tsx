@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import "./App.css";
-import { getMe, login, logout, register, ApiError, type User } from "./api";
+import { acceptInvite, getMe, login, logout, ApiError, type User } from "./api";
 import { IncidentDashboard } from "./incidents";
-import { Routes, Route, Navigate, Link } from "react-router";
+import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
 import { AdminPage } from "./admin";
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
@@ -14,8 +14,6 @@ type AuthState =
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
-  // When anonymous, which form to show.
-  const [mode, setMode] = useState<"login" | "register">("login");
 
   useEffect(() => {
     getMe()
@@ -47,21 +45,20 @@ function App() {
             auth.kind === "authenticated" ? (
               <LoggedIn
                 user={auth.user}
-                onLogout={() => {
-                  setAuth({ kind: "anonymous" });
-                  setMode("login");
-                }}
-              />
-            ) : mode === "login" ? (
-              <LoginForm
-                onLoggedIn={onLoggedIn}
-                onSwitch={() => setMode("register")}
+                onLogout={() => setAuth({ kind: "anonymous" })}
               />
             ) : (
-              <RegisterForm
-                onLoggedIn={onLoggedIn}
-                onSwitch={() => setMode("login")}
-              />
+              <LoginForm onLoggedIn={onLoggedIn} />
+            )
+          }
+        />
+        <Route
+          path="/invite"
+          element={
+            auth.kind === "authenticated" ? (
+              <Navigate to="/" replace />
+            ) : (
+              <AcceptInvite onLoggedIn={onLoggedIn} />
             )
           }
         />
@@ -83,13 +80,7 @@ function App() {
 }
 
 // Login form. On success, hands the user up to App via onLoggedIn.
-function LoginForm({
-  onLoggedIn,
-  onSwitch,
-}: {
-  onLoggedIn: (user: User) => void;
-  onSwitch: () => void;
-}) {
+function LoginForm({ onLoggedIn }: { onLoggedIn: (user: User) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<
@@ -143,26 +134,20 @@ function LoginForm({
         </button>
       </form>
       <p className="auth-switch">
-        Need an account?{" "}
-        <button type="button" className="link" onClick={onSwitch}>
-          Register
-        </button>
+        Accounts are by invitation. Ask an administrator for an invite link.
       </p>
     </section>
   );
 }
 
-// Registration form. Creates the account, then auto-logs-in (registration does
-// not start a session), landing the new user in the logged-in view.
-function RegisterForm({
-  onLoggedIn,
-  onSwitch,
-}: {
-  onLoggedIn: (user: User) => void;
-  onSwitch: () => void;
-}) {
+// AcceptInvite turns an invite link (/invite#<token>) into an account: the
+// invitee picks their name and password, then is logged in. The token comes
+// after "#", which browsers never send to a server, and is wiped from the
+// address bar as soon as it is read, so it does not linger in history.
+function AcceptInvite({ onLoggedIn }: { onLoggedIn: (user: User) => void }) {
+  const navigate = useNavigate();
+  const [token] = useState(() => window.location.hash.slice(1));
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<
     | { kind: "idle" }
@@ -170,13 +155,34 @@ function RegisterForm({
     | { kind: "error"; message: string }
   >({ kind: "idle" });
 
+  useEffect(() => {
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
+  if (!token) {
+    return (
+      <section className="auth-card">
+        <h2>Accept your invite</h2>
+        <p className="status error">
+          This page needs the full invite link. Open the link you were sent.
+        </p>
+        <p className="auth-switch">
+          <Link to="/">Go to log in</Link>
+        </p>
+      </section>
+    );
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus({ kind: "submitting" });
     try {
-      await register(email, password, fullName);
-      const user = await login(email, password);
+      const created = await acceptInvite(token, fullName, password);
+      const user = await login(created.email, password);
       onLoggedIn(user);
+      navigate("/", { replace: true });
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : "Something went wrong";
@@ -186,7 +192,7 @@ function RegisterForm({
 
   return (
     <section className="auth-card">
-      <h2>Create your account</h2>
+      <h2>Accept your invite</h2>
       <form onSubmit={handleSubmit}>
         <label>
           Full name
@@ -196,16 +202,6 @@ function RegisterForm({
             onChange={(e) => setFullName(e.target.value)}
             required
             autoComplete="name"
-          />
-        </label>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
           />
         </label>
         <label>
@@ -223,17 +219,9 @@ function RegisterForm({
           <p className="status error">{status.message}</p>
         )}
         <button type="submit" disabled={status.kind === "submitting"}>
-          {status.kind === "submitting"
-            ? "Creating account…"
-            : "Create account"}
+          {status.kind === "submitting" ? "Creating account…" : "Create account"}
         </button>
       </form>
-      <p className="auth-switch">
-        Have an account?{" "}
-        <button type="button" className="link" onClick={onSwitch}>
-          Log in
-        </button>
-      </p>
     </section>
   );
 }

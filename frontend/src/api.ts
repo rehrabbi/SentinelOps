@@ -7,7 +7,7 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 
 // Roles mirror the CHECK constraint on users.role in the database and the
-// validRoles map in the Go handler. Three copies of one truth, which is the
+// ValidRoles map in the Go user package. Three copies of one truth, which is the
 // cost of not generating these types from the backend.
 export type Role = 'reporter' | 'analyst' | 'admin'
 
@@ -89,24 +89,45 @@ export async function logout(): Promise<void> {
     if (!res.ok) throw new ApiError(res.status, `Logout failed (${res.status})`)
 }
 
-// register creates a new account via POST /api/users. On success it returns the
-// created user (201). On failure it surfaces the server's plain-text message
-// (validation detail, or "email already registered") so the form can show why.
-export async function register(
-    email: string,
-    password: string,
-    fullName: string,
-): Promise<User> {
-    const res = await request('/api/users', {
+// IssuedInvite is what an admin gets back: the invite and its one-time token.
+// The token is a credential, shown once and never stored by the server.
+export type IssuedInvite = {
+    email: string
+    role: Role
+    expiresAt: string
+    token: string
+}
+
+// textError surfaces the server's plain-text message (a validation rule, or
+// why an invite cannot be used), falling back to a status-based one.
+async function textError(res: Response, fallback: string): Promise<ApiError> {
+    const text = (await res.text()).trim()
+    return new ApiError(res.status, text || `${fallback} (${res.status})`)
+}
+
+// createInvite asks for a one-time invite for email with role (admins only).
+export async function createInvite(email: string, role: Role): Promise<IssuedInvite> {
+    const res = await request('/api/invites', {
         method: 'POST',
-        body: JSON.stringify({ email, password, fullName }),
+        body: JSON.stringify({ email, role }),
     })
-    if (!res.ok) {
-        const text = (await res.text()).trim()
-        throw new ApiError(res.status, text || `Registration failed (${res.status})`)
-    }
+    if (!res.ok) throw await textError(res, 'Could not create the invite')
     return res.json()
-}  
+}
+
+// acceptInvite creates the account an invite was issued for. Accounts exist
+// only through invites; there is no open sign-up. It does not start a session.
+export async function acceptInvite(token: string, fullName: string, password: string): Promise<User> {
+    const res = await request('/api/invites/accept', {
+        method: 'POST',
+        body: JSON.stringify({ token, fullName, password }),
+    })
+    if (res.status === 429) {
+        throw new ApiError(429, tooManyAttemptsMessage(res.headers.get('Retry-After')))
+    }
+    if (!res.ok) throw await textError(res, 'Could not accept the invite')
+    return res.json()
+}
 
 // Incident status/severity mirror the DB CHECK enums. Using unions (not plain
 // string) gives autocomplete and lets te UI map each value to a badge color.
