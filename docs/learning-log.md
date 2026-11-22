@@ -1305,8 +1305,7 @@ image in #40, and the required Terraform check in #42; released as v0.4.0 on 202
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
 - ~~Account enumeration~~: closed in v0.5.0 by removing open sign-up; accounts come from invites.
-- Expired `sessions` rows are never cleaned up. Decide on a strategy (periodic delete job vs
-  cleanup on write) before this reaches production.
+- ~~Expired `sessions` rows are never cleaned up~~: pruned on login, at most hourly, since v0.5.0.
 - Render's Terraform provider cannot update free-plan services (render-oss/terraform-provider-render#80).
   When a release includes the fix (#105), return to `terraform apply` and delete `infra/deploy-api.sh`.
 - `actions/checkout` v4.4.0 runs on Node.js 20, which GitHub has deprecated; move every workflow to a

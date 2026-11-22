@@ -123,6 +123,7 @@ the threat it answers.
 | Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked, and accepting invites is limited to 5 per visitor per hour. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
 | Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
+| Personal data kept longer than needed | Expired sessions are deleted, and invites a week after they are used or expire, on the first successful login each hour; the audit log keeps the permanent record | `internal/prune/` |
 | CSRF | `SameSite=Lax` on the session cookie, kept first-party in production by serving the API through the frontend's own address | `internal/auth/handler.go`, `frontend/functions/api/` |
 | Bypassing the proxy | The API answers only requests carrying the secret the proxy adds, compared in constant time; Terraform generates it, so no person handles it | `main.go`, `infra/api.tf` |
 | Spoofed visitor address | The forwarded address is trusted only on requests that passed the secret check, and parsed before it reaches the audit log; the proxy overwrites any value the browser sent | `internal/audit/audit.go`, `frontend/functions/api/` |
@@ -144,7 +145,6 @@ the threat it answers.
 
 Listed openly, because a portfolio that hides its weak spots is not worth much.
 
-- Expired session rows are never pruned, so the table grows without bound.
 - The frontend has no automated tests. The API's behaviour, including its security
   controls, is covered by integration tests that run on every pull request.
 - The audit log is tamper evident, not tamper proof. A database superuser can drop the

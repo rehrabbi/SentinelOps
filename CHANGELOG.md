@@ -30,6 +30,8 @@ first hardened production deployment.
 
 ### Removed
 
+- Expired sessions, which were refused but never deleted. They are now removed on the first
+  successful login each hour, and invites a week after they are used or expire.
 - Open sign-up: `POST /api/users` and the registration form. Accounts now come only from
   invites.
 
