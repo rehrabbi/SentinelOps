@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"sentinelops/internal/invite"
 	"sentinelops/internal/prune"
 	"sentinelops/internal/ratelimit"
+	"sentinelops/internal/reqlog"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
@@ -18,9 +20,10 @@ import (
 // serverConfig is the environment-derived configuration the HTTP API needs.
 // main reads it from the environment; tests set it directly.
 type serverConfig struct {
-	FrontendOrigin string // the one origin CORS allows, with credentials
-	SecureCookies  bool   // set the session cookie's Secure flag (true in production)
-	ProxySecret    string // required in X-Proxy-Secret; empty switches the check off
+	FrontendOrigin string       // the one origin CORS allows, with credentials
+	SecureCookies  bool         // set the session cookie's Secure flag (true in production)
+	ProxySecret    string       // required in X-Proxy-Secret; empty switches the check off
+	Logger         *slog.Logger // where request logs go; nil means slog.Default()
 }
 
 // newHandler builds the whole HTTP API: every route, its middleware, and the
@@ -127,7 +130,21 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// Wrap the router in CORS middleware so our browser frontend (and only
 	// that origin) is allowed to read API responses, and wrap that in the
 	// proxy check, so nothing at all is answered without the proxy's secret.
-	return requireProxySecret(withCORS(mux, cfg.FrontendOrigin), cfg.ProxySecret)
+	// Outermost, one JSON log line per request, including requests the proxy
+	// check refuses. Until the proxy check has decided whether to trust the
+	// forwarded address, the visitor is the connection's own; once it has, the
+	// layer inside it records the real visitor key, the same one the rate
+	// limiter uses.
+	inner := withCORS(mux, cfg.FrontendOrigin)
+	noteVisitor := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqlog.SetVisitor(r.Context(), visitorKey(r))
+		inner.ServeHTTP(w, r)
+	})
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return reqlog.Middleware(logger, visitorKey, requireProxySecret(noteVisitor, cfg.ProxySecret))
 }
 
 // visitorKey identifies the visitor for rate limiting: the address the proxy
