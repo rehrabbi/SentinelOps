@@ -54,17 +54,33 @@ export async function getMe(): Promise<User | null> {
 }
 
 // login posts credentials; returns the user on sucess, throws ApiError on 401
-// (bad credentials) or any other non-2xx
+// (bad credentials), 429 (too many failed attempts) or any other non-2xx
 export async function login(email: string, password: string): Promise<User> {
     const res = await request('/api/sessions', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
     })
     if (!res.ok) {
+        if (res.status === 429) {
+            throw new ApiError(429, tooManyAttemptsMessage(res.headers.get('Retry-After')))
+        }
         const msg = res.status === 401 ? 'Invalid email or password' : `Login failed (${res.status})`
-            throw new ApiError(res.status, msg)
+        throw new ApiError(res.status, msg)
     }
     return res.json()
+}
+
+// tooManyAttemptsMessage turns the API's Retry-After (whole seconds) into a
+// wait the user can act on. In production the API is same-origin, so the
+// header is readable; in local development it is a cross-origin request,
+// where browsers hide Retry-After, so the message falls back to "later".
+function tooManyAttemptsMessage(retryAfter: string | null): string {
+    const seconds = Number(retryAfter)
+    if (!retryAfter || !Number.isFinite(seconds) || seconds <= 0) {
+        return 'Too many failed attempts. Please try again later.'
+    }
+    const minutes = Math.ceil(seconds / 60)
+    return `Too many failed attempts. Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`
 }
 
 // logout deletes the current session (204). Idempotent server-side

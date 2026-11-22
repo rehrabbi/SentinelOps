@@ -18,6 +18,11 @@ first hardened production deployment.
   and the proxy secret. Each run uses its own database, and the tests refuse any host but
   `localhost`.
 
+### Changed
+
+- When login is rate limited, the login form says so ("Too many failed attempts") and, on the
+  deployed site, how many minutes to wait, instead of a generic "Login failed (429)".
+
 ### Security
 
 - Login is rate limited per visitor: after 10 failed attempts in 15 minutes, further attempts get
