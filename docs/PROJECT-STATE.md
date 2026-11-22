@@ -307,13 +307,19 @@ the 1.0.0 review and release.
   admin screen (now titled Users) that shows the link once, and `/reset#<token>`, open whether or not
   someone is logged in.
 - Pruning deletes resets a week after use or expiry, like invites.
-- Tests: five new integration tests and the extended prune test; 16 deliberate regressions, all caught
+- Tests: six new integration tests and the extended prune test; 16 deliberate regressions, all caught
   (one first slipped through and exposed a flawed test, fixed before merging); race detector clean.
+- **Browser check passed locally (2026-11-22)**, with throwaway `uicheck-*@example.test` accounts: wrong
+  current password shown and the session kept; change, then log out everywhere; an admin issues a link
+  (none on their own row), opens it in the same browser, the token leaves the address bar, the reset
+  works and the admin stays logged in; only the newest password logs in; every step is in the audit
+  log with its session count; the Users screen holds the link at phone width. It found one real bug:
+  the CORS preflight did not list `PUT` (fixed, with a test). Local-only snag: a leftover test API on
+  port 8080 (IPv6) answered instead of the container until it was stopped.
 - Known gap, written into the README: with no email, if the only admin forgets their password nobody can
   issue them a link.
 
-**⏭️ Next:** check the new screens in a browser locally (needs the owner's OK to apply migration 7 to
-the local database), merge, then deploy on the owner's request: `infra/migrate.sh` (migration 7) before
+**⏭️ Next:** merge, then deploy on the owner's request: `infra/migrate.sh` (migration 7) before
 the new API image, as with invites. Then brief step 2, seamless `PROXY_SECRET` rotation.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any

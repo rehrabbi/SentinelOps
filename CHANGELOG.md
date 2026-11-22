@@ -31,6 +31,12 @@ first hardened production deployment.
 - Pruning also deletes password resets a week after they are used or expire.
 - The admin screen is now titled **Users**, and the logged-in view links to Account security.
 
+### Fixed
+
+- The API's CORS preflight now allows `PUT`. It listed every method but that one, so a browser
+  refused the password change in local development, where the site and the API are separate
+  origins. A test now checks the preflight for every method the API uses.
+
 ## [0.6.0] - 2026-11-22
 
 Observe and recover: production now announces its failures and can be recovered. The database is
