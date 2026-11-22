@@ -1,0 +1,73 @@
+name: Backup
+
+# Every night: dump the production database and keep it, encrypted, as a
+# workflow artifact for 90 days. The dump is encrypted inside the runner with
+# the public key in infra/backup-recipient.txt before anything is stored, so
+# GitHub only ever holds ciphertext. Artifacts of a public repository can be
+# downloaded by anyone who can read it; without the private key, which never
+# leaves the owner, they are useless. infra/restore-drill.sh proves a backup
+# restores, and that it holds the audit history GitHub has been anchoring.
+on:
+  schedule:
+    - cron: "47 2 * * *" # 02:47 UTC daily, away from the audit check's slots
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump, encrypt, and store
+    runs-on: ubuntu-latest
+    # Holds BACKUP_DATABASE_URL, the read-only backup_reader login, and
+    # releases it only to runs from main.
+    environment: backup
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: infra/backup-recipient.txt
+          sparse-checkout-cone-mode: false
+
+      # age from Ubuntu's own archive, verified by apt's signatures.
+      - name: Install age
+        run: sudo apt-get install -y --no-install-recommends age
+
+      - name: Dump and encrypt
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          recipient="$(tr -d '\r\n' < infra/backup-recipient.txt)"
+          if ! [[ "$recipient" =~ ^age1[02-9ac-hj-np-z]{58}$ ]]; then
+            echo "::error::infra/backup-recipient.txt does not hold an age public key"
+            exit 1
+          fi
+          # pg_dump comes from the same major version as production. Its
+          # output goes straight into age: no unencrypted copy is ever written
+          # to the runner's disk. pipefail makes a failed dump fail the step.
+          set -o pipefail
+          docker run --rm --env DATABASE_URL postgres:17-alpine \
+            sh -c 'pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL"' \
+            | age --encrypt --recipient "$recipient" > sentinelops.dump.age
+          size=$(stat -c %s sentinelops.dump.age)
+          # An encrypted empty dump is a few hundred bytes; anything that small
+          # means the dump did not contain the database.
+          if [ "$size" -lt 2048 ]; then
+            echo "::error::the encrypted dump is only $size bytes"
+            exit 1
+          fi
+          echo "BACKUP_NAME=sentinelops-db-$(date -u +%Y%m%dT%H%MZ)" >> "$GITHUB_ENV"
+          echo "Encrypted dump: $size bytes"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.BACKUP_NAME }}
+          path: sentinelops.dump.age
+          retention-days: 90
+          if-no-files-found: error
+          # Already compressed by pg_dump and encrypted by age.
+          compression-level: 0

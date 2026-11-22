@@ -10,6 +10,21 @@ first hardened production deployment.
 
 ## [Unreleased]
 
+### Added
+
+- Nightly backups of the production database, kept for 90 days as workflow artifacts. Each is
+  dumped through `backup_reader`, a role that can read every table and change nothing, and
+  encrypted with `age` inside the runner before anything is stored.
+- `infra/restore-drill.sh`, which restores the newest backup into a throwaway database, checks
+  its schema version, and verifies its audit chain against the newest anchor it should contain.
+
+### Security
+
+- Backups are encrypted to a public key; the private key exists only with the owner, so neither
+  GitHub nor anyone who can read this public repository's artifacts can read a backup.
+  Encryption is authenticated, so a truncated or altered backup fails to decrypt rather than
+  restoring silently.
+
 ## [0.5.0] - 2026-11-22
 
 Harden the live app: the gaps the public deployment exposed are closed. Login is rate limited

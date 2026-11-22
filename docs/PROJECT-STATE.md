@@ -5,8 +5,8 @@
 > has the blow-by-blow history.
 >
 > **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.5.0, harden the live app**, live at
-> https://sentinelops.pages.dev, with all nine checks required. Next: plan the next stage. Full
-> detail in §6.
+> https://sentinelops.pages.dev, with all nine checks required. In progress: **Observe and recover**
+> (v0.6.0, issue #54). Full detail in §6.
 
 ---
 
@@ -279,14 +279,22 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ NEXT STEP: plan the next stage
+### ⏭️ IN PROGRESS: Observe and recover (v0.6.0, issue #54, milestone #5)
 
-v0.5.0 was released on 2026-11-22, closing issue #45 and milestone #4. The next stage starts the
-standard way: a milestone, an issue, and the decisions briefed to the owner first. Candidates, in the
-README roadmap's order:
-1. **Observability, alerting and backups** (uptime checks, logs and error tracking, backups beyond
-   Neon's 6-hour window, a runbook for a failed audit check).
-2. **Environments** (`dev`, `staging`, `prod`) once there is more than one deployment.
+Chosen 2026-11-22 over separate environments: nobody would notice an outage, and nothing beyond
+Neon's 6-hour window protected the data. In scope, in order: encrypted backups with a restore drill,
+structured request logs, uptime alerts, and a runbook.
+
+**Step 1, encrypted backups (decided 2026-11-22):** `.github/workflows/backup.yml` runs nightly at
+02:47 UTC: `pg_dump` (postgres:17) through `backup_reader` (read-only, created with
+`infra/sql/backup-reader.sql`; URL is the secret `BACKUP_DATABASE_URL` in a GitHub environment `backup`
+limited to `main`), piped straight into `age` with the public key in `infra/backup-recipient.txt`, and
+uploaded as an artifact kept 90 days. The private key exists only with the owner (password manager, and
+`~/.sentinelops/backup-key.txt` on the machine that runs the drill): lose it and the backups are
+unreadable. `infra/restore-drill.sh` restores the newest backup into a throwaway container and runs
+`verify-audit` against the newest anchor the backup should contain; a full restore creates triggers
+after loading data, so the stored hashes are untouched. Rejected: a private repository (grows forever),
+Cloudflare R2 (an extra credential, card requirement unconfirmed).
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
