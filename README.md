@@ -255,6 +255,7 @@ Per device setup notes, including the macOS and Colima path, live in
 |---|---|---|---|
 | `GET` | `/healthz` | none | Liveness |
 | `GET` | `/readyz` | none | Readiness, including a database ping |
+| `GET` | `/api/healthz` | proxy secret | Liveness through the site's proxy, for uptime monitoring; never touches the database |
 | `POST` | `/api/invites` | cookie, admin only | Issue a one-time invite; returns its token once |
 | `POST` | `/api/invites/accept` | the invite token | Create the invited account, returns `201` |
 | `GET` | `/api/users` | cookie, admin only | List users |
