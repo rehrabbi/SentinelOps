@@ -1301,6 +1301,66 @@ image in #40, and the required Terraform check in #42; released as v0.4.0 on 202
 
 ---
 
+## Stage: Harden the live app (issue #45, milestone #4, released as v0.5.0)
+
+**Decisions:** hardening came before observability and environments, because v0.4.0 made the
+known gaps real: anyone could now reach the login form. In order:
+- an integration test suite first, so every later fix arrived with a test;
+- login rate limiting in API memory, keyed on the proxy-verified visitor;
+- invite-only accounts instead of open sign-up;
+- pruning of expired sessions and spent invites on login.
+
+**What happened:** each step shipped with tests that were deliberately broken to prove they could
+fail. Fifteen sabotages across the stage were all caught, one only after it was redone because the
+first version did not compile. Steps 1–3 went to production on 2026-11-22 with a migration (version 6,
+`invites`), and step 4 followed with the release. Two production lessons came out of the deploys:
+Render's free-plan provider bug (handled by `deploy-api.sh`, see v0.4.0), and the stored `api_image`
+output, which needs a refresh-only apply after deploying that way.
+
+**Concepts learned:**
+- **A test that has never failed proves nothing.** The suite was written, then the code it guards
+  was broken on purpose (cookie readable by JavaScript, 403 instead of 404, no rate limit, a raw token
+  stored), and each test had to catch its sabotage. A sabotage that does not compile proves nothing
+  either; it has to be redone so it builds.
+- **Integration tests belong at the level where the bugs are.** Authorization lives in middleware and
+  SQL, so the tests drive real HTTP through the real router (`newHandler`, extracted from `main()` for
+  exactly this) against a real Postgres, not mocks.
+- **Design tests around the system's own safeguards.** `audit_log` refuses `TRUNCATE`, so tests cannot
+  reset tables; each run creates its own database instead. Tests also refuse any host but localhost,
+  so a stray variable cannot point them at production.
+- **A limiter is only as good as its key.** Keying on a header the visitor controls lets them claim a
+  fresh identity per guess. The limiter uses the address the proxy reports behind its secret, which the
+  tests already proved cannot be spoofed, and groups IPv6 by /64, since one connection owns a whole /64.
+- **Check-then-act is a race.** Checking the count and recording the attempt separately let 200 of 200
+  concurrent guesses through in a test. Reserving a slot under a lock first allowed exactly 10. The race
+  detector, run in a container because Windows lacks a C compiler, confirms the code is clean.
+- **Count the right thing.** Only failed logins count, so a correct password is never penalised; a
+  success does not reset the count, or an attacker could clear it by logging into an account of their
+  own between guesses. A per-account limit was rejected because it lets anyone lock a victim out.
+- **Some leaks cannot be hidden, only removed.** With open sign-up and no email, enumeration survives any
+  response wording: sign up, then log in with the password you chose. Uniform responses would have been
+  theatre. Removing open sign-up closed it, and invites fit an internal incident tracker anyway.
+- **Treat one-time tokens like passwords.** Invite tokens are 256-bit, stored as SHA-256 hashes, returned
+  once with `Cache-Control: no-store`, carried after `#` so they never reach a server log or `Referer`,
+  wiped from the address bar on arrival, and claimed with a single conditional `UPDATE` so two accepts
+  cannot both succeed.
+- **Removing a feature can remove a bootstrap.** Without sign-up there was no way to create the first
+  admin; a command-line `invite`, needing database access like `migrate`, replaced "register, then
+  promote in SQL".
+- **Data minimisation is a control too.** Expired sessions were already refused, but they still recorded
+  who logged in and when. Pruning on login, at most hourly, bounds the tables by the very activity that
+  grows them, with no scheduler and no new credential.
+- **Same-origin is not just a cookie rule.** Locally the frontend calls the API cross-origin, where
+  browsers hide `Retry-After`, so the 429 message needs a fallback; on the deployed, same-origin site
+  the header is readable.
+- **Check claims against the code before publishing them.** A pull request first said the login form
+  showed the API's 429 message; reading `api.ts` showed it did not, which became a fix of its own.
+
+*(Tests in #46, rate limiting in #47 and #48, invites in #49, the production deploy in #50, pruning in
+#51; released as v0.5.0.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.

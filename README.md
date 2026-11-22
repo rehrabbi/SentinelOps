@@ -32,9 +32,9 @@ infrastructure as code, and cloud architecture.
 It is built incrementally, and the git history is meant to read as an engineering story,
 one concern per branch and one concern per pull request.
 
-**Status:** the current release is [v0.4.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.4.0),
-the free cloud deployment, **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)** and
-provisioned with Terraform. Every release is described in the [changelog](CHANGELOG.md).
+**Status:** the current release is [v0.5.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.5.0),
+which hardens the deployment **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)**: login
+rate limiting, invite-only accounts, data pruning, and integration tests on every pull request. Every release is described in the [changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -339,12 +339,14 @@ declared in Terraform, a same-origin proxy for the API, published and attested i
 audit chain anchored outside the database every 6 hours. AWS was the original target, but its
 free plan now ends after six months and may require a card.
 
+**v0.5.0, released.** Harden the live app: integration tests against Postgres on every pull
+request, login rate limiting keyed on the proxy-verified visitor, invite-only accounts that close
+account enumeration, and pruning of expired sessions and spent invites.
+
 Next up, each stage ending in a minor release.
 
 1. Observability, alerting, and backups for the deployed stack
-2. The known gaps above: rate limiting, session pruning, account enumeration, and a real
-   test suite
-3. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
+2. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
    between
 
 **1.0.0** is the first hardened production deployment.
