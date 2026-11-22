@@ -1219,6 +1219,88 @@ before the workflow merged. CodeQL and gitleaks found nothing.
 
 ---
 
+## Stage: Free cloud deployment (issue #30, milestone #3)
+
+**Decisions:** AWS was dropped: since July 2025 its free plan is a six-month credit that may ask
+for a card. The stage deploys to free platform services instead, with no card anywhere:
+Cloudflare Pages for the frontend, Render's free plan for the API image from GHCR, and Neon's free
+Postgres, all in Singapore and all declared in Terraform. Settled along the way:
+- a same-origin Pages Function proxies `/api`, guarded by a shared secret that Terraform
+  generates;
+- Terraform's state lives in a separate Neon organisation;
+- every provider token is scoped to this project;
+- the API image is pinned by commit;
+- migrations run from the owner's machine with the same image;
+- frontend deploys come from a GitHub environment limited to `main`;
+- the audit chain head is anchored on a protected branch every 6 hours.
+
+**What happened:** the site went live at `https://sentinelops.pages.dev` on 2026-11-21, and the
+end-to-end test passed. Registration, login, the admin screen and incidents work through the
+proxy; the API refuses direct calls; audit entries carry the visitor's real address; the chain
+verifies. Four surprises came from outside the code:
+- Avast's HTTPS scanning broke Terraform, first natively and, after a reboot, inside Docker too.
+- Render's provider cannot update free-plan services.
+- Cloudflare insists on matching `fail_open` settings for production and preview.
+- The Windows machine lost power during a git checkout.
+
+**Concepts learned:**
+- **"Free" is a moving target.** AWS's free tier changed shape mid-project. Free platform
+  services hide networking (no VPCs, security groups or NAT) in exchange for zero cost, and the
+  trade-off is worth writing down rather than discovering later.
+- **Cookies care about sites, not origins.** `*.pages.dev` and `*.onrender.com` are on the
+  Public Suffix List, so a frontend and an API there are different *sites*, and `SameSite=Lax`
+  would drop the session cookie. Proxying `/api` through the frontend's own address keeps the
+  cookie first-party without weakening CSRF protection.
+- **A proxy needs a way to prove it is the proxy.** A shared secret compared in constant time
+  stops anyone calling the API around it. The visitor address it forwards is trusted only on
+  requests that carried the secret, and parsed before use, because a header the browser could
+  set is not evidence.
+- **Generate secrets where they are used.** Terraform's `random_password` goes straight to Render
+  and Cloudflare, so no person ever sees or copies the proxy secret.
+- **Terraform state is a secret.** Anything handed to a provider lands in state, so state lives in
+  its own database, behind its own credentials. `sensitive` only stops values being printed; it
+  does not keep them out of state.
+- **Ephemeral values exist for a reason, and providers may not support them yet.** Neon only hands
+  out its password as an ephemeral value, and Render has no write-only field to receive one. The
+  database URL had to be copied once by hand. Reading the provider schemas
+  (`terraform providers schema -json`) settled this before any code was written.
+- **Two resources that need each other's address form a cycle.** It was broken by deriving the
+  site's address from its name and checking it after creation with a postcondition.
+- **Plan, read, then apply the plan you read.** Saving a plan and applying that file means nothing
+  beyond what was reviewed can change; Terraform refuses a plan that has gone stale.
+- **Provider bugs are real, and creation is not update.** Creating the free Render service worked;
+  every later change failed because the provider always sends a setting the free plan refuses.
+  The upstream issue had been open for months. A small script deploying through Render's own API
+  works around it, and `terraform plan` showing "No changes" proves the two still agree.
+- **Antivirus can sit in the middle of TLS.** HTTPS scanning re-signs every certificate with its
+  own root. Tools that bundle their own trust store, like Terraform's providers, correctly
+  refuse it. Exceptions for three API hosts fixed it without turning the protection off.
+- **Least privilege, one credential at a time.** Each credential holds exactly its permission:
+  - a Render key scoped to services and deploys, plus read-only log streams;
+  - a Cloudflare token for Pages only, on one account, with an expiry;
+  - a Neon key for the app's organisation only;
+  - a separate CI token held in a GitHub environment that only `main` can use;
+  - an `audit_verifier` role that can read `audit_log` and nothing else.
+
+  Each leak would be contained.
+- **Tamper evidence needs a witness outside the system.** The hash chain proves rows weren't
+  edited, but whoever controls the database can rebuild the whole chain. Anchoring
+  "entry N had hash H" in GitHub, a separate trust domain, and checking it on a schedule closes
+  that, apart from the window since the last run.
+- **Fail loudly, never silently pass.** The scheduled check refuses to run unless the anchor is
+  explicitly confirmed, because an older image ignored `--anchor` and would have reported
+  "intact" without checking. Its first scheduled run did fail, exactly as designed.
+- **Free tiers sleep.** Render's free API stops after 15 idle minutes, and the next request gets a
+  502 page while it wakes. That is availability, not security, but it surprises users.
+- **A crash can corrupt what was mid-write.** Power loss during a checkout zeroed git's `HEAD`,
+  index and 30 files. Because every commit had been pushed, recovery meant swapping in a fresh
+  `.git` and resetting, with the damaged copy kept, not deleted. "Push early" is a backup strategy.
+
+*(Infrastructure in #37, the end-to-end test in #38, the audit anchor in #39, and the anchor-capable
+image in #40.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
@@ -1227,3 +1309,9 @@ before the workflow merged. CodeQL and gitleaks found nothing.
   is not.
 - Expired `sessions` rows are never cleaned up. Decide on a strategy (periodic delete job vs
   cleanup on write) before this reaches production.
+- Render's Terraform provider cannot update free-plan services (render-oss/terraform-provider-render#80).
+  When a release includes the fix (#105), return to `terraform apply` and delete `infra/deploy-api.sh`.
+- `actions/checkout` v4.4.0 runs on Node.js 20, which GitHub has deprecated; move every workflow to a
+  newer pinned release.
+- Scheduled workflows pause after 60 days without a commit. Decide how the audit check stays alive
+  if the repository goes quiet.
