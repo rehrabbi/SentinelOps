@@ -34,8 +34,9 @@ one concern per branch and one concern per pull request.
 
 **Status:** the current release is [v0.3.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.3.0),
 which scans every pull request for vulnerable dependencies, code, images, and leaked secrets.
-Next is the AWS deployment with Terraform. Every release is described in the
-[changelog](CHANGELOG.md).
+The free cloud deployment that will become v0.4.0 is **live at
+[sentinelops.pages.dev](https://sentinelops.pages.dev)**, provisioned with Terraform. Every
+release is described in the [changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -49,6 +50,9 @@ Next is the AWS deployment with Terraform. Every release is described in the
 - Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
 - The whole stack runnable in containers: a 20 MB distroless API image, an unprivileged
   nginx image for the frontend, and a Compose profile that runs migrations first
+- A public deployment on free services, declared in Terraform: Cloudflare Pages in front, the
+  API on Render, Postgres on Neon, and a proxy that keeps the session cookie first-party
+- The audit chain verified every 6 hours against a head recorded outside the database
 
 ## Screens
 
@@ -64,42 +68,37 @@ Next is the AWS deployment with Terraform. Every release is described in the
 
 ## Architecture
 
-Today the application runs as a Go API and a React client against Postgres, either
-natively for development or as two images, one for the API and one serving the built
-frontend, the same split the target deployment uses.
+The application is a Go API and a React client against Postgres. In production every request
+goes to one address: Cloudflare serves the frontend and forwards `/api` to the API, so the
+browser only ever talks to one site.
 
 ```mermaid
 flowchart LR
-    B["Browser<br/>React + Vite + TS"]
-    C["CORS<br/>one named origin"]
-    R["RequireAuth<br/>cookie, session, user"]
-    H["Handlers<br/>per-object authorization"]
-    D[("PostgreSQL 17")]
-
-    B -->|"JSON + session cookie"| C
-    C --> R
-    R --> H
-    H -->|"parameterised SQL"| D
+    B["Browser"] -->|"HTTPS, one site"| CF["Cloudflare Pages<br/>static files + /api proxy function"]
+    CF -->|"/api/* + X-Proxy-Secret<br/>+ visitor address"| API["Render, free plan<br/>Go API image pinned by commit"]
+    API -->|"TLS, parameterised SQL"| DB[("Neon Postgres 17<br/>free plan")]
+    B -.->|"direct calls: 403"| API
 ```
 
-The target deployment, which the roadmap below works toward, adds the cloud and delivery
-layers.
+Inside the API, each request passes the proxy check, CORS, `RequireAuth`, and per-object
+authorization before any SQL runs. Delivery and verification run around it.
 
 ```mermaid
 flowchart TB
-    U["Internet"] --> W["CDN and WAF"]
-    W --> LB["Load balancer"]
-    LB --> APP["Containers<br/>frontend + API"]
-    APP --> RDS[("Managed Postgres")]
-
-    GH["GitHub"] --> CI["GitHub Actions<br/>build, vet, scan, image"]
-    CI --> APP
-
-    TF["Terraform"] -.-> W
-    TF -.-> LB
-    TF -.-> APP
-    TF -.-> RDS
+    PR["Pull request"] --> CI["CI and Security<br/>build, test, scan"]
+    CI -->|"merge to main"| PUB["Publish<br/>scan again, push to GHCR,<br/>attest provenance"]
+    CI -->|"merge to main"| DF["Deploy frontend<br/>wrangler, production environment"]
+    DF --> CF["Cloudflare Pages"]
+    PUB -.->|"bump api-image-tag.txt,<br/>migrate.sh, deploy-api.sh"| API["Render API"]
+    TF["Terraform in Docker<br/>state in a separate Neon org"] -.-> CF
+    TF -.-> API
+    TF -.-> DB[("Neon Postgres")]
+    AV["Audit verify, every 6 hours<br/>read-only role"] --> DB
+    AV --> AN["audit-anchors branch<br/>protected, append-only"]
 ```
+
+All of it is free: no card is on file with any provider. The trade-offs are that these
+platforms hide private networking, and that the free API sleeps after 15 idle minutes.
 
 Complexity is added only when a real problem justifies it. There are no microservices, no
 queues, and no ORM, because nothing in the project has yet needed them.
@@ -123,7 +122,11 @@ the threat it answers.
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
 | Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
-| CSRF | `SameSite=Lax` on the session cookie | `internal/auth/handler.go` |
+| CSRF | `SameSite=Lax` on the session cookie, kept first-party in production by serving the API through the frontend's own address | `internal/auth/handler.go`, `frontend/functions/api/` |
+| Bypassing the proxy | The API answers only requests carrying the secret the proxy adds, compared in constant time; Terraform generates it, so no person handles it | `main.go`, `infra/api.tf` |
+| Spoofed visitor address | The forwarded address is trusted only on requests that passed the secret check, and parsed before it reaches the audit log; the proxy overwrites any value the browser sent | `internal/audit/audit.go`, `frontend/functions/api/` |
+| Over-privileged deploy credentials | Each provider token is scoped to this project; CI's Cloudflare token sits in a GitHub environment only `main` can use; the audit check connects as a role that can only read the audit log | `infra/`, `.github/workflows/` |
+| Unknown code in production | The API runs an image pinned by commit, scanned before it is pushed and carrying a signed build provenance attestation | `infra/api-image-tag.txt`, `.github/workflows/publish.yml` |
 | Cleartext session cookie | `Secure` flag driven by the `SECURE_COOKIES` environment variable | `main.go` |
 | Mass assignment | Strict JSON decoding with unknown fields rejected, and no client supplied owner or status on create | `internal/incident/handler.go` |
 | Oversized request bodies | `MaxBytesReader` caps every JSON body at 1 MiB | `internal/incident/handler.go` |
@@ -152,6 +155,10 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
   about 6 hours, could still be rewritten undetected.
 - Authentication events are recorded on a best-effort basis, unlike role changes, which
   are transactional. A failed audit write is logged but does not fail the login.
+- The free API sleeps after 15 idle minutes, and the first request after that gets Render's
+  502 page for up to a minute while it wakes.
+- Render's Terraform provider cannot update free-plan services, so new API images are
+  deployed with `infra/deploy-api.sh` until an upstream fix ships.
 
 ## Tech stack
 
@@ -165,6 +172,8 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 | Auth | Server side sessions, bcrypt, `HttpOnly` cookie | Instant revocation, and it teaches cookie security properly |
 | Config | 12 factor environment variables, git ignored `.env` | Secrets never reach the repository |
 | Containers | Multi-stage builds: distroless for the API, `nginx-unprivileged` for the frontend | Small, non-root images with no shell in the API image |
+| Hosting | Cloudflare Pages, Render, and Neon, all on free plans in Singapore | A real public deployment with no card on file |
+| Infrastructure as code | Terraform 1.17, run from HashiCorp's image, state in its own Neon database | Every resource reviewable as a plan before it changes |
 
 ## Quickstart
 
@@ -277,8 +286,10 @@ SentinelOps/
 │  ├─ public/_headers                security headers when served by Cloudflare Pages
 │  └─ src/                           React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
-├─ infra/                            Terraform: providers, lock file, state in Neon
-├─ .github/workflows/ci.yml          format, vet, build, test, lint on every pull request
+├─ infra/                            Terraform for Neon, Render and Pages; terraform.sh,
+│                                    migrate.sh, deploy-api.sh; the pinned API image tag
+├─ .github/workflows/                CI and security scans on every pull request; publish,
+│                                    deploy frontend, and the 6-hourly audit verification
 ├─ CHANGELOG.md                      every release, in Keep a Changelog format
 └─ compose.yaml                      Postgres by default; migrate, api, and web with --profile app
 ```
@@ -320,15 +331,21 @@ and the whole stack running in Compose, with migrations as a one-shot job.
 **v0.3.0, released.** CI hardening: dependency, static analysis, image, and secret scanning
 on every pull request, all required to pass, with results in the repository's Security tab.
 
+**v0.4.0, in progress.** Free cloud deployment, live at
+[sentinelops.pages.dev](https://sentinelops.pages.dev): Cloudflare Pages, Render and Neon
+declared in Terraform, a same-origin proxy for the API, published and attested images, and the
+audit chain anchored outside the database every 6 hours. AWS was the original target, but its
+free plan now ends after six months and may require a card.
+
 Next up, each stage ending in a minor release.
 
-1. **AWS deployment, v0.4.0.** Architecture provisioned with Terraform, then `dev`,
-   `staging`, and `prod` environment branches once there is somewhere to deploy, plus a
-   scheduled `verify-audit` run against the real database and somewhere outside it to anchor
-   the chain head
-2. Observability, alerting, backups, and a cost review
+1. Observability, alerting, and backups for the deployed stack
+2. The known gaps above: rate limiting, session pruning, registration enumeration, and a real
+   test suite
+3. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
+   between
 
-**1.0.0** is the first hardened production deployment on AWS.
+**1.0.0** is the first hardened production deployment.
 
 ## Documentation
 

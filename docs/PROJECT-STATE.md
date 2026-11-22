@@ -348,10 +348,13 @@ image, connecting as `audit_verifier` (read-only on `audit_log`, created once wi
 `infra/sql/audit-verifier.sql`) whose URL is the secret `AUDIT_DATABASE_URL` in a GitHub environment
 `audit` limited to `main`. Provisioned: the role (verified read-only), the environment and secret, the
 branch with a header-only `anchors.log`, and the ruleset "Protect audit anchors" (deletion and
-force-push blocked, no bypass). Remaining: deploy the image `sha-5014901…`, the first with
-`--anchor`, with `migrate.sh` then `apply`; then run **Audit verify** by hand to record the first
-anchor. Until then scheduled runs fail on purpose with "could not read the chain head". Afterwards: make `Infrastructure (Terraform)` a required check, refresh the README
-roadmap, release v0.4.0.
+force-push blocked, no bypass). The anchor-capable image `sha-5014901…` was deployed on 2026-11-22
+with `deploy-api.sh` (#40); **Audit verify** recorded the first anchor (`4:6b9c9f7f…`, commit
+`0a39675` on `audit-anchors`) and a second run confirmed it holds. **Step 7 is done.**
+
+**⏭️ Next:** make `Infrastructure (Terraform)` a required check on `main` (branch protection change,
+needs the owner's approval), then prepare **v0.4.0** (release confirmed by the owner before tagging)
+and close milestone #3.
 
 ### ✅ CI hardening (released as v0.3.0, issue #24, milestone #2)
 
