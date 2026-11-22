@@ -9,6 +9,7 @@ import (
 	"sentinelops/internal/auth"
 	"sentinelops/internal/incident"
 	"sentinelops/internal/invite"
+	"sentinelops/internal/prune"
 	"sentinelops/internal/ratelimit"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
@@ -70,8 +71,12 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// count, so a correct password never uses up the limit, and a success does
 	// not reset it, so an attacker cannot clear their count by logging in to
 	// an account of their own between guesses.
+	//
+	// A successful login also triggers the cleanup of expired sessions and
+	// spent invites, at most once an hour (see internal/prune).
 	loginLimit := ratelimit.New(10, 15*time.Minute)
-	mux.Handle("POST /api/sessions", loginLimit.Wrap(http.HandlerFunc(authHandler.Login), visitorKey,
+	pruner := prune.New(db, time.Hour)
+	mux.Handle("POST /api/sessions", loginLimit.Wrap(pruner.AfterLogin(http.HandlerFunc(authHandler.Login)), visitorKey,
 		func(status int) bool { return status == http.StatusUnauthorized }))
 
 	// Protected route: GET /api/me returns the current user. RequireAuth wraps

@@ -691,3 +691,53 @@ func TestInviteAcceptRateLimit(t *testing.T) {
 	}
 	c.expect(http.StatusTooManyRequests, "POST", "/api/invites/accept", guess)
 }
+
+func TestPruneOnLogin(t *testing.T) {
+	requireDB(t)
+	u := createAccount(t, "pruned", "")
+
+	// An expired session, and invites in every state.
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := testDB.Exec(query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() - interval '1 minute')`, "prune-expired-1", u.ID)
+	for hash, state := range map[string]string{
+		"prune-used-8d":    `now() + interval '1 day', now() - interval '8 days'`, // used over a week ago: delete
+		"prune-expired-8d": `now() - interval '8 days', NULL`,                     // expired over a week ago: delete
+		"prune-used-1d":    `now() + interval '1 day', now() - interval '1 day'`,  // used recently: keep
+		"prune-pending":    `now() + interval '1 day', NULL`,                      // still usable: keep
+	} {
+		exec(`INSERT INTO invites (token_hash, email, expires_at, used_at) VALUES ($1, $2, `+state+`)`, hash, uniqueEmail(hash))
+	}
+	count := func(query, arg string) int {
+		t.Helper()
+		var n int
+		if err := testDB.QueryRow(query, arg).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	c := newClient(t, newServer(t, serverConfig{}))
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
+
+	if n := count(`SELECT count(*) FROM sessions WHERE token_hash = $1`, "prune-expired-1"); n != 0 {
+		t.Error("the expired session survived a login")
+	}
+	c.expect(http.StatusOK, "GET", "/api/me", nil) // the live session it just created works
+	for hash, want := range map[string]int{"prune-used-8d": 0, "prune-expired-8d": 0, "prune-used-1d": 1, "prune-pending": 1} {
+		if n := count(`SELECT count(*) FROM invites WHERE token_hash = $1`, hash); n != want {
+			t.Errorf("invite %s: %d rows after pruning, want %d", hash, n, want)
+		}
+	}
+
+	// At most once an hour: the next login does not prune again.
+	exec(`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() - interval '1 minute')`, "prune-expired-2", u.ID)
+	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
+	if n := count(`SELECT count(*) FROM sessions WHERE token_hash = $1`, "prune-expired-2"); n != 1 {
+		t.Error("a second login within the hour pruned again")
+	}
+}
