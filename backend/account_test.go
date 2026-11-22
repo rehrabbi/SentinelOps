@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -72,6 +73,22 @@ func TestChangePassword(t *testing.T) {
 	c := newClient(t, srv)
 	c.expect(http.StatusUnauthorized, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
 	login(t, c, u.Email, newTestPassword)
+}
+
+// In local development the site and the API are different origins, so the
+// browser asks permission (a CORS preflight) before every method but GET and
+// POST. A method missing from the answer fails only in a browser.
+func TestPreflightAllowsEveryMethodTheAPIUses(t *testing.T) {
+	c := newClient(t, newServer(t, serverConfig{}))
+	c.header.Set("Origin", "http://localhost:5173")
+	for _, method := range []string{"PUT", "PATCH", "DELETE"} {
+		c.header.Set("Access-Control-Request-Method", method)
+		c.expect(http.StatusNoContent, "OPTIONS", "/api/me/password", nil)
+		allowed := strings.Split(c.last.Header.Get("Access-Control-Allow-Methods"), ", ")
+		if !slices.Contains(allowed, method) {
+			t.Errorf("preflight allows %v, not %s", allowed, method)
+		}
+	}
 }
 
 func TestChangePasswordRateLimit(t *testing.T) {

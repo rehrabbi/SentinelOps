@@ -211,10 +211,11 @@ func withCORS(next http.Handler, allowedOrigin string) http.Handler {
 
 		// Preflight. Before a POST carrying a JSON body, the browser first
 		// sends OPTIONS to ask permission. We must answer it HERE and stop:
-		// the router only has GET/POST/DELETE patterns registered, so an
-		// OPTIONS request would fall through to a 405 and fail the preflight.
+		// the router has no OPTIONS patterns registered, so an OPTIONS
+		// request would fall through to a 405 and fail the preflight. Every
+		// method a route uses must be listed, or the browser refuses it.
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			w.Header().Set("Access-Control-Max-Age", "600") // cache permission 10 min
 			w.WriteHeader(http.StatusNoContent)             // 204: permission granted, no body
