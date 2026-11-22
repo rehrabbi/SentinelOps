@@ -22,6 +22,8 @@ first hardened production deployment.
 - `GET /api/healthz`, a liveness check that requires the proxy secret, so one external check fetched
   through the site covers Cloudflare, the proxy, the secret, Render and the API. It never touches the
   database, so frequent checks do not keep it awake.
+- Uptime monitoring with UptimeRobot's free plan: the site and `/api/healthz` (through the proxy) are
+  checked every 5 minutes, with an email to the owner when either stops answering.
 - `infra/restore-drill.sh`, which restores the newest backup into a throwaway database, checks
   its schema version, and verifies its audit chain against the newest anchor it should contain.
 
