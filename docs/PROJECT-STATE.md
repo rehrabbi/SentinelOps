@@ -324,8 +324,15 @@ public status page.
 Deployed 2026-11-22 as `sha-78198ac…` (#59): request logs and `/api/healthz` are live; through the site
 `/api/healthz` answers 200, directly 403; responses carry `X-Request-ID`; Terraform "No changes".
 
-**⏭️ Next:** the owner creates the UptimeRobot account; then the two monitors and the email alert are
-configured, and an alert is tested.
+**UptimeRobot configured 2026-11-22:** account created by the owner (free plan, email alerts to the owner's
+address); monitors `https://sentinelops.pages.dev/` and `https://sentinelops.pages.dev/api/healthz`, both
+HTTP(S), 5-minute interval, default location, both Up. A third monitor pointing at a route that does not
+exist (`/api/alert-test-not-a-real-route`, a 404 through the proxy) went down and the owner **received the
+alert email**, proving the real down path end to end; it is now paused (not deleted). Each monitor's page
+also has a "Test Notification" button for a quicker check. The UptimeRobot setup was made
+by hand in its dashboard, not in Terraform (no provider was evaluated); this note is the record of it.
+
+**⏭️ Next:** step 4, the runbook (`docs/RUNBOOK.md`): what to do for each alert this stage introduced.
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
