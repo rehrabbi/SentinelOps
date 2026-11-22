@@ -10,6 +10,27 @@ first hardened production deployment.
 
 ## [Unreleased]
 
+### Added
+
+- Changing your own password, from a new **Account security** page (`PUT /api/me/password`). It
+  needs the current password, follows the same rules as accepting an invite, ends every other session
+  of yours while keeping the one you are using, and is recorded in the audit log, failures included.
+  Wrong current passwords are limited like logins: 10 per visitor in 15 minutes.
+- **Log out everywhere** (`DELETE /api/sessions`): ends every session of yours, on every device,
+  including the current one, and records how many ended.
+- Admin-issued password resets, so a forgotten password is no longer a permanent lockout. On the
+  Users screen an admin creates a one-time link for any other account, admins included
+  (`POST /api/users/{id}/password-reset`). Like an invite it is stored only as a SHA-256 hash and shown
+  once, but it lasts 1 hour, and issuing a new one retires any earlier unused one. Following it
+  (`/reset#<token>`, `POST /api/password-resets/accept`) sets the new password and ends every session
+  of that account. Using links is limited to 10 per visitor per hour. Both steps are audited.
+- Migration 7, `password_resets`.
+
+### Changed
+
+- Pruning also deletes password resets a week after they are used or expire.
+- The admin screen is now titled **Users**, and the logged-in view links to Account security.
+
 ## [0.6.0] - 2026-11-22
 
 Observe and recover: production now announces its failures and can be recovered. The database is

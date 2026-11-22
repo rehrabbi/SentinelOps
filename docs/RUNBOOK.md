@@ -193,3 +193,23 @@ Render's Terraform provider cannot update the service, so the order matters:
 4. Run **Deploy frontend** by hand so the proxy function picks up the new value.
 5. Confirm: `/api/healthz` through the site answers 200, and `infra/terraform.sh plan` says
    "No changes".
+
+---
+
+## 6. Someone is locked out, or an account may be compromised
+
+| Situation | Steps |
+|---|---|
+| A user forgot their password | An admin opens **Users**, presses **Reset password** on that row, and sends the link to that person only, over a channel other than the site itself. It works once, for 1 hour, and a new one replaces it. Using it logs that account out everywhere. |
+| A session may be stolen (a lost device, an unfamiliar login in the audit log) | The user opens **Account security** and changes their password, which ends every other session, or presses **Log out everywhere**. If the user cannot log in, an admin issues a reset link, which ends all of their sessions when used. |
+| An admin forgot their password | Another admin issues them a reset link: nobody can reset their own account. If they are the only admin, there is no in-app path; it needs direct database access with the owner login. |
+
+**Confirm:** the audit log shows `user.password_reset`, `user.password_changed` or `user.logout_all`
+for that account, with the number of sessions ended:
+
+```sql
+SELECT occurred_at, actor_email, action, outcome, detail
+FROM audit_log
+WHERE action IN ('user.password_changed', 'user.password_reset', 'user.password_reset_issued', 'user.logout_all')
+ORDER BY id DESC LIMIT 20;
+```
