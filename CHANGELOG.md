@@ -10,6 +10,13 @@ first hardened production deployment.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-22
+
+Free cloud deployment: SentinelOps is live at https://sentinelops.pages.dev on the free plans
+of Cloudflare Pages, Render and Neon, all declared in Terraform. A same-origin proxy keeps the
+session cookie first-party, the API refuses requests that bypass it, and the audit chain is
+verified every 6 hours against a head recorded outside the database.
+
 ### Added
 
 - A Cloudflare Pages Function that forwards `/api/*` from the frontend's own address to the
@@ -177,7 +184,8 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/rehrabbi/SentinelOps/releases/tag/v0.1.0
