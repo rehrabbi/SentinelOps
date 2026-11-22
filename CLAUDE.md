@@ -35,6 +35,8 @@ between continuing this project and accidentally restarting a stage that is alre
 2. **Look for unfinished work on another branch before trusting `main`.** A fresh clone lands
    on `main`, and the newest work usually is not there. Anything listed below is an unfinished
    stage, not an archive; archived branches are named `merged/*` and are already in `main`.
+   The one exception is `audit-anchors`: a permanent data branch, written by the scheduled
+   audit check, that never merges into `main`. Do not check it out or treat it as a stage.
 
    ```bash
    git fetch origin

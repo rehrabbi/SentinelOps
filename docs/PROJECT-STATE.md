@@ -13,7 +13,8 @@
 ## 1. How to resume on a new device
 
 1. Clone the repo and open the folder in VSCode. Run `git fetch origin` and
-   `git branch -r --no-merged main`: any branch it prints is unfinished work to check out first.
+   `git branch -r --no-merged main`: any branch it prints is unfinished work to check out first,
+   except `audit-anchors`, the permanent audit-anchor data branch, which never merges.
 2. Tell Claude: *"Read docs/WAYS-OF-WORKING.md and docs/PROJECT-STATE.md, then re-orient
    per the Session behavior section and continue."* (Re-paste the operating manual too if
    you have it — but WAYS-OF-WORKING.md captures all of it.)
