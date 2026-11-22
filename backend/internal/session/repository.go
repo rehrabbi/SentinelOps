@@ -79,3 +79,20 @@ func (r *Repository) DeleteByTokenHash(ctx context.Context, tokenHash string) er
 	}
 	return nil
 }
+
+// execer is satisfied by both *sql.DB and *sql.Tx.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// DeleteForUser ends every session of a user except the one whose token hash
+// is keepHash (pass "" to end them all), on q so it can share a transaction
+// with a password change. It returns how many sessions ended.
+func DeleteForUser(ctx context.Context, q execer, userID, keepHash string) (int64, error) {
+	res, err := q.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = $1 AND token_hash <> $2`, userID, keepHash)
+	if err != nil {
+		return 0, fmt.Errorf("end sessions: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}

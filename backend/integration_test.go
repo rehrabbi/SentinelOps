@@ -712,6 +712,8 @@ func TestPruneOnLogin(t *testing.T) {
 		"prune-pending":    `now() + interval '1 day', NULL`,                      // still usable: keep
 	} {
 		exec(`INSERT INTO invites (token_hash, email, expires_at, used_at) VALUES ($1, $2, `+state+`)`, hash, uniqueEmail(hash))
+		// Password resets follow the same rule, with the same four states.
+		exec(`INSERT INTO password_resets (token_hash, user_id, expires_at, used_at) VALUES ($1, $2, `+state+`)`, hash, u.ID)
 	}
 	count := func(query, arg string) int {
 		t.Helper()
@@ -732,6 +734,9 @@ func TestPruneOnLogin(t *testing.T) {
 	for hash, want := range map[string]int{"prune-used-8d": 0, "prune-expired-8d": 0, "prune-used-1d": 1, "prune-pending": 1} {
 		if n := count(`SELECT count(*) FROM invites WHERE token_hash = $1`, hash); n != want {
 			t.Errorf("invite %s: %d rows after pruning, want %d", hash, n, want)
+		}
+		if n := count(`SELECT count(*) FROM password_resets WHERE token_hash = $1`, hash); n != want {
+			t.Errorf("password reset %s: %d rows after pruning, want %d", hash, n, want)
 		}
 	}
 

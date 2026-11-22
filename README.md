@@ -41,10 +41,12 @@ alerts, and a runbook. Every release is described in the [changelog](CHANGELOG.m
 
 - Accounts by one-time invite only (no open sign-up), and login with server side sessions
   in an `HttpOnly` cookie
+- Password change and "log out everywhere" for every user, and one-time password reset links
+  that an admin issues, so a forgotten password does not lock anyone out
 - Role based access control across three roles, reporter, analyst, and admin, with an
   admin only user directory and an admin screen for changing roles
-- An append-only, hash-chained audit log recording logins, failed logins, logouts,
-  and role changes, with a command that verifies the chain
+- An append-only, hash-chained audit log recording logins, failed logins, logouts, role
+  changes, invites, password changes and resets, with a command that verifies the chain
 - Incident create, list, read, and partial update, each one scoped by owner and role
 - A React dashboard with severity and status badges and inline status editing
 - Health and readiness endpoints, versioned SQL migrations, Postgres in Docker
@@ -121,13 +123,15 @@ the threat it answers.
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
 | Account enumeration and unwanted sign-ups | There is no open sign-up, so no endpoint answers "is this email registered?". Accounts come only from one-time invites that an admin issues: 24 hours, single use, stored only as a SHA-256 hash, and audited with the account they create | `internal/invite/` |
-| Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked, and accepting invites is limited to 5 per visitor per hour. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
+| Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked; wrong current passwords on a password change have the same limit, accepting invites is limited to 5 per visitor per hour, and using reset links to 10. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
+| A stolen session or password outliving its discovery | Changing a password ends every other session of that user, a reset ends all of them, and "log out everywhere" ends them on demand; a password change needs the current password, so a stolen session alone cannot lock the owner out | `internal/account/` |
+| A forgotten password becoming a permanent lockout | An admin issues a one-time reset link for any other account: 1 hour, single use, stored only as a SHA-256 hash, the newest one replacing any earlier, and audited when issued and when used. Nobody can reset their own account this way, so a stolen admin session cannot take over its own account's password without the current one | `internal/account/` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
 | Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
 | An outage nobody notices | UptimeRobot checks the site and `/api/healthz` through the proxy every 5 minutes and emails the owner when either fails; the proxied check covers Cloudflare, the proxy, the shared secret, Render and the API in one request, and never touches the database | UptimeRobot (outside the repository), `server.go` |
 | An incident nobody can reconstruct | Every API request leaves one JSON log line with a request ID (returned as `X-Request-ID`), status, duration, visitor key and user ID, and never cookies, headers, query strings or bodies; a test proves passwords, tokens and secrets stay out | `internal/reqlog/` |
 | Losing the database, or a backup that cannot be read or trusted | A nightly `pg_dump` through a read-only role, encrypted with `age` inside the CI runner before it is stored, so GitHub only ever holds ciphertext; the private key never leaves the owner. A restore drill restores a backup into a throwaway database and checks it against the audit anchors, proving it is complete and unaltered | `.github/workflows/backup.yml`, `infra/restore-drill.sh` |
-| Personal data kept longer than needed | Expired sessions are deleted, and invites a week after they are used or expire, on the first successful login each hour; the audit log keeps the permanent record | `internal/prune/` |
+| Personal data kept longer than needed | Expired sessions are deleted, and invites and password resets a week after they are used or expire, on the first successful login each hour; the audit log keeps the permanent record | `internal/prune/` |
 | CSRF | `SameSite=Lax` on the session cookie, kept first-party in production by serving the API through the frontend's own address | `internal/auth/handler.go`, `frontend/functions/api/` |
 | Bypassing the proxy | The API answers only requests carrying the secret the proxy adds, compared in constant time; Terraform generates it, so no person handles it | `main.go`, `infra/api.tf` |
 | Spoofed visitor address | The forwarded address is trusted only on requests that passed the secret check, and parsed before it reaches the audit log; the proxy overwrites any value the browser sent | `internal/audit/audit.go`, `frontend/functions/api/` |
@@ -159,6 +163,9 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
   are transactional. A failed audit write is logged but does not fail the login.
 - The free API sleeps after 15 idle minutes, and the first request after that gets Render's
   502 page for up to a minute while it wakes.
+- There is no email, so an admin hands reset links over by hand. If the only admin forgets
+  their password, nobody can issue them a link; that needs a second admin or direct database
+  access.
 - Render's Terraform provider cannot update free-plan services, so new API images are
   deployed with `infra/deploy-api.sh` until an upstream fix ships.
 
@@ -264,7 +271,11 @@ Per device setup notes, including the macOS and Colima path, live in
 | `PATCH` | `/api/users/{id}` | cookie, admin only | Change a user's role, never your own |
 | `POST` | `/api/sessions` | none | Log in, sets the session cookie |
 | `DELETE` | `/api/sessions/current` | cookie | Log out, idempotent |
+| `DELETE` | `/api/sessions` | cookie | Log out everywhere: end every session of the caller |
 | `GET` | `/api/me` | cookie | The authenticated user |
+| `PUT` | `/api/me/password` | cookie | Change your password; needs the current one, ends your other sessions |
+| `POST` | `/api/users/{id}/password-reset` | cookie, admin only | Issue a one-time reset link for another user; returns its token once |
+| `POST` | `/api/password-resets/accept` | the reset token | Set a new password; ends every session of that account |
 | `POST` | `/api/incidents` | cookie | Create, owner is the caller and status starts `open` |
 | `GET` | `/api/incidents` | cookie | List, scoped by role |
 | `GET` | `/api/incidents/{id}` | cookie | Read one, scoped by owner and role |
@@ -356,11 +367,13 @@ account enumeration, and pruning of expired sessions and spent invites.
 against the audit anchors, one structured log line per request, uptime alerts through the proxy, and
 a runbook with its rotation procedure exercised.
 
-Next up, each stage ending in a minor release.
+**In progress: the hardening review before 1.0.0.** Password change, "log out everywhere" and
+admin-issued reset links are built; still to come are seamless `PROXY_SECRET` rotation, a scheduled
+passive scan of the live site, and operational hygiene.
 
-1. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
-   between
-2. A hardening review before **1.0.0**
+Deferred: `dev`, `staging`, and `prod` environments. Every free Render service shares 750
+instance-hours a month and production already uses about 744, so a hosted staging environment would
+put production at risk.
 
 **1.0.0** is the first hardened production deployment.
 

@@ -20,12 +20,16 @@ import (
 // new kind of event is a new constant here plus new detail keys, never a
 // migration.
 const (
-	ActionLogin          = "user.login"
-	ActionLoginFailed    = "user.login_failed"
-	ActionLogout         = "user.logout"
-	ActionRoleChanged    = "user.role_changed"
-	ActionInvited        = "user.invited"
-	ActionInviteAccepted = "user.invite_accepted"
+	ActionLogin                 = "user.login"
+	ActionLoginFailed           = "user.login_failed"
+	ActionLogout                = "user.logout"
+	ActionRoleChanged           = "user.role_changed"
+	ActionInvited               = "user.invited"
+	ActionInviteAccepted        = "user.invite_accepted"
+	ActionPasswordChanged       = "user.password_changed"
+	ActionLogoutAll             = "user.logout_all"
+	ActionPasswordResetIssued   = "user.password_reset_issued"
+	ActionPasswordResetComplete = "user.password_reset"
 )
 
 const (

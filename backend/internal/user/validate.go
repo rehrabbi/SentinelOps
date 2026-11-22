@@ -49,16 +49,8 @@ func (in CreateInput) Validate() error {
 		return err
 	}
 
-	// Password: length-based policy
-	// Minimum counts runes (so multi-byte characters aren't unfairly "worth
-	// more"); maximum counts bytes (bcrypt's hard 72-byte limit).
-	if utf8.RuneCountInString(in.Password) < minPasswordLen {
-		return fmt.Errorf("%w: password must be at least %d characters", ErrValidation,
-			minPasswordLen)
-	}
-	if len(in.Password) > maxPasswordLen {
-		return fmt.Errorf("%w: password must be at most %d bytes", ErrValidation,
-			maxPasswordLen)
+	if err := ValidatePassword(in.Password); err != nil {
+		return err
 	}
 
 	// Full name: present and bounded
@@ -106,4 +98,18 @@ func ValidationMessage(err error) string {
 // invites.role (migration 6), so a bad value is a clean 400, not a DB error.
 var ValidRoles = map[string]bool{
 	"reporter": true, "analyst": true, "admin": true,
+}
+
+// ValidatePassword applies the password policy: length only, following NIST
+// 800-63B. The minimum counts characters (runes), so multi-byte characters are
+// not unfairly "worth more"; the maximum counts bytes, bcrypt's hard limit.
+// Every place that sets a password uses it: invites, changes, and resets.
+func ValidatePassword(password string) error {
+	if utf8.RuneCountInString(password) < minPasswordLen {
+		return fmt.Errorf("%w: password must be at least %d characters", ErrValidation, minPasswordLen)
+	}
+	if len(password) > maxPasswordLen {
+		return fmt.Errorf("%w: password must be at most %d bytes", ErrValidation, maxPasswordLen)
+	}
+	return nil
 }

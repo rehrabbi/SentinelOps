@@ -2,10 +2,12 @@ import { Link } from "react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   createInvite,
+  createPasswordReset,
   getUsers,
   updateUserRole,
   ApiError,
   type IssuedInvite,
+  type IssuedReset,
   type Role,
   type User,
 } from "./api";
@@ -56,7 +58,7 @@ export function AdminPage({ currentUserId }: { currentUserId: string }) {
 
   return (
     <section className="admin">
-      <h2>User roles</h2>
+      <h2>Users</h2>
             <p className="admin-link">
         <Link to="/">Back to incidents</Link>
       </p>
@@ -90,6 +92,40 @@ function UserRow({
   const [choice, setChoice] = useState<Role>(user.role);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reset, setReset] = useState<
+    | { kind: "idle" }
+    | { kind: "issuing" }
+    | { kind: "issued"; reset: IssuedReset; copied: boolean }
+  >({ kind: "idle" });
+
+  // A reset link lets whoever holds it choose this person's password, so it is
+  // shown once, here, and handed over by the admin like an invite.
+  async function issueReset() {
+    setReset({ kind: "issuing" });
+    setError(null);
+    try {
+      const issued = await createPasswordReset(user.id);
+      setReset({ kind: "issued", reset: issued, copied: false });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create the reset link");
+      setReset({ kind: "idle" });
+    }
+  }
+
+  const resetLink =
+    reset.kind === "issued"
+      ? `${window.location.origin}/reset#${reset.reset.token}`
+      : "";
+
+  async function copyResetLink() {
+    if (reset.kind !== "issued") return;
+    try {
+      await navigator.clipboard.writeText(resetLink);
+      setReset({ ...reset, copied: true });
+    } catch {
+      // Clipboard access can be refused; the link stays visible to copy by hand.
+    }
+  }
 
   // Nothing to save until the draft differs from what the server told us.
   const dirty = choice !== user.role;
@@ -136,7 +172,28 @@ function UserRow({
         <button onClick={save} disabled={isSelf || !dirty || saving}>
           {saving ? "Saving…" : "Save"}
         </button>
+        {!isSelf && (
+          <button onClick={issueReset} disabled={reset.kind === "issuing"}>
+            {reset.kind === "issuing" ? "Creating…" : "Reset password"}
+          </button>
+        )}
       </div>
+      {reset.kind === "issued" && (
+        <div className="invite-issued user-reset">
+          <p>
+            Password reset link for <strong>{reset.reset.email}</strong>, valid
+            until {new Date(reset.reset.expiresAt).toLocaleString()}. Send it only
+            to them; it is shown once, works once, and replaces any earlier link.
+            Using it logs them out everywhere.
+          </p>
+          <div className="invite-link">
+            <input type="text" readOnly value={resetLink} aria-label="Password reset link" />
+            <button type="button" onClick={copyResetLink}>
+              {reset.copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
     </li>
   );
 }

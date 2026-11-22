@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"sentinelops/internal/account"
 	"sentinelops/internal/audit"
 	"sentinelops/internal/auth"
 	"sentinelops/internal/incident"
@@ -84,7 +85,7 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// an account of their own between guesses.
 	//
 	// A successful login also triggers the cleanup of expired sessions and
-	// spent invites, at most once an hour (see internal/prune).
+	// spent invites and password resets, at most once an hour (see internal/prune).
 	loginLimit := ratelimit.New(10, 15*time.Minute)
 	pruner := prune.New(db, time.Hour)
 	mux.Handle("POST /api/sessions", loginLimit.Wrap(pruner.AfterLogin(http.HandlerFunc(authHandler.Login)), visitorKey,
@@ -114,6 +115,27 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// Logout: destroy the current session and clear the cookie. Public and
 	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth.
 	mux.HandleFunc("DELETE /api/sessions/current", authHandler.Logout)
+
+	// Account security (see internal/account). Changing a password needs the
+	// current one, so it is limited like login: 10 wrong current passwords
+	// (403) per visitor in 15 minutes, on a limiter of its own. Logging out
+	// everywhere ends every session of the caller, this one included.
+	accountHandler := account.NewHandler(account.NewService(db, userRepo, auditRepo), cfg.SecureCookies)
+	changeLimit := ratelimit.New(10, 15*time.Minute)
+	mux.Handle("PUT /api/me/password", changeLimit.Wrap(
+		authHandler.RequireAuth(http.HandlerFunc(accountHandler.ChangePassword)), visitorKey,
+		func(status int) bool { return status == http.StatusForbidden }))
+	mux.Handle("DELETE /api/sessions", authHandler.RequireAuth(http.HandlerFunc(accountHandler.LogoutEverywhere)))
+
+	// An admin issues a one-time reset link for any other account, admins
+	// included; using it is public, because its owner cannot log in. Using
+	// one is limited per visitor to 10 an hour, counting successes (204) and
+	// unusable tokens (404); a too-short password (400) does not count.
+	mux.Handle("POST /api/users/{id}/password-reset",
+		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(accountHandler.IssueReset))))
+	resetLimit := ratelimit.New(10, time.Hour)
+	mux.Handle("POST /api/password-resets/accept", resetLimit.Wrap(http.HandlerFunc(accountHandler.AcceptReset), visitorKey,
+		func(status int) bool { return status == http.StatusNoContent || status == http.StatusNotFound }))
 
 	// Incidents feature: create + list, BOTH behind RequireAuth. The handler
 	// reads the authenticated user from the request context (for ownership on

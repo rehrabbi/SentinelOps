@@ -4,6 +4,7 @@ import { acceptInvite, getMe, login, logout, ApiError, type User } from "./api";
 import { IncidentDashboard } from "./incidents";
 import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
 import { AdminPage } from "./admin";
+import { AccountPage, ResetPassword } from "./account";
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
 // still asking the server (GET /api/me) whether a session exists.
@@ -15,13 +16,17 @@ type AuthState =
 function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
 
-  useEffect(() => {
+  // Ask the server who is logged in. Runs on load, and again after anything
+  // that may have ended this browser's session from elsewhere.
+  function refreshSession() {
     getMe()
       .then((user) =>
         setAuth(user ? { kind: "authenticated", user } : { kind: "anonymous" })
       )
       .catch(() => setAuth({ kind: "anonymous" }));
-  }, []);
+  }
+
+  useEffect(refreshSession, []);
 
   if (auth.kind === "loading") {
     return (
@@ -61,6 +66,25 @@ function App() {
               <AcceptInvite onLoggedIn={onLoggedIn} />
             )
           }
+        />
+        <Route
+          path="/account"
+          element={
+            auth.kind === "authenticated" ? (
+              <AccountPage
+                user={auth.user}
+                onLoggedOut={() => setAuth({ kind: "anonymous" })}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        {/* Open whether or not someone is logged in: an admin may follow a
+            link in a browser that holds their own session. */}
+        <Route
+          path="/reset"
+          element={<ResetPassword onSessionChanged={refreshSession} />}
         />
         <Route
           path="/admin"
@@ -248,11 +272,15 @@ function LoggedIn({ user, onLogout }: { user: User; onLogout: () => void }) {
         <button onClick={handleLogout} disabled={busy}>
           {busy ? "Logging out…" : "Log out"}
         </button>
-                {user.role === "admin" && (
-          <p className="admin-link">
-            <Link to="/admin">Manage user roles</Link>
-          </p>
-        )}
+        <p className="admin-link">
+          <Link to="/account">Account security</Link>
+          {user.role === "admin" && (
+            <>
+              {" · "}
+              <Link to="/admin">Manage users</Link>
+            </>
+          )}
+        </p>
       </section>
       <IncidentDashboard />
     </>

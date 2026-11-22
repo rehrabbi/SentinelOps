@@ -5,8 +5,8 @@
 > has the blow-by-blow history.
 >
 > **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.6.0, observe and recover**, live at
-> https://sentinelops.pages.dev, with all nine checks required. Next: plan the next stage. Full
-> detail in §6.
+> https://sentinelops.pages.dev, with all nine checks required. In progress: **Hardening review**
+> (1.0.0, issue #63, milestone #6). Full detail in §6.
 
 ---
 
@@ -279,14 +279,48 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ NEXT STEP: plan the next stage
+### ⏭️ IN PROGRESS: Hardening review (1.0.0, issue #63, milestone #6)
 
-v0.6.0 was released on 2026-11-22, closing issue #54 and milestone #5. The next stage starts the
-standard way: a milestone, an issue, and the decisions briefed to the owner first. Candidates, in the
-README roadmap's order:
-1. **Environments** (`dev`, `staging`, `prod`), within the free plans' project and service limits.
-2. **A hardening review before 1.0.0**: everything in `docs/learning-log.md`'s open questions,
-   including an exercised `PROXY_SECRET` rotation and a second, independent backup copy.
+Chosen 2026-11-22 over separate environments, which are deferred: every free Render service shares 750
+instance-hours a month, production already uses about 744 (uptime checks keep it awake), and running
+out would suspend production too. In scope, in order: password change and resets, seamless
+`PROXY_SECRET` rotation, a scheduled passive ZAP scan of the live site, operational hygiene (Render
+hours warning, `actions/checkout` off Node 20, keeping scheduled jobs alive, a second backup copy), then
+the 1.0.0 review and release.
+
+**Step 1, password change, log out everywhere, admin resets (decided 2026-11-22):**
+`backend/internal/account`, routes in `server.go`, migration 7 (`password_resets`).
+- `PUT /api/me/password` needs the current password (wrong → 403, audited as a failure, limited to 10 per
+  visitor in 15 minutes on its own limiter), applies the sign-up rules, refuses the same password, and in
+  one transaction sets the hash, ends every **other** session of the user (the current one stays), and
+  writes `user.password_changed`.
+- `DELETE /api/sessions` ends every session including the current one, clears the cookie, and writes
+  `user.logout_all` with the count.
+- `POST /api/users/{id}/password-reset` (admin only) works for **any other account, admins included**,
+  never your own (403). Token as for invites (256-bit, SHA-256 stored, `no-store`, after `#`), **1 hour**,
+  and issuing one deletes the account's earlier unused resets. Audited as `user.password_reset_issued`.
+- `POST /api/password-resets/accept` is public, limited to 10 per visitor per hour (counting 204 and
+  404); the password is checked before the token is touched, so a rule-breaking password leaves the link
+  usable. The atomic claim, the new hash, ending **all** sessions and `user.password_reset` share one
+  transaction.
+- Frontend: an **Account security** page (`/account`), a **Reset password** button per user on the
+  admin screen (now titled Users) that shows the link once, and `/reset#<token>`, open whether or not
+  someone is logged in.
+- Pruning deletes resets a week after use or expiry, like invites.
+- Tests: six new integration tests and the extended prune test; 16 deliberate regressions, all caught
+  (one first slipped through and exposed a flawed test, fixed before merging); race detector clean.
+- **Browser check passed locally (2026-11-22)**, with throwaway `uicheck-*@example.test` accounts: wrong
+  current password shown and the session kept; change, then log out everywhere; an admin issues a link
+  (none on their own row), opens it in the same browser, the token leaves the address bar, the reset
+  works and the admin stays logged in; only the newest password logs in; every step is in the audit
+  log with its session count; the Users screen holds the link at phone width. It found one real bug:
+  the CORS preflight did not list `PUT` (fixed, with a test). Local-only snag: a leftover test API on
+  port 8080 (IPv6) answered instead of the container until it was stopped.
+- Known gap, written into the README: with no email, if the only admin forgets their password nobody can
+  issue them a link.
+
+**⏭️ Next:** merge, then deploy on the owner's request: `infra/migrate.sh` (migration 7) before
+the new API image, as with invites. Then brief step 2, seamless `PROXY_SECRET` rotation.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.

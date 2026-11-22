@@ -236,17 +236,31 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Always overwrite the cookie with an expired one so the browser drops it.
-	// Name and Path must match the login cookie or the browser won't replace it.
+	ExpireCookie(w, h.secureCookies)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ExpireCookie overwrites the session cookie with an expired one so the
+// browser drops it. Name and Path must match the login cookie or the browser
+// won't replace it. Used by logout and by "log out everywhere".
+func ExpireCookie(w http.ResponseWriter, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   h.secureCookies,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1, // negative MaxAge tells the browser to delete it immediately
 	})
+}
 
-	w.WriteHeader(http.StatusNoContent)
+// CurrentTokenHash returns the hash of the session token the request carries,
+// so a password change can keep that one session while ending the others.
+func CurrentTokenHash(r *http.Request) (string, bool) {
+	c, err := r.Cookie(cookieName)
+	if err != nil || c.Value == "" {
+		return "", false
+	}
+	return session.HashToken(c.Value), true
 }
