@@ -307,9 +307,8 @@ GHCR, Singapore) and **Neon free** (Postgres 17, Singapore), all declared in Ter
 - **Frontend deploys:** `.github/workflows/deploy-frontend.yml` builds with `VITE_API_URL=""` and
   uploads with `wrangler` (exact-pinned dev dependency) on pushes to `main` touching `frontend/`.
   Its Cloudflare token lives in the GitHub **Environment `production`**, limited to `main`.
-- **Owner runs plan/apply**; Claude never applies. One owner-requested exception on 2026-11-22: Claude ran
-  `migrate.sh` and an apply of a reviewed saved plan (which hit the provider bug above), then
-  `deploy-api.sh`. The rule itself is unchanged.
+- **The owner runs plan/apply** and the production scripts (`migrate.sh`, `deploy-api.sh`), or
+  explicitly asks for them to be run on their behalf, case by case.
 
 **First bring-up order** (steps 1–5 done 2026-11-21; `plan` reports no changes):
 1. ✅ `infra/terraform.sh apply -target=neon_project.app`: creates only the database
