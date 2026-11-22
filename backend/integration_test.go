@@ -494,3 +494,67 @@ func TestProxySecret(t *testing.T) {
 		t.Errorf("spoofed X-Client-IP was trusted: recorded %q", ip)
 	}
 }
+
+func TestLoginRateLimit(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	_, u := signUp(t, srv, "limited", "")
+	c := newClient(t, srv)
+	wrong := map[string]string{"email": u.Email, "password": "wrong-password-123"}
+	right := map[string]string{"email": u.Email, "password": testPassword}
+
+	// Correct logins never use up the limit.
+	for i := 0; i < 12; i++ {
+		c.expect(http.StatusOK, "POST", "/api/sessions", right)
+	}
+	for i := 0; i < 10; i++ {
+		c.expect(http.StatusUnauthorized, "POST", "/api/sessions", wrong)
+	}
+	text := c.expect(http.StatusTooManyRequests, "POST", "/api/sessions", wrong)
+	if retry := c.last.Header.Get("Retry-After"); retry == "" || retry == "0" {
+		t.Errorf("429 without a usable Retry-After (%q): %s", retry, text)
+	}
+	// Refused before any password is checked: the right password is refused too.
+	c.expect(http.StatusTooManyRequests, "POST", "/api/sessions", right)
+
+	// A header the visitor controls does not buy a fresh count: without the
+	// proxy secret configured, X-Client-IP is ignored.
+	c.header.Set("X-Client-IP", "198.51.100.23")
+	c.expect(http.StatusTooManyRequests, "POST", "/api/sessions", wrong)
+}
+
+func TestLoginRateLimitIsPerProxiedVisitor(t *testing.T) {
+	const secret = "test-proxy-secret-local-only"
+	srv := newServer(t, serverConfig{ProxySecret: secret})
+	ghost := map[string]string{"email": uniqueEmail("nobody"), "password": testPassword}
+
+	attacker := newClient(t, srv)
+	attacker.header.Set("X-Proxy-Secret", secret)
+	attacker.header.Set("X-Client-IP", "203.0.113.50")
+	for i := 0; i < 10; i++ {
+		attacker.expect(http.StatusUnauthorized, "POST", "/api/sessions", ghost)
+	}
+	attacker.expect(http.StatusTooManyRequests, "POST", "/api/sessions", ghost)
+
+	// Behind the proxy, each visitor has their own count: everyone else
+	// reaching the API through the same proxy is unaffected.
+	bystander := newClient(t, srv)
+	bystander.header.Set("X-Proxy-Secret", secret)
+	bystander.header.Set("X-Client-IP", "203.0.113.51")
+	bystander.expect(http.StatusUnauthorized, "POST", "/api/sessions", ghost)
+}
+
+func TestRegistrationRateLimit(t *testing.T) {
+	c := newClient(t, newServer(t, serverConfig{}))
+	// Validation errors do not count...
+	for i := 0; i < 8; i++ {
+		c.expect(http.StatusBadRequest, "POST", "/api/users",
+			map[string]string{"fullName": "X", "email": "not-an-email", "password": testPassword})
+	}
+	// ...accounts created do, five per hour per visitor.
+	for i := 0; i < 5; i++ {
+		c.expect(http.StatusCreated, "POST", "/api/users",
+			map[string]string{"fullName": "Bulk", "email": uniqueEmail("bulk"), "password": testPassword})
+	}
+	c.expect(http.StatusTooManyRequests, "POST", "/api/users",
+		map[string]string{"fullName": "Bulk", "email": uniqueEmail("bulk"), "password": testPassword})
+}

@@ -3,10 +3,12 @@ package main
 import (
 	"database/sql"
 	"net/http"
+	"time"
 
 	"sentinelops/internal/audit"
 	"sentinelops/internal/auth"
 	"sentinelops/internal/incident"
+	"sentinelops/internal/ratelimit"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
@@ -45,14 +47,25 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	userHandler := user.NewHandler(userRepo, db, auditRepo)
 	// GET /api/users is registered further down: it is admin-only, so it needs
 	// authHandler, which does not exist yet at this point.
-	mux.HandleFunc("POST /api/users", userHandler.Create)
+	// Registration is limited per visitor: at most 5 accounts created (or
+	// taken emails probed) per hour. Validation errors do not count.
+	signupLimit := ratelimit.New(5, time.Hour)
+	mux.Handle("POST /api/users", signupLimit.Wrap(http.HandlerFunc(userHandler.Create), visitorKey,
+		func(status int) bool { return status == http.StatusCreated || status == http.StatusConflict }))
 
 	// Auth feature: login reads a user AND writes a session, so it takes both
 	// repositories. This is why auth is its own package rather than living
 	// inside user or session.
 	sessionRepo := session.NewRepository(db)
 	authHandler := auth.NewHandler(userRepo, sessionRepo, auditRepo, cfg.SecureCookies)
-	mux.HandleFunc("POST /api/sessions", authHandler.Login)
+	// Login is limited per visitor: after 10 failed logins in 15 minutes every
+	// further attempt gets 429 before any password is checked. Only failures
+	// count, so a correct password never uses up the limit, and a success does
+	// not reset it, so an attacker cannot clear their count by logging in to
+	// an account of their own between guesses.
+	loginLimit := ratelimit.New(10, 15*time.Minute)
+	mux.Handle("POST /api/sessions", loginLimit.Wrap(http.HandlerFunc(authHandler.Login), visitorKey,
+		func(status int) bool { return status == http.StatusUnauthorized }))
 
 	// Protected route: GET /api/me returns the current user. RequireAuth wraps
 	// the Me handler, so an invalid/missing session is rejected with 401 before
@@ -90,4 +103,15 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// that origin) is allowed to read API responses, and wrap that in the
 	// proxy check, so nothing at all is answered without the proxy's secret.
 	return requireProxySecret(withCORS(mux, cfg.FrontendOrigin), cfg.ProxySecret)
+}
+
+// visitorKey identifies the visitor for rate limiting: the address the proxy
+// reported, trusted only behind the proxy secret, otherwise the connection's
+// own (see audit.ClientIP). Never a header the visitor controls.
+func visitorKey(r *http.Request) string {
+	ip := audit.ClientIP(r)
+	if ip == nil {
+		return "unknown"
+	}
+	return ratelimit.Key(*ip)
 }
