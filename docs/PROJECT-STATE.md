@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.5.0, harden the live app**, live at
-> https://sentinelops.pages.dev, with all nine checks required. In progress: **Observe and recover**
-> (v0.6.0, issue #54). Full detail in §6.
+> **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.6.0, observe and recover**, live at
+> https://sentinelops.pages.dev, with all nine checks required. Next: plan the next stage. Full
+> detail in §6.
 
 ---
 
@@ -279,7 +279,19 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ IN PROGRESS: Observe and recover (v0.6.0, issue #54, milestone #5)
+### ⏭️ NEXT STEP: plan the next stage
+
+v0.6.0 was released on 2026-11-22, closing issue #54 and milestone #5. The next stage starts the
+standard way: a milestone, an issue, and the decisions briefed to the owner first. Candidates, in the
+README roadmap's order:
+1. **Environments** (`dev`, `staging`, `prod`), within the free plans' project and service limits.
+2. **A hardening review before 1.0.0**: everything in `docs/learning-log.md`'s open questions,
+   including an exercised `PROXY_SECRET` rotation and a second, independent backup copy.
+
+Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
+alert.
+
+### ✅ Observe and recover (released as v0.6.0, issue #54, milestone #5)
 
 Chosen 2026-11-22 over separate environments: nobody would notice an outage, and nothing beyond
 Neon's 6-hour window protected the data. In scope, in order: encrypted backups with a restore drill,
@@ -342,7 +354,7 @@ passwords rotated, then Audit verify and Backup passed with the new ones. `PROXY
 accepts about a minute of 403s and is written down but **not yet exercised**; its order avoids a trap
 (targeting the Pages project would also try to update Render, which fails).
 
-**⏭️ Next:** close the stage: the stage's learning-log entry, then prepare **v0.6.0**.
+Released as **v0.6.0** on 2026-11-22.
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner

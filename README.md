@@ -32,9 +32,10 @@ infrastructure as code, and cloud architecture.
 It is built incrementally, and the git history is meant to read as an engineering story,
 one concern per branch and one concern per pull request.
 
-**Status:** the current release is [v0.5.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.5.0),
-which hardens the deployment **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)**: login
-rate limiting, invite-only accounts, data pruning, and integration tests on every pull request. Every release is described in the [changelog](CHANGELOG.md).
+**Status:** the current release is [v0.6.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.6.0),
+which makes the deployment **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)** observable
+and recoverable: encrypted nightly backups with a restore drill, structured request logs, uptime
+alerts, and a runbook. Every release is described in the [changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -351,11 +352,15 @@ free plan now ends after six months and may require a card.
 request, login rate limiting keyed on the proxy-verified visitor, invite-only accounts that close
 account enumeration, and pruning of expired sessions and spent invites.
 
+**v0.6.0, released.** Observe and recover: encrypted nightly backups with a restore drill checked
+against the audit anchors, one structured log line per request, uptime alerts through the proxy, and
+a runbook with its rotation procedure exercised.
+
 Next up, each stage ending in a minor release.
 
-1. Observability, alerting, and backups for the deployed stack
-2. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
+1. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
    between
+2. A hardening review before **1.0.0**
 
 **1.0.0** is the first hardened production deployment.
 

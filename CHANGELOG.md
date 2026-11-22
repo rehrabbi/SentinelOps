@@ -10,6 +10,14 @@ first hardened production deployment.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-22
+
+Observe and recover: production now announces its failures and can be recovered. The database is
+backed up nightly, encrypted before it leaves the CI runner, and a restore drill proves each backup
+restores and matches the audit anchors; every API request leaves one structured log line; uptime
+monitoring emails the owner within minutes of an outage; and a runbook covers each failure, with its
+rotation procedure exercised.
+
 ### Added
 
 - Nightly backups of the production database, kept for 90 days as workflow artifacts. Each is
@@ -263,7 +271,8 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.2.0...v0.3.0
