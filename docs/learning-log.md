@@ -1304,9 +1304,7 @@ image in #40, and the required Terraform check in #42; released as v0.4.0 on 202
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
-- Account enumeration: decide whether to close BOTH channels (login timing + registration's
-  409) or accept both. Currently inconsistent — the subtle one is defended, the obvious one
-  is not.
+- ~~Account enumeration~~: closed in v0.5.0 by removing open sign-up; accounts come from invites.
 - Expired `sessions` rows are never cleaned up. Decide on a strategy (periodic delete job vs
   cleanup on write) before this reaches production.
 - Render's Terraform provider cannot update free-plan services (render-oss/terraform-provider-render#80).

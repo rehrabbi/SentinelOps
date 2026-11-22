@@ -38,7 +38,8 @@ provisioned with Terraform. Every release is described in the [changelog](CHANGE
 
 **What works today**
 
-- Registration and login with server side sessions in an `HttpOnly` cookie
+- Accounts by one-time invite only (no open sign-up), and login with server side sessions
+  in an `HttpOnly` cookie
 - Role based access control across three roles, reporter, analyst, and admin, with an
   admin only user directory and an admin screen for changing roles
 - An append-only, hash-chained audit log recording logins, failed logins, logouts,
@@ -118,7 +119,8 @@ the threat it answers.
 | An unrecorded privileged action | A role change and its audit entry share one transaction, so if the entry cannot be written the change is rolled back | `internal/user/handler.go` |
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
-| Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked, and registration allows 5 accounts per visitor per hour. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
+| Account enumeration and unwanted sign-ups | There is no open sign-up, so no endpoint answers "is this email registered?". Accounts come only from one-time invites that an admin issues: 24 hours, single use, stored only as a SHA-256 hash, and audited with the account they create | `internal/invite/` |
+| Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked, and accepting invites is limited to 5 per visitor per hour. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
 | Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
 | CSRF | `SameSite=Lax` on the session cookie, kept first-party in production by serving the API through the frontend's own address | `internal/auth/handler.go`, `frontend/functions/api/` |
@@ -142,8 +144,6 @@ the threat it answers.
 
 Listed openly, because a portfolio that hides its weak spots is not worth much.
 
-- Registration returns `409` on a duplicate email, which leaks whether an account exists.
-  Login resists enumeration, so the two endpoints disagree.
 - Expired session rows are never pruned, so the table grows without bound.
 - The frontend has no automated tests. The API's behaviour, including its security
   controls, is covered by integration tests that run on every pull request.
@@ -201,16 +201,17 @@ cd frontend
 npm install && npm run dev    # UI on :5173
 ```
 
-Register a user at `http://localhost:5173`, then file an incident. The database lives in a
+There is no open sign-up: accounts come from one-time invites. The database lives in a
 local Docker volume and does not travel with the repository, so every machine starts
-empty. Promote yourself to analyst with
-`UPDATE users SET role='analyst' WHERE email='you@example.com';` to see every incident
-rather than only your own.
+empty, and the first admin's invite comes from the command line, which needs database
+access rather than an admin session:
 
-The first admin has to be created the same way, with
-`UPDATE users SET role='admin' WHERE email='you@example.com';`. Nothing in the
-application can do it, because the admin screen is itself admin only. That is deliberate,
-and it holds in production too.
+```bash
+cd backend && go run . invite --email you@example.com --role admin --site http://localhost:5173
+```
+
+Open the printed link, choose your name and password, and you are in as an admin. From the
+admin screen you can invite anyone else, as a reporter, analyst, or admin.
 
 Three optional variables all have working local defaults. `FRONTEND_ORIGIN` defaults to
 `http://localhost:5173`, and `SECURE_COOKIES` defaults to `false`, which must become
@@ -252,7 +253,8 @@ Per device setup notes, including the macOS and Colima path, live in
 |---|---|---|---|
 | `GET` | `/healthz` | none | Liveness |
 | `GET` | `/readyz` | none | Readiness, including a database ping |
-| `POST` | `/api/users` | none | Register, returns `201` |
+| `POST` | `/api/invites` | cookie, admin only | Issue a one-time invite; returns its token once |
+| `POST` | `/api/invites/accept` | the invite token | Create the invited account, returns `201` |
 | `GET` | `/api/users` | cookie, admin only | List users |
 | `PATCH` | `/api/users/{id}` | cookie, admin only | Change a user's role, never your own |
 | `POST` | `/api/sessions` | none | Log in, sets the session cookie |
@@ -340,7 +342,7 @@ free plan now ends after six months and may require a card.
 Next up, each stage ending in a minor release.
 
 1. Observability, alerting, and backups for the deployed stack
-2. The known gaps above: rate limiting, session pruning, registration enumeration, and a real
+2. The known gaps above: rate limiting, session pruning, account enumeration, and a real
    test suite
 3. `dev`, `staging`, and `prod` environments once there is more than one deployment to promote
    between
