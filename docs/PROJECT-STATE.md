@@ -335,14 +335,16 @@ records the visitor's real address; the session cookie is first-party and invisi
 `verify-audit` with the deployed image reports the chain intact (4 entries). The first request after
 15 idle minutes can return Render's 502 "currently unavailable" page while the free API wakes.
 
-**Step 7, audit anchor (in progress, branch `feat/audit-anchor`):** decided 2026-11-21: anchors on a
+**Step 7, audit anchor (code merged in #39, provisioned 2026-11-21):** anchors on a
 protected `audit-anchors` branch (one line `<UTC time> <id>:<hash>` per run, force-push and deletion
 blocked by a ruleset), checked every 6 hours by `.github/workflows/audit-verify.yml` with the deployed
 image, connecting as `audit_verifier` (read-only on `audit_log`, created once with
 `infra/sql/audit-verifier.sql`) whose URL is the secret `AUDIT_DATABASE_URL` in a GitHub environment
-`audit` limited to `main`. To provision: create the role, the environment and secret, the branch with
-a header-only `anchors.log`, and the ruleset; then run the workflow once by hand. A new API image must
-be published and pinned before the scheduled run can use `--anchor`. Afterwards: make `Infrastructure (Terraform)` a required check, refresh the README
+`audit` limited to `main`. Provisioned: the role (verified read-only), the environment and secret, the
+branch with a header-only `anchors.log`, and the ruleset "Protect audit anchors" (deletion and
+force-push blocked, no bypass). Remaining: deploy the image `sha-5014901…`, the first with
+`--anchor`, with `migrate.sh` then `apply`; then run **Audit verify** by hand to record the first
+anchor. Until then scheduled runs fail on purpose with "could not read the chain head". Afterwards: make `Infrastructure (Terraform)` a required check, refresh the README
 roadmap, release v0.4.0.
 
 ### ✅ CI hardening (released as v0.3.0, issue #24, milestone #2)
