@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-21 · **Current release:** ✅ **v0.3.0, CI hardening** (issue #24, PRs
-> #25–#28). Security scanning runs on every PR, on `main`, and weekly, with all eight checks
-> required. Next: plan the **AWS deployment** stage (v0.4.0), free tier first. Full detail in §6.
+> **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.3.0, CI hardening**. In progress:
+> **free cloud deployment** (v0.4.0, issue #30), live at https://sentinelops.pages.dev, with all
+> nine checks required. Next: release **v0.4.0**. Full detail in §6.
 
 ---
 
@@ -130,8 +130,9 @@ merge commit uses the **PR title and description** as its message, so PR write-u
 `git log`. **Auto-merge** was enabled on 2026-11-21 (owner-approved settings change): PRs are
 set to merge themselves once all required checks pass, and branches are archived afterwards. Merge commits were chosen because they keep commit hashes valid on `main`, which the
 docs cite. The PR template gained a linked issue, type of change, risk and rollback, and
-screenshots. **Eight jobs are required checks** on `main` (the two `ci.yml` jobs, plus the six
-`security.yml` jobs added in CI hardening, approved 2026-11-21), reported by GitHub Actions only
+screenshots. **Nine jobs are required checks** on `main` (the two `ci.yml` jobs, plus the six
+`security.yml` jobs added in CI hardening, approved 2026-11-21, plus `Infrastructure (Terraform)`
+from `ci.yml`, approved 2026-11-22), reported by GitHub Actions only
 (app id 15368) and with branches required to be up to date before merging; the rule lives in the
 classic branch protection alongside the existing PR, admin, and conversation rules.
 Routine commits, pushes, PRs, and merges on green CI are **pre-approved** (see WAYS-OF-WORKING
@@ -352,9 +353,10 @@ force-push blocked, no bypass). The anchor-capable image `sha-5014901…` was de
 with `deploy-api.sh` (#40); **Audit verify** recorded the first anchor (`4:6b9c9f7f…`, commit
 `0a39675` on `audit-anchors`) and a second run confirmed it holds. **Step 7 is done.**
 
-**⏭️ Next:** make `Infrastructure (Terraform)` a required check on `main` (branch protection change,
-needs the owner's approval), then prepare **v0.4.0** (release confirmed by the owner before tagging)
-and close milestone #3.
+`Infrastructure (Terraform)` became the ninth required check on `main` on 2026-11-22 (owner-approved
+branch protection change; every other protection setting unchanged).
+
+**⏭️ Next:** prepare **v0.4.0** (release confirmed by the owner before tagging) and close milestone #3.
 
 ### ✅ CI hardening (released as v0.3.0, issue #24, milestone #2)
 

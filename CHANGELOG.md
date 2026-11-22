@@ -62,6 +62,8 @@ first hardened production deployment.
 - The audit chain head is anchored outside the database, so a chain rebuilt by someone with
   database access is detected. The scheduled check connects as `audit_verifier`, a role that
   can only read `audit_log`.
+- Terraform formatting and validation is now a required check on `main`, alongside the build,
+  lint and scanning jobs, so a broken infrastructure change cannot merge.
 
 ## [0.3.0] - 2026-11-21
 
