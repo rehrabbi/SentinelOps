@@ -296,6 +296,16 @@ unreadable. `infra/restore-drill.sh` restores the newest backup into a throwaway
 after loading data, so the stored hashes are untouched. Rejected: a private repository (grows forever),
 Cloudflare R2 (an extra credential, card requirement unconfirmed).
 
+Provisioned 2026-11-22 (owner-approved): `backup_reader` (SELECT on all six tables only), environment
+`backup` (main only) with `BACKUP_DATABASE_URL`. The key pair was generated into
+`~/.sentinelops/backup-key.txt` on the second Windows machine; the owner keeps the file in their
+password manager. **First backup** `sentinelops-db-20261122T1032Z` (17,546 bytes, kept to 2027-02-20);
+**first real restore drill passed**: schema 6, 1 user, 1 incident, 4 audit entries, anchor `4:6b9c…`
+holds. The drill first failed on Windows (host paths not converted for `gh`/`docker cp`), fixed in
+the same PR as this note.
+
+**⏭️ Next:** step 2, structured request logs: brief the decisions before writing anything.
+
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
 items listed under the free cloud deployment below; observe a live login 429 once, deliberately.
