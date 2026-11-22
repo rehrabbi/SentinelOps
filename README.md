@@ -123,6 +123,7 @@ the threat it answers.
 | Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked, and accepting invites is limited to 5 per visitor per hour. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
 | Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
+| Losing the database, or a backup that cannot be read or trusted | A nightly `pg_dump` through a read-only role, encrypted with `age` inside the CI runner before it is stored, so GitHub only ever holds ciphertext; the private key never leaves the owner. A restore drill restores a backup into a throwaway database and checks it against the audit anchors, proving it is complete and unaltered | `.github/workflows/backup.yml`, `infra/restore-drill.sh` |
 | Personal data kept longer than needed | Expired sessions are deleted, and invites a week after they are used or expire, on the first successful login each hour; the audit log keeps the permanent record | `internal/prune/` |
 | CSRF | `SameSite=Lax` on the session cookie, kept first-party in production by serving the API through the frontend's own address | `internal/auth/handler.go`, `frontend/functions/api/` |
 | Bypassing the proxy | The API answers only requests carrying the secret the proxy adds, compared in constant time; Terraform generates it, so no person handles it | `main.go`, `infra/api.tf` |
@@ -289,9 +290,11 @@ SentinelOps/
 │  └─ src/                           React app, api.ts is the typed API client
 ├─ docs/                             working agreement, project state, learning log
 ├─ infra/                            Terraform for Neon, Render and Pages; terraform.sh,
-│                                    migrate.sh, deploy-api.sh; the pinned API image tag
+│                                    migrate.sh, deploy-api.sh, restore-drill.sh; the pinned
+│                                    API image tag and the backups' public key
 ├─ .github/workflows/                CI and security scans on every pull request; publish,
-│                                    deploy frontend, and the 6-hourly audit verification
+│                                    deploy frontend, nightly encrypted backups, and the
+│                                    6-hourly audit verification
 ├─ CHANGELOG.md                      every release, in Keep a Changelog format
 └─ compose.yaml                      Postgres by default; migrate, api, and web with --profile app
 ```
