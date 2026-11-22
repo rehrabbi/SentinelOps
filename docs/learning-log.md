@@ -1361,6 +1361,61 @@ output, which needs a refresh-only apply after deploying that way.
 
 ---
 
+## Stage: Observe and recover (issue #54, milestone #5, released as v0.6.0)
+
+**Decisions:** observability and recovery came before separate environments, because nobody would
+have noticed an outage and nothing beyond Neon's 6-hour window protected the data. In order:
+- encrypted nightly backups with a restore drill;
+- one structured log line per API request;
+- uptime alerts through the proxy;
+- a runbook, with its rotation procedure exercised.
+
+**What happened:** the first real restore drill failed, on a Windows path bug in the drill itself,
+fixed in #56. The rerun restored production's backup and matched the independently recorded audit
+anchor. A deliberate test outage emailed the owner. Both read-only database passwords were rotated
+live, and both jobs passed afterwards.
+
+**Concepts learned:**
+- **A backup nobody has restored is a hope.** The drill is part of the backup, not an extra: its first
+  run against a real backup found a bug that the local rehearsal had not exercised.
+- **Encrypt before the data leaves, with a key the storage never sees.** Dumps are piped straight into
+  `age` inside the runner, to a public key. GitHub, and anyone who can read this public repository's
+  artifacts, only ever holds ciphertext. The private key is the single point of recovery, so its custody
+  (the password manager) is part of the design.
+- **Authenticated encryption turns corruption into an error.** A truncated or altered backup fails to
+  decrypt instead of restoring silently wrong data.
+- **Prove a backup is the history you witnessed, not just that a file exists.** The drill checks the
+  restored audit chain against the newest anchor the backup should contain, which proves it complete
+  and unaltered. A full `pg_restore` creates triggers after loading data, so the stored hashes survive.
+- **One credential per job, and least privilege for each.** `backup_reader` reads every table;
+  `audit_verifier` reads one; neither can change anything, and default privileges keep future tables
+  in the backups.
+- **Logs are a security surface.** One JSON line per request, with a request ID returned to the caller,
+  but never cookies, headers, query strings or bodies. A test sends every secret through the real API
+  and checks none reaches the output. A client-sent request ID is never trusted, or one request's line
+  could pose as another's.
+- **Information known deeper in the stack can flow back out.** The logger sits outermost but needs the
+  verified visitor and the user; inner layers fill a slot the logger put in the request context.
+- **Monitor the path users take, and watch what monitoring costs.** One check through the site covers
+  Cloudflare, the proxy, the secret, Render and the API. It deliberately never touches the database: a
+  check every 5 minutes would keep Neon awake past the free plan's compute allowance.
+- **Test the alert, not just the monitor.** A monitor that is green proves nothing about whether an
+  alert reaches a person; a deliberate outage did.
+- **A runbook is only trustworthy where it has been exercised.** Rotation was rehearsed live; the
+  steps not yet run are labelled as such. Writing them surfaced a real trap: targeting the Pages project
+  in Terraform also pulls in Render, which cannot be updated on the free plan.
+- **Shared files conflict.** Two branches appending a test to one file and a line to one changelog
+  section needed a manual merge; a stash popped onto the result conflicted too. Keeping both sides, then
+  re-running the whole suite, is the reliable fix.
+- **Check claims before writing them down.** A draft said the free plan had no test-alert button (it
+  does, per monitor) and that a Terraform provider "was not worth it" (none was evaluated); both were
+  corrected before merging.
+
+*(Backups in #55 and #56, request logs in #57, the proxied health check in #58, the deploy in #59,
+monitoring in #60, the runbook in #61; released as v0.6.0.)*
+
+---
+
 ## Questions to revisit later
 - Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
   a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
@@ -1372,3 +1427,7 @@ output, which needs a refresh-only apply after deploying that way.
   newer pinned release.
 - Scheduled workflows pause after 60 days without a commit. Decide how the audit check stays alive
   if the repository goes quiet.
+- `PROXY_SECRET` rotation is written in the runbook but has never run; consider accepting a previous
+  secret during rotation (`PROXY_SECRET_PREVIOUS`) so it can be rehearsed without 403s.
+- Backups live 90 days as GitHub artifacts, all under one GitHub account; decide whether a second,
+  independent copy is worth an extra service.
