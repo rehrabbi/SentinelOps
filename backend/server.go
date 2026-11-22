@@ -34,6 +34,14 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	// Liveness — "is the process up?" Does NOT touch the database.
 	mux.HandleFunc("GET /healthz", healthHandler)
 
+	// The same liveness answer, but under /api, where the site's proxy forwards
+	// and the proxy secret is required (only /healthz itself is exempt). Uptime
+	// monitoring fetches it through the site, so one check covers the whole
+	// path a user's request takes: Cloudflare, the proxy function, the shared
+	// secret, Render, and the API. It never touches the database, so checking
+	// it every few minutes does not keep the database awake.
+	mux.HandleFunc("GET /api/healthz", healthHandler)
+
 	// Readiness — "can we serve real traffic?" Pings the database.
 	mux.HandleFunc("GET /readyz", readyHandler(db))
 
