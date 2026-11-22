@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -136,6 +137,11 @@ func main() {
 		}
 		return
 	}
+
+	// From here on the process is the server, so everything it logs, including
+	// the existing log.Printf calls, is one JSON object per line on stderr,
+	// which Render collects. The subcommands above keep plain, readable text.
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
 
 	// Every route, middleware and dependency is wired in newHandler (server.go),
 	// so the integration tests serve exactly the same API this process does.

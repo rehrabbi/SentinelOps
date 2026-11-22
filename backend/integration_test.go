@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -739,5 +740,97 @@ func TestPruneOnLogin(t *testing.T) {
 	c.expect(http.StatusOK, "POST", "/api/sessions", map[string]string{"email": u.Email, "password": testPassword})
 	if n := count(`SELECT count(*) FROM sessions WHERE token_hash = $1`, "prune-expired-2"); n != 1 {
 		t.Error("a second login within the hour pruned again")
+	}
+}
+
+func TestRequestLogsCarryNoSecrets(t *testing.T) {
+	requireDB(t)
+	const proxySecret = "test-proxy-secret-for-log-check"
+	var buf bytes.Buffer
+	srv := newServer(t, serverConfig{ProxySecret: proxySecret, Logger: slog.New(slog.NewJSONHandler(&buf, nil))})
+
+	admin := createAccount(t, "log-admin", "admin")
+	proxied := func() *client {
+		c := newClient(t, srv)
+		c.header.Set("X-Proxy-Secret", proxySecret)
+		c.header.Set("X-Client-IP", "203.0.113.44")
+		return c
+	}
+	requests := 0
+	do := func(c *client, want int, method, path string, body any) string {
+		t.Helper()
+		requests++
+		return c.expect(want, method, path, body)
+	}
+
+	// Log in (a password in the body), then use the session (a cookie).
+	a := proxied()
+	do(a, http.StatusOK, "POST", "/api/sessions", map[string]string{"email": admin.Email, "password": testPassword})
+	var cookie string
+	for _, ck := range a.last.Cookies() {
+		if ck.Name == "sentinelops_session" {
+			cookie = ck.Value
+		}
+	}
+	do(a, http.StatusOK, "GET", "/api/me", nil)
+
+	// Issue an invite (a token in the response) and accept it (the token and
+	// another password in the body); a query string with a secret-looking value.
+	text := do(a, http.StatusCreated, "POST", "/api/invites", map[string]string{"email": uniqueEmail("log-invitee")})
+	var issued struct{ Token string }
+	if err := json.Unmarshal([]byte(text), &issued); err != nil {
+		t.Fatal(err)
+	}
+	const otherPassword = "another-long-password-77"
+	do(proxied(), http.StatusCreated, "POST", "/api/invites/accept",
+		map[string]string{"token": issued.Token, "fullName": "Logged", "password": otherPassword})
+	do(a, http.StatusOK, "GET", "/api/incidents?token=query-secret-value", nil)
+
+	// A direct call, without the proxy secret, is refused and still logged.
+	do(newClient(t, srv), http.StatusForbidden, "GET", "/api/me", nil)
+
+	out := buf.String()
+	for name, secret := range map[string]string{
+		"password": testPassword, "second password": otherPassword, "invite token": issued.Token,
+		"session cookie": cookie, "proxy secret": proxySecret, "query value": "query-secret-value",
+	} {
+		if secret == "" {
+			t.Fatalf("%s was never captured; the test is not checking anything", name)
+		}
+		if strings.Contains(out, secret) {
+			t.Errorf("the request log contains the %s", name)
+		}
+	}
+
+	var lines []map[string]any
+	for _, raw := range strings.Split(strings.TrimSpace(out), "\n") {
+		var line map[string]any
+		if err := json.Unmarshal([]byte(raw), &line); err != nil {
+			t.Fatalf("log line is not JSON: %q", raw)
+		}
+		if line["msg"] == "request" {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) != requests {
+		t.Fatalf("%d request lines for %d requests", len(lines), requests)
+	}
+	me, direct := lines[1], lines[len(lines)-1]
+	if me["path"] != "/api/me" || me["user_id"] != admin.ID || me["visitor"] != "203.0.113.44" {
+		t.Errorf("/api/me line = %v; want the user's ID and the proxied visitor", me)
+	}
+	if direct["status"] != float64(http.StatusForbidden) || direct["visitor"] != "127.0.0.1" || direct["user_id"] != nil {
+		t.Errorf("direct call line = %v; want 403 from the connection's own address, no user", direct)
+	}
+	sawIncidents := false
+	for _, line := range lines {
+		path, _ := line["path"].(string)
+		if strings.Contains(path, "?") {
+			t.Errorf("a query string was logged as part of the path: %q", path)
+		}
+		sawIncidents = sawIncidents || path == "/api/incidents"
+	}
+	if !sawIncidents {
+		t.Error("no line for the /api/incidents request")
 	}
 }

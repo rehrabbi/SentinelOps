@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"sentinelops/internal/authctx"
+	"sentinelops/internal/reqlog"
 	"sentinelops/internal/session"
 	"sentinelops/internal/user"
 )
@@ -53,6 +54,8 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 		// this middleware pull it out with authctx.FromContext. Only the id and
 		// role travel: a context states who is asking, it is not a row cache.
 		ctx := authctx.WithPrincipal(r.Context(), authctx.Principal{ID: u.ID, Email: u.Email, Role: u.Role})
+		// The request log records who this was: the opaque ID, never the email.
+		reqlog.SetUser(ctx, u.ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
