@@ -304,7 +304,17 @@ password manager. **First backup** `sentinelops-db-20261122T1032Z` (17,546 bytes
 holds. The drill first failed on Windows (host paths not converted for `gh`/`docker cp`), fixed in
 the same PR as this note.
 
-**⏭️ Next:** step 2, structured request logs: brief the decisions before writing anything.
+**Step 2, request logs (decided 2026-11-22):** `backend/internal/reqlog`, outermost in `newHandler`:
+one JSON line per request via `log/slog` (request ID also sent as `X-Request-ID`, method, path without
+query, status, duration, bytes, visitor key, user ID when logged in); levels INFO / WARN for 4xx / ERROR
+for 5xx. The visitor and user are filled in by inner layers through a context slot (after the proxy
+check, and in `RequireAuth`). Never logged: cookies, headers, query strings, bodies. Every `/healthz`
+is logged (owner's choice). The server's other messages go through the same JSON handler; CLI
+subcommands keep plain text. Logs stay in Render's dashboard; shipping them elsewhere is deferred.
+Five deliberate regressions were caught by the tests.
+
+**⏭️ Next:** step 3, uptime alerts: brief the decisions (needs an UptimeRobot account) before writing
+anything. The new image also needs deploying (no migration).
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
