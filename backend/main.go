@@ -13,10 +13,6 @@ import (
 	"time"
 
 	"sentinelops/internal/audit"
-	"sentinelops/internal/auth"
-	"sentinelops/internal/incident"
-	"sentinelops/internal/session"
-	"sentinelops/internal/user"
 )
 
 // main is the entry point of every Go program. It sets up the HTTP
@@ -131,73 +127,13 @@ func main() {
 		return
 	}
 
-	// A ServeMux ("multiplexer" / router) inspects each incoming
-	// request and decides which handler function should answer it.
-	mux := http.NewServeMux()
-
-	// Liveness — "is the process up?" Does NOT touch the database.
-	mux.HandleFunc("GET /healthz", healthHandler)
-
-	// Readiness — "can we serve real traffic?" Pings the database.
-	mux.HandleFunc("GET /readyz", readyHandler(db))
-
-	// Users feature: wire the repository (SQL) to the handler (HTTP), then
-	// register its routes. This is dependency injection by hand — main() is
-	// where all the pieces are constructed and connected.
-	// The audit repository is built first because several handlers record to it.
-	auditRepo := audit.NewRepository(db)
-
-	// The user handler also takes the pool itself, because changing a role runs
-	// the update and its audit entry inside one transaction.
-	userRepo := user.NewRepository(db)
-	userHandler := user.NewHandler(userRepo, db, auditRepo)
-	// GET /api/users is registered further down: it is admin-only, so it needs
-	// authHandler, which does not exist yet at this point.
-	mux.HandleFunc("POST /api/users", userHandler.Create)
-
-	// Auth feature: login reads a user AND writes a session, so it takes both
-	// repositories. This is why auth is its own package rather than living
-	// inside user or session.
-	sessionRepo := session.NewRepository(db)
-	authHandler := auth.NewHandler(userRepo, sessionRepo, auditRepo, secureCookies)
-	mux.HandleFunc("POST /api/sessions", authHandler.Login)
-
-	// Protected route: GET /api/me returns the current user. RequireAuth wraps
-	// the Me handler, so an invalid/missing session is rejected with 401 before
-	// Me runs. This is our first route that requires authentication.
-	mux.Handle("GET /api/me", authHandler.RequireAuth(http.HandlerFunc(authHandler.Me)))
-
-	// Listing users exposes every account's email, name, and role, so it is
-	// admin-only rather than merely authenticated. RequireRole is chained INSIDE
-	// RequireAuth, because RequireAuth is what loads the user it reads.
-	mux.Handle("GET /api/users",
-		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(userHandler.List))))
-
-	// Changing a role is admin-only too. The handler additionally refuses an
-	// admin changing their OWN role, which keeps at least one admin alive.
-	mux.Handle("PATCH /api/users/{id}",
-		authHandler.RequireAuth(authHandler.RequireRole("admin", http.HandlerFunc(userHandler.UpdateRole))))
-
-	// Logout: destroy the current session and clear the cookie. Public and
-	// idempotent (see auth.Logout), so it is NOT wrapped in RequireAuth.
-	mux.HandleFunc("DELETE /api/sessions/current", authHandler.Logout)
-
-	// Incidents feature: create + list, BOTH behind RequireAuth. The handler
-	// reads the authenticated user from the request context (for ownership on
-	// create, and role-based scoping on list), so these must be wrapped.
-	incidentRepo := incident.NewRepository(db)
-	incidentHandler := incident.NewHandler(incidentRepo)
-	mux.Handle("POST /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Create)))
-	mux.Handle("GET /api/incidents", authHandler.RequireAuth(http.HandlerFunc(incidentHandler.List)))
-	mux.Handle("GET /api/incidents/{id}",
-		authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Get)))
-	mux.Handle("PATCH /api/incidents/{id}",
-		authHandler.RequireAuth(http.HandlerFunc(incidentHandler.Update)))
-
-	// Wrap the router in CORS middleware so our browser frontend (and only
-	// that origin) is allowed to read API responses, and wrap that in the
-	// proxy check, so nothing at all is answered without the proxy's secret.
-	handler := requireProxySecret(withCORS(mux, frontendOrigin), proxySecret)
+	// Every route, middleware and dependency is wired in newHandler (server.go),
+	// so the integration tests serve exactly the same API this process does.
+	handler := newHandler(db, serverConfig{
+		FrontendOrigin: frontendOrigin,
+		SecureCookies:  secureCookies,
+		ProxySecret:    proxySecret,
+	})
 
 	// The address the server listens on. ":8080" means "all network
 	// interfaces on this machine, port 8080".
