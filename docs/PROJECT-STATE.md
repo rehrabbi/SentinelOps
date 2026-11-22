@@ -292,7 +292,12 @@ GHCR, Singapore) and **Neon free** (Postgres 17, Singapore), all declared in Ter
 - **Tokens:** Render key, Cloudflare Pages-only token (expires 2027-05-21), Neon key for the
   **SentinelOps App** org only. All live in `.env`; the wrapper passes them by name.
 - **API releases:** the image is pinned by `infra/api-image-tag.txt` (`sha-<commit>`, never `main`).
-  To ship a new API: bump that file → `infra/migrate.sh` → `infra/terraform.sh apply`.
+  To ship a new API: bump that file → `infra/migrate.sh` → **`infra/deploy-api.sh`** → `infra/terraform.sh
+  plan` must say "No changes". Not `apply`: Render's provider 1.9.1 cannot update a free-plan service
+  ("maintenance mode can only be configured for non-free tier services", upstream
+  render-oss/terraform-provider-render#80, fix pending in #105), so the script deploys the pinned image
+  through Render's API. Any other change to the API service (env vars included) hits the same bug.
+  Delete the script once a provider release includes #105.
 - **Migrations** run from the owner's machine with the same image (`infra/migrate.sh`), never at
   API startup and never from CI.
 - **Database URL:** Neon's provider only gives the password as an ephemeral value, which Render's
@@ -302,7 +307,9 @@ GHCR, Singapore) and **Neon free** (Postgres 17, Singapore), all declared in Ter
 - **Frontend deploys:** `.github/workflows/deploy-frontend.yml` builds with `VITE_API_URL=""` and
   uploads with `wrangler` (exact-pinned dev dependency) on pushes to `main` touching `frontend/`.
   Its Cloudflare token lives in the GitHub **Environment `production`**, limited to `main`.
-- **Owner runs plan/apply**; Claude never applies.
+- **Owner runs plan/apply**; Claude never applies. One owner-requested exception on 2026-11-22: Claude ran
+  `migrate.sh` and an apply of a reviewed saved plan (which hit the provider bug above), then
+  `deploy-api.sh`. The rule itself is unchanged.
 
 **First bring-up order** (steps 1–5 done 2026-11-21; `plan` reports no changes):
 1. ✅ `infra/terraform.sh apply -target=neon_project.app`: creates only the database
@@ -575,6 +582,11 @@ between a native `terraform.exe` and its providers (`x509: certificate signed by
 authority`), and a file exception for `terraform.exe` does not stop it. The Docker wrapper avoids
 it. The same scanning breaks winget's `msstore` source, so use `--source winget`. Terraform 1.17.2
 is also installed natively at `D:\Program Files\Terraform`, useful only for `terraform fmt`.
+Since a reboot on 2026-11-21, Avast also intercepts HTTPS from **inside Docker containers**, so the
+providers failed there too. Fixed by Web Shield website exceptions for `api.render.com`,
+`console.neon.tech` and `api.cloudflare.com` (HTTPS scanning stays on for everything else). Check with
+`docker run --rm curlimages/curl:8.11.1 -skv -o /dev/null https://api.render.com/ 2>&1 | grep issuer`:
+the issuer must not be Avast. Docker Desktop may also quit on its own; start it again before Terraform.
 
 **macOS (Apple Silicon) — set up 2026-08-16:**
 - Toolchain via Homebrew: `brew install go colima docker docker-compose node`.

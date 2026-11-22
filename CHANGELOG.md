@@ -33,6 +33,8 @@ first hardened production deployment on AWS.
   from `.env`.
 - `infra/migrate.sh`, which applies migrations to the production database with the exact image
   about to be deployed, before Render is pointed at it.
+- `infra/deploy-api.sh`, which deploys the pinned API image through Render's API and waits until
+  it is live and healthy, because Render's Terraform provider cannot update a free-plan service.
 - A deploy workflow that builds the frontend and uploads it with its proxy to Cloudflare Pages
   on every change to `main`, using `wrangler` pinned in `package-lock.json`.
 - `verify-audit --anchor <id>:<hash>` checks that an earlier chain head is still in the audit
