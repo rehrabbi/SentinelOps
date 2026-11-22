@@ -10,6 +10,13 @@ first hardened production deployment.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-22
+
+Harden the live app: the gaps the public deployment exposed are closed. Login is rate limited
+per visitor, accounts come only from one-time invites so no one can learn which emails are
+registered, expired sessions and spent invites are deleted, and the API's behaviour is covered by
+integration tests that run against Postgres on every pull request.
+
 ### Added
 
 - Integration tests that drive the real API, its router, middleware and SQL, against a
@@ -223,7 +230,8 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.1.0...v0.2.0
