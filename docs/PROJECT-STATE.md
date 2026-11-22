@@ -321,8 +321,11 @@ API. Nothing monitored touches the database: Neon's free 100 compute-hours a mon
 checks every 5 minutes. A side effect accepted: the checks keep the free Render instance awake. No
 public status page.
 
-**⏭️ Next:** deploy the image with request logs and `/api/healthz` (no migration); then the owner
-creates the UptimeRobot account and the monitors are configured.
+Deployed 2026-11-22 as `sha-78198ac…` (#59): request logs and `/api/healthz` are live; through the site
+`/api/healthz` answers 200, directly 403; responses carry `X-Request-ID`; Terraform "No changes".
+
+**⏭️ Next:** the owner creates the UptimeRobot account; then the two monitors and the email alert are
+configured, and an alert is tested.
 
 Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
 return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
