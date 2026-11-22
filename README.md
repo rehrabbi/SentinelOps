@@ -118,6 +118,7 @@ the threat it answers.
 | An unrecorded privileged action | A role change and its audit entry share one transaction, so if the entry cannot be written the change is rolled back | `internal/user/handler.go` |
 | Weak password storage | bcrypt, with a 12 character minimum and no composition rules, following NIST 800-63B | `internal/user/validate.go` |
 | Account enumeration by timing | An unknown email still runs a bcrypt compare against a dummy hash, so both failures cost the same | `internal/auth/handler.go` |
+| Password guessing | After 10 failed logins in 15 minutes a visitor gets `429` before any password is checked, and registration allows 5 accounts per visitor per hour. Visitors are keyed on the proxy-verified address (IPv6 by /64), slots are reserved so parallel requests cannot exceed the limit, and correct logins never count | `internal/ratelimit/`, `server.go` |
 | Session theft through XSS | Opaque 256 bit token in an `HttpOnly` cookie, never readable by JavaScript | `internal/auth/handler.go` |
 | Session theft at rest | Only the SHA-256 hash of the token is stored, so a database leak yields nothing usable | `internal/session/repository.go` |
 | CSRF | `SameSite=Lax` on the session cookie, kept first-party in production by serving the API through the frontend's own address | `internal/auth/handler.go`, `frontend/functions/api/` |
@@ -143,7 +144,6 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 
 - Registration returns `409` on a duplicate email, which leaks whether an account exists.
   Login resists enumeration, so the two endpoints disagree.
-- No rate limiting, so login is open to brute force attempts.
 - Expired session rows are never pruned, so the table grows without bound.
 - The frontend has no automated tests. The API's behaviour, including its security
   controls, is covered by integration tests that run on every pull request.

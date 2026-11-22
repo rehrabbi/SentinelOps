@@ -294,8 +294,19 @@ creates and drops `sentinelops_test_<random>` (a fresh database, because `audit_
 without it. Written in `backend/integration_test.go`; two deliberate regressions (cookie not
 `HttpOnly`, 403 instead of 404) were both caught before merging.
 
-**⏭️ Next:** step 2, login rate limiting: brief its decisions (where it lives, limits, key, behaviour
-on a single restarting free instance) before writing anything.
+Merged in #46.
+
+**Step 2, rate limiting (decided 2026-11-22):** in API memory (one instance; restarts clear it), in
+`backend/internal/ratelimit` and wired in `server.go`. Login: 10 *failed* attempts per visitor per
+15 minutes, then `429` + `Retry-After` before any password check; successes never count and never
+reset. Registration: 5 per visitor per hour, counting 201 and 409 only. Key: `audit.ClientIP` (proxy
+address only behind the secret), IPv6 by /64. Slots are reserved before each attempt, so concurrent
+guesses cannot exceed the limit; memory is capped at 100,000 keys and fails closed. A per-account
+limit was rejected because it lets anyone lock a victim out. Four deliberate regressions were caught
+by the tests before merging.
+
+**⏭️ Next:** step 3, registration that does not reveal whether an email has an account: brief the
+decisions (what replaces `409` with no email service) before writing anything.
 
 Small follow-ups that need no stage:
 - Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.
