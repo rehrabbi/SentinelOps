@@ -93,6 +93,19 @@ cd backend && gofmt -l . && go vet ./... && go build ./... && go test ./...
 cd ../frontend && npm run lint && npm run build
 ```
 
+`go test` also runs the API's integration tests (`backend/integration_test.go`), which drive the
+real router against Postgres. They need `TEST_DATABASE_URL` pointing at a **local** database
+whose user can create databases; the Compose one works. Without it they skip locally, but CI
+always runs them. Each run creates its own `sentinelops_test_<random>` database and drops it.
+
+```bash
+docker compose up -d   # the local database
+export TEST_DATABASE_URL="postgres://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/<POSTGRES_DB>?sslmode=disable"
+cd backend && go test ./...
+```
+
+The tests refuse any host other than `localhost`, so they cannot reach the production database.
+
 The two dependency scans from the security workflow also run locally, and catch most of
 what it would fail on. The image, CodeQL, and history scans run only in CI.
 

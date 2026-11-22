@@ -145,8 +145,8 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
   Login resists enumeration, so the two endpoints disagree.
 - No rate limiting, so login is open to brute force attempts.
 - Expired session rows are never pruned, so the table grows without bound.
-- No automated test suite yet. Verification so far is scripted `curl` runs and manual
-  browser checks, both recorded in the learning log.
+- The frontend has no automated tests. The API's behaviour, including its security
+  controls, is covered by integration tests that run on every pull request.
 - The audit log is tamper evident, not tamper proof. A database superuser can drop the
   triggers and rebuild the whole hash chain. The scheduled anchor check catches any rebuild
   that reaches back before the last anchor, but entries written since the last run, at most
@@ -270,6 +270,8 @@ SentinelOps/
 ├─ backend/
 │  ├─ Dockerfile                     multi-stage build to a distroless, non-root image
 │  ├─ main.go, db.go, migrate.go     entry point, pool, migration runner
+│  ├─ server.go                      every route and middleware, shared with the tests
+│  ├─ integration_test.go            the API end to end against a throwaway Postgres
 │  ├─ migrations/                    versioned SQL, currently at version 5
 │  └─ internal/
 │     ├─ user/                       model, repository, handler, validation, role changes

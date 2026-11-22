@@ -10,6 +10,14 @@ first hardened production deployment.
 
 ## [Unreleased]
 
+### Added
+
+- Integration tests that drive the real API, its router, middleware and SQL, against a
+  throwaway Postgres on every pull request. They cover registration, login, sessions and the
+  cookie's flags, RBAC, per-object authorization, role changes, the append-only audit chain,
+  and the proxy secret. Each run uses its own database, and the tests refuse any host but
+  `localhost`.
+
 ## [0.4.0] - 2026-11-22
 
 Free cloud deployment: SentinelOps is live at https://sentinelops.pages.dev on the free plans
