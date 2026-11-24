@@ -51,6 +51,8 @@ if [ -z "$RENDER_API_KEY" ] && [ -f "$repo_dir/.env" ]; then
 fi
 [ -n "$RENDER_API_KEY" ] || { echo "RENDER_API_KEY is not set and not in .env" >&2; exit 1; }
 
+# For requests without a body: the key reaches curl on standard input, never
+# as a command-line argument.
 render() {
   printf 'Authorization: Bearer %s\n' "$RENDER_API_KEY" |
     curl --silent --show-error --fail-with-body -H @- -H 'Accept: application/json' "$@"
@@ -69,10 +71,22 @@ if $delete; then
   exit 0
 fi
 
-# The JSON body is built by Python from the environment, so the value is
-# escaped correctly and never passes through a command-line argument.
-body="$(VALUE="$value" python -I -c 'import json, os; print(json.dumps({"value": os.environ["VALUE"]}))' 2>/dev/null ||
-  VALUE="$value" python3 -I -c 'import json, os; print(json.dumps({"value": os.environ["VALUE"]}))')"
-render -X PUT -H 'Content-Type: application/json' --data-binary @- \
-  "https://api.render.com/v1/services/$ids/env-vars/$name" <<<"$body" >/dev/null
+# The PUT is sent by Python's standard library, which reads the key and the
+# value from its environment: neither passes through a command-line argument,
+# and the JSON is escaped correctly. (curl cannot take both the key and the
+# body on standard input: two "@-" in one call compete for it, and the body
+# arrived empty, which Render refused with 400.) An error names the status
+# only, never the value.
+py=python
+command -v python >/dev/null 2>&1 || py=python3
+VALUE="$value" KEY="$RENDER_API_KEY" URL="https://api.render.com/v1/services/$ids/env-vars/$name" "$py" -I -c '
+import json, os, sys, urllib.error, urllib.request
+req = urllib.request.Request(os.environ["URL"], method="PUT",
+    data=json.dumps({"value": os.environ["VALUE"]}).encode(),
+    headers={"Authorization": "Bearer " + os.environ["KEY"],
+             "Content-Type": "application/json", "Accept": "application/json"})
+try:
+    urllib.request.urlopen(req, timeout=30).close()
+except urllib.error.HTTPError as e:
+    sys.exit("Render refused the update: HTTP %d" % e.code)'
 echo "$name updated on Render. Roll it out with infra/deploy-api.sh."
