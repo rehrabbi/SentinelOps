@@ -12,6 +12,15 @@ first hardened production deployment.
 
 ### Added
 
+- `PROXY_SECRET` can be rotated without refusing anyone. During a rotation the API also accepts
+  `PROXY_SECRET_PREVIOUS`, compares both in constant time, warns at every start while it is set, and
+  marks each request it let in with `"proxy_secret":"previous"` in the request log, so it is clear
+  when the proxy has switched. It refuses to start with a previous secret but no current one.
+- `infra/set-pages-secret.sh` sets the proxy's secret with wrangler from a pipe, and
+  `infra/probe-site.sh` fetches `/api/healthz` through the site every second during a change,
+  reporting every answer that is not 200. `infra/set-render-env.sh` can set and delete
+  `PROXY_SECRET_PREVIOUS`.
+
 - Changing your own password, from a new **Account security** page (`PUT /api/me/password`). It
   needs the current password, follows the same rules as accepting an invite, ends every other session
   of yours while keeping the one you are using, and is recorded in the audit log, failures included.
