@@ -2,10 +2,21 @@
 # production. Keep these in step with frontend/nginx.conf.template, which
 # serves the same files from the container image. connect-src is 'self' here
 # because the API is reached through this site's own /api proxy.
+#
+# Found by the ZAP baseline scan (.github/workflows/zap-baseline.yml):
+# - style-src has no 'unsafe-inline': the production build links its CSS from
+#   a file and injects no <style> tag (only Vite's dev server does).
+# - Pages adds Access-Control-Allow-Origin: * to static files by default; "!"
+#   removes it, so no other site's scripts can read these responses.
+# - HSTS: browsers already force HTTPS on .dev addresses (preloaded), but the
+#   header says so for every client. includeSubDomains covers the preview
+#   deployments, which are all HTTPS too.
 /*
+  ! Access-Control-Allow-Origin
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Content-Security-Policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Cache-Control: no-cache
 
 /assets/*
