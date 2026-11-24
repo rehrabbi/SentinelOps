@@ -18,6 +18,8 @@ map $uri $cache_control {
 server {
     # The unprivileged image cannot bind ports below 1024.
     listen 8080;
+    # Do not announce the nginx version in the Server header (found by ZAP).
+    server_tokens off;
 
     root  /usr/share/nginx/html;
     index index.html;
@@ -29,9 +31,10 @@ server {
     add_header Cache-Control           $cache_control always;
     add_header X-Content-Type-Options  "nosniff" always;
     add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
-    # 'unsafe-inline' on style-src is a known weakening for the style tag Vite
-    # injects; a nonce can remove it later.
-    add_header Content-Security-Policy "default-src 'self'; connect-src 'self' ${API_ORIGIN}; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    # No 'unsafe-inline' on style-src: the production build links its CSS from
+    # a file; only Vite's dev server injects a <style> tag. No HSTS here: this
+    # image serves plain http locally, where browsers ignore it.
+    add_header Content-Security-Policy "default-src 'self'; connect-src 'self' ${API_ORIGIN}; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
 
     gzip       on;
     gzip_types text/css application/javascript application/json image/svg+xml;

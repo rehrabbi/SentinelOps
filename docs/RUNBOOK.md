@@ -16,7 +16,7 @@ Write down what you did as you go: a GitHub issue labelled `priority: high` is t
 | Terraform state | Neon project `sentinelops-tfstate` in its own organisation (`PG_CONN_STR`) |
 | API logs | Render dashboard → `sentinelops-api` → Logs; one JSON line per request, searchable by `request_id` (returned to callers as `X-Request-ID`) |
 | Uptime alerts | UptimeRobot (owner's account): the site and `/api/healthz` through the proxy, every 5 minutes, by email |
-| Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily); a failed scheduled run emails the owner |
+| Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily), **ZAP baseline** (04:17 UTC Mondays); a failed scheduled run emails the owner |
 | Audit anchors | branch `audit-anchors`, file `anchors.log` (protected: no force-push, no deletion) |
 | Backups | GitHub Actions artifacts `sentinelops-db-<UTC time>`, 90 days, encrypted with `age` |
 | Backup private key | owner's password manager, and `~/.sentinelops/backup-key.txt` on the machine that restores |
@@ -243,3 +243,21 @@ FROM audit_log
 WHERE action IN ('user.password_changed', 'user.password_reset', 'user.password_reset_issued', 'user.logout_all')
 ORDER BY id DESC LIMIT 20;
 ```
+
+---
+
+## 7. ZAP baseline failed
+
+The weekly passive scan found something of Medium risk or above on the live site. It never attacks
+or logs in, so the failure is a finding, not damage.
+
+1. Open the run: its page lists every finding with its risk and rule id. The full HTML report is in
+   the run's artifact `zap-baseline-<run id>`.
+2. If the scan itself failed (no report, or ZAP could not reach the site), treat it as an outage
+   first: §4.
+3. For each Medium or High finding, find the cause: a header in `frontend/public/_headers` (keep
+   `frontend/nginx.conf.template` in step), the proxy in `frontend/functions/api/`, or the API.
+   Fix it by pull request, or, if it is a false positive or an accepted risk, add the rule to
+   `.zap/rules.tsv` as `IGNORE` with the reason in a comment above it.
+4. **Confirm:** run **ZAP baseline** by hand once the fix is live (`gh workflow run zap-baseline.yml`);
+   it must pass.
