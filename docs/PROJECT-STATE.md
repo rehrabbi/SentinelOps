@@ -319,8 +319,13 @@ the 1.0.0 review and release.
 - Known gap, written into the README: with no email, if the only admin forgets their password nobody can
   issue them a link.
 
-**⏭️ Next:** merge, then deploy on the owner's request: `infra/migrate.sh` (migration 7) before
-the new API image, as with invites. Then brief step 2, seamless `PROXY_SECRET` rotation.
+**Deployed 2026-11-24** as `sha-12e9dc4…` (#64, pinned in #65), at the owner's request:
+`infra/migrate.sh` (production at schema 7, clean), `infra/deploy-api.sh`, then a saved refresh-only
+plan, inspected (the image tag, the site's own deploy of #64, and Neon's size) and applied; Terraform
+"No changes". Through the site, the new routes answer 401 without a session and the reset form 404
+for a bad token; direct calls still get 403; `backup_reader` can read `password_resets` and not write it.
+
+**⏭️ Next:** brief step 2, seamless `PROXY_SECRET` rotation.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.
