@@ -12,6 +12,8 @@ first hardened production deployment.
 
 ### Added
 
+- `keep-schedules-alive.yml`: on the 1st of each month, re-enables every workflow through GitHub's
+  API, so the 60-day inactivity rule for public repositories never pauses the scheduled checks.
 - A weekly passive scan of the live site with OWASP ZAP's baseline (`.github/workflows/zap-baseline.yml`,
   Mondays and on demand). It never attacks or logs in; any finding of Medium risk or above that is not
   triaged in `.zap/rules.tsv` fails the run. Reports are kept 90 days and summarised on the run page.
@@ -40,6 +42,11 @@ first hardened production deployment.
 
 ### Changed
 
+- Every workflow runs on Node.js 24: `actions/checkout` v7.0.1, `actions/setup-go` v7.0.0 and
+  `actions/setup-node` v7.1.0, pinned by commit.
+- The site sends a `Permissions-Policy` that switches off device features it never uses, and is
+  cross-origin isolated (`Cross-Origin-Opener-Policy`, `-Resource-Policy` and `-Embedder-Policy`),
+  clearing the ZAP baseline's last warnings.
 - The site's security headers, after the first ZAP scan: the CSP no longer allows inline styles
   (`style-src 'self'`; the production build has none), `Strict-Transport-Security` is set, and
   Cloudflare Pages' default `Access-Control-Allow-Origin: *` on static files is removed. The container

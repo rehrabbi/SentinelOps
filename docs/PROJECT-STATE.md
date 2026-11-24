@@ -383,7 +383,25 @@ through the exact deployment it uploaded, failing (and emailing) on anything but
 the recovery, §5 step 8 is corrected. For the learning log at the stage's end: a drill's success
 criterion has to include the next deployment, not just the moment.
 
-**⏭️ Next:** brief step 4, operational hygiene.
+**Step 4, operational hygiene (decided 2026-11-24):** in three parts.
+- **A, built:** every workflow off Node.js 20 (`actions/checkout` v7.0.1, `actions/setup-go` v7.0.0,
+  `actions/setup-node` v7.1.0, all Node 24, pinned by commit; setup-go 7.1.0 was skipped as under two
+  weeks old). The site's last ZAP Lows fixed in `frontend/public/_headers` and the nginx template:
+  `Permissions-Policy` (device features off, clipboard kept for the admin's Copy buttons) and
+  cross-origin isolation (`Cross-Origin-Opener-Policy` and `-Resource-Policy` `same-origin`,
+  `-Embedder-Policy` `require-corp`); checked in a browser on the local container (isolated, login,
+  Users screen, reset link, a new incident through the cross-origin API, no console errors). A monthly
+  `keep-schedules-alive.yml` re-enables every workflow in `.github/workflows` through the API, which
+  restarts GitHub's 60-day inactivity clock for scheduled runs without committing anything.
+- **B, written, waiting on a new GitHub environment:** `infra/render-hours.sh` projects the worst case
+  for Render's 750 free hours (every free web service that is not suspended, awake all month) and fails
+  above 750 or when the API is suspended; `render-hours.yml` runs it every Monday with the Render key
+  from a `render` environment limited to `main` (owner's choice, knowing Render keys cannot be limited).
+  Tested against the workspace (720 of 750 for November) and against made-up service lists.
+- **C, waiting on the owner's Backblaze account:** the nightly Backup also uploads the same encrypted
+  file to a private Backblaze B2 bucket (10 GB free, no card), with a key that can only write files.
+
+**⏭️ Next:** the owner approves the `render` environment (B) and creates the B2 account and bucket (C).
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.
@@ -453,8 +471,8 @@ accepts about a minute of 403s and is written down but **not yet exercised**; it
 
 Released as **v0.6.0** on 2026-11-22.
 
-Small follow-ups that need no stage: move workflows off `actions/checkout` v4.4.0 (Node.js 20);
-return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
+Small follow-ups that need no stage: ~~move workflows off `actions/checkout` v4.4.0 (Node.js 20)~~
+done in the hardening review; return API deploys to `terraform apply` once render-oss/terraform-provider-render#105 ships; owner
 items listed under the free cloud deployment below; observe a live login 429 once, deliberately.
 
 ### ✅ Harden the live app (released as v0.5.0, issue #45, milestone #4)
@@ -516,7 +534,7 @@ Step 4 deployed 2026-11-22 as `sha-840b3d0…` (#52): `migrate.sh` (nothing new)
 `apply -refresh-only`, `plan` "No changes". Released as **v0.5.0** on 2026-11-22.
 
 Small follow-ups that need no stage:
-- Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.
+- ~~Move every workflow off `actions/checkout` v4.4.0, which runs on the deprecated Node.js 20.~~ Done in the hardening review.
 - When render-oss/terraform-provider-render#105 ships, return API deploys to `terraform apply`
   and delete `infra/deploy-api.sh`.
 - Owner: enable 2FA on Render and the Neon organisations; keep every provider key in the
