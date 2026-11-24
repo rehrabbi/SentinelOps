@@ -11,27 +11,37 @@
 #
 # Usage (see docs/RUNBOOK.md, "A secret leaked"):
 #   <command that prints the new value> | infra/set-render-env.sh PROXY_SECRET
+#   infra/set-render-env.sh --delete PROXY_SECRET_PREVIOUS
 #
-# Only the variables a rotation needs are allowed. Never use Render's
-# PUT /env-vars (no key) instead: it replaces the whole list.
+# Only the variables a rotation needs are allowed, and only the temporary
+# PROXY_SECRET_PREVIOUS can be deleted. Never use Render's PUT /env-vars (no
+# key) instead: it replaces the whole list.
 set -euo pipefail
 
+delete=false
+if [ "${1:-}" = "--delete" ]; then
+  delete=true
+  shift
+fi
 name="${1:-}"
-case "$name" in
-  PROXY_SECRET | DATABASE_URL) ;;
+case "$delete:$name" in
+  false:PROXY_SECRET | false:PROXY_SECRET_PREVIOUS | false:DATABASE_URL | true:PROXY_SECRET_PREVIOUS) ;;
   *)
-    echo "usage: <value on stdin> | $0 PROXY_SECRET|DATABASE_URL" >&2
+    echo "usage: <value on stdin> | $0 PROXY_SECRET|PROXY_SECRET_PREVIOUS|DATABASE_URL" >&2
+    echo "       $0 --delete PROXY_SECRET_PREVIOUS" >&2
     exit 2
     ;;
 esac
-if [ -t 0 ]; then
-  echo "the new value must come from a pipe, not the keyboard" >&2
-  exit 2
-fi
-value="$(cat)"
-if [ -z "$value" ]; then
-  echo "no value on standard input" >&2
-  exit 1
+if ! $delete; then
+  if [ -t 0 ]; then
+    echo "the new value must come from a pipe, not the keyboard" >&2
+    exit 2
+  fi
+  value="$(cat)"
+  if [ -z "$value" ]; then
+    echo "no value on standard input" >&2
+    exit 1
+  fi
 fi
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -51,6 +61,12 @@ ids="$(render "https://api.render.com/v1/services?name=sentinelops-api&limit=20"
 if [ "$(grep -c . <<<"$ids")" -ne 1 ]; then
   echo "expected exactly one Render service named sentinelops-api, found: ${ids:-none}" >&2
   exit 1
+fi
+
+if $delete; then
+  render -X DELETE "https://api.render.com/v1/services/$ids/env-vars/$name" >/dev/null
+  echo "$name deleted on Render. Roll it out with infra/deploy-api.sh."
+  exit 0
 fi
 
 # The JSON body is built by Python from the environment, so the value is

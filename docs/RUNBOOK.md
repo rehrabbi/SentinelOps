@@ -170,29 +170,50 @@ Rotate the leaked one first, then check the logs and the audit trail for use of 
 |---|---|
 | `audit_verifier` or `backup_reader` password (GitHub environment `audit` / `backup`) | `infra/rotate-readonly-role.sh audit_verifier` (or `backup_reader`), then run **Audit verify** (or **Backup**) by hand. *Exercised on 2026-11-22.* |
 | Owner database login (`PROD_DATABASE_URL`, Render's `DATABASE_URL`) | Neon console → project `sentinelops` → Roles → `sentinelops` → reset password; copy the new direct connection string into `.env` as `PROD_DATABASE_URL`. Then `grep -m1 '^PROD_DATABASE_URL=' .env \| cut -d= -f2- \| tr -d '\r\n' \| infra/set-render-env.sh DATABASE_URL`, `infra/deploy-api.sh`, `infra/terraform.sh apply -refresh-only`. |
-| `PROXY_SECRET` | See below. Expect about a minute of 403s through the site. |
+| `PROXY_SECRET` | See below. The API accepts the old and the new secret for the few minutes the switch takes, so nobody is refused. |
 | Cloudflare token for CI (environment `production`) | Cloudflare → My Profile → API tokens → roll or delete `sentinelops-github-deploy`, create a new one with the same scope (Cloudflare Pages: Edit, one account, an expiry), copy it, then `powershell -NoProfile -Command "Get-Clipboard" \| gh secret set CLOUDFLARE_API_TOKEN --env production --repo rehrabbi/SentinelOps` and clear the clipboard. Run **Deploy frontend** to confirm. |
 | Provider keys in `.env` (`RENDER_API_KEY`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, `PG_CONN_STR`) | Roll the key in that provider's dashboard with the same scope, update `.env` on every device, and confirm with `infra/terraform.sh plan` ("No changes"). |
 | Backup private key | Move the old key file aside (keep it until its backups expire), then generate a new pair straight into the file without printing it: `docker run --rm alpine:3.20 sh -c "apk add -q age >/dev/null && age-keygen 2>/dev/null" > ~/.sentinelops/backup-key.txt`. Save the file in the password manager, put its `# public key:` line's key in `infra/backup-recipient.txt` by pull request, then run **Backup** and the drill with the new key. Backups made with the old key stay readable by whoever has it until they expire (90 days); delete those artifacts if that matters. |
 
-**Rotating `PROXY_SECRET`** (not yet exercised live). The API accepts one secret at a time, and
-Render's Terraform provider cannot update the service, so the order matters:
-1. Replace only the secret in Terraform's state:
+**Rotating `PROXY_SECRET`** (not yet exercised live). For a few minutes the API accepts two
+secrets, the new one and `PROXY_SECRET_PREVIOUS`, so the API and the proxy can switch one after
+the other without refusing anyone. Run every step from the repository root in Git Bash. It needs an API image from 2026-11-24 or
+later, which knows `PROXY_SECRET_PREVIOUS`.
+
+The secret's value always travels from Terraform's state straight into a pipe. This reads it:
+
+```bash
+proxy_secret() {
+  infra/terraform.sh state pull |
+    python -I -c "import json,sys; s=json.load(sys.stdin); print(next(r['instances'][0]['attributes']['result'] for r in s['resources'] if r['type']=='random_password'), end='')"
+}
+```
+
+1. In a second terminal, start the probe and leave it running: `infra/probe-site.sh 1800`. It
+   fetches `/api/healthz` through the site every second and prints every answer that is not 200.
+2. Keep the current secret on the API as the previous one: `proxy_secret | infra/set-render-env.sh PROXY_SECRET_PREVIOUS`.
+3. Generate the new secret, in Terraform's state only:
    `infra/terraform.sh apply -replace=random_password.proxy_secret -target=random_password.proxy_secret`.
    The plan must replace exactly that one resource.
-2. Give it to the API (the value goes from the state straight into the pipe):
-   ```bash
-   infra/terraform.sh state pull \
-     | python -I -c "import json,sys; s=json.load(sys.stdin); print(next(r['instances'][0]['attributes']['result'] for r in s['resources'] if r['type']=='random_password'), end='')" \
-     | infra/set-render-env.sh PROXY_SECRET
-   infra/deploy-api.sh
-   ```
-   From here until step 4, requests through the site get 403.
-3. Give it to the proxy: `infra/terraform.sh apply -target=cloudflare_pages_project.web`. The plan
-   must change only the Pages project (Render already has the new value, so it shows no change there).
-4. Run **Deploy frontend** by hand so the proxy function picks up the new value.
-5. Confirm: `/api/healthz` through the site answers 200, and `infra/terraform.sh plan` says
-   "No changes".
+4. Give the new secret to the API, which then accepts both:
+   `proxy_secret | infra/set-render-env.sh PROXY_SECRET`, then `infra/deploy-api.sh`. Its logs show
+   "PROXY_SECRET_PREVIOUS is set" at start.
+5. Give the new secret to the proxy: `proxy_secret | infra/set-pages-secret.sh`, then run
+   **Deploy frontend** (`gh workflow run deploy-frontend.yml --ref main`) and wait for it to finish.
+   Not Terraform: the Pages project depends on the Render service, so targeting it would also try
+   to update Render, which the free plan refuses (and Render now holds a variable Terraform does
+   not know).
+6. Wait until requests stop arriving with the old secret: Render → `sentinelops-api` → Logs, search
+   `proxy_secret`. Lines marked `"proxy_secret":"previous"` stop once the new deployment serves
+   the site; give it a few minutes past the last one.
+7. Retire the old secret: `infra/set-render-env.sh --delete PROXY_SECRET_PREVIOUS`, then
+   `infra/deploy-api.sh`. From here the old value is refused.
+8. Bring Terraform back in line: `infra/terraform.sh apply -refresh-only`, then
+   `infra/terraform.sh plan`. If the plan wants to set the Pages project's `PROXY_SECRET`
+   (Cloudflare never returns secret values, so the state still holds the old one), apply it: the
+   value is the one the proxy already has; the plan must change only the Pages project. Then
+   `infra/terraform.sh plan` must say "No changes".
+9. Stop the probe. It must report `0 not 200`.
 
 ---
 

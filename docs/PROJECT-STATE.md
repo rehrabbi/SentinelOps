@@ -325,7 +325,23 @@ plan, inspected (the image tag, the site's own deploy of #64, and Neon's size) a
 "No changes". Through the site, the new routes answer 401 without a session and the reset form 404
 for a bad token; direct calls still get 403; `backup_reader` can read `password_resets` and not write it.
 
-**⏭️ Next:** brief step 2, seamless `PROXY_SECRET` rotation.
+**Step 2, seamless `PROXY_SECRET` rotation (decided 2026-11-24):** the API also accepts an optional
+`PROXY_SECRET_PREVIOUS`, only during a rotation (both compared in constant time, every time). It warns at
+every start while one is set, refuses to start with a previous secret but no current one, and marks
+each request the previous secret let in with `"proxy_secret":"previous"` in the request log, so the
+switch-over is visible; it stays valid until the runbook's last step deletes it (no automatic expiry).
+The proxy's secret is set with wrangler (`infra/set-pages-secret.sh`), not Terraform: the Pages project
+depends on the Render service, so targeting it plans a Render update the free plan refuses.
+`infra/set-render-env.sh` gained `PROXY_SECRET_PREVIOUS` and `--delete` for it only;
+`infra/probe-site.sh` fetches `/api/healthz` through the site every second during the change.
+Done means the real secret rotated live with the probe reporting zero non-200 answers and Terraform
+"No changes" (owner's choice). Tests: the three phases of a rotation through the real router, the
+startup rule, and the log mark; 8 deliberate regressions, all caught (a first miss showed the startup
+rule lived only in `main()`, so it moved into a tested function); race detector clean. Not yet proven: Render's delete-variable call and wrangler reading the
+secret from a pipe, both first used in the live drill.
+
+**⏭️ Next:** merge, deploy the API (no migration), then the live rotation on the owner's request,
+following docs/RUNBOOK.md §5.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.

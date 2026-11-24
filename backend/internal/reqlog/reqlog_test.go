@@ -79,6 +79,17 @@ func TestSlotsFilledByInnerLayers(t *testing.T) {
 	}
 }
 
+func TestPreviousSecretIsMarkedOnlyWhenUsed(t *testing.T) {
+	marked := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { MarkPreviousSecret(r.Context()) })
+	if _, line := serve(t, marked, httptest.NewRequest("GET", "/api/me", nil)); line["proxy_secret"] != "previous" {
+		t.Errorf("proxy_secret = %v, want previous", line["proxy_secret"])
+	}
+	plain := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+	if _, line := serve(t, plain, httptest.NewRequest("GET", "/api/me", nil)); line["proxy_secret"] != nil {
+		t.Errorf("an ordinary request carries proxy_secret = %v", line["proxy_secret"])
+	}
+}
+
 func TestLongPathIsCapped(t *testing.T) {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 	_, line := serve(t, h, httptest.NewRequest("GET", "/"+strings.Repeat("a", 5000), nil))
@@ -92,4 +103,5 @@ func TestSettersAreSafeOutsideTheMiddleware(t *testing.T) {
 	// unit test, say) that must be a harmless no-op.
 	SetUser(httptest.NewRequest("GET", "/", nil).Context(), "x")
 	SetVisitor(httptest.NewRequest("GET", "/", nil).Context(), "x")
+	MarkPreviousSecret(httptest.NewRequest("GET", "/", nil).Context())
 }

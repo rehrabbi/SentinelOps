@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"flag"
 	"log"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"sentinelops/internal/audit"
+	"sentinelops/internal/reqlog"
 )
 
 // main is the entry point of every Go program. It sets up the HTTP
@@ -53,9 +55,18 @@ func main() {
 
 	// The secret the Cloudflare proxy sends with every request. Empty means
 	// there is no proxy (local development), and the check is switched off.
-	proxySecret := os.Getenv("PROXY_SECRET")
+	// During a rotation there is also the previous one (see proxySecrets).
+	proxySecret, proxySecretPrevious, err := proxySecrets(os.Getenv)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if proxySecret == "" {
 		log.Println("PROXY_SECRET not set: direct requests allowed (local development only)")
+	}
+	// It is meant to exist for minutes, so its presence is announced at every start.
+	if proxySecretPrevious != "" {
+		log.Println("PROXY_SECRET_PREVIOUS is set: the previous proxy secret is still accepted; " +
+			"remove it once no request log line shows proxy_secret=previous")
 	}
 
 	// Open the connection pool. This does NOT connect yet — it just prepares
@@ -146,9 +157,10 @@ func main() {
 	// Every route, middleware and dependency is wired in newHandler (server.go),
 	// so the integration tests serve exactly the same API this process does.
 	handler := newHandler(db, serverConfig{
-		FrontendOrigin: frontendOrigin,
-		SecureCookies:  secureCookies,
-		ProxySecret:    proxySecret,
+		FrontendOrigin:      frontendOrigin,
+		SecureCookies:       secureCookies,
+		ProxySecret:         proxySecret,
+		ProxySecretPrevious: proxySecretPrevious,
 	})
 
 	// The address the server listens on. ":8080" means "all network
@@ -234,6 +246,21 @@ const (
 	clientIPHeader    = "X-Client-IP"
 )
 
+// proxySecrets reads PROXY_SECRET and, during a rotation, PROXY_SECRET_PREVIOUS:
+// the secret the proxy used until now, also accepted so the API and the proxy
+// can switch one after the other without refusing anyone (docs/RUNBOOK.md).
+//
+// A previous secret without a current one is refused. An empty PROXY_SECRET
+// switches the check off entirely, so starting anyway would let every request
+// in while whoever set the previous secret believes one is enforced.
+func proxySecrets(getenv func(string) string) (current, previous string, err error) {
+	current, previous = getenv("PROXY_SECRET"), getenv("PROXY_SECRET_PREVIOUS")
+	if previous != "" && current == "" {
+		return "", "", errors.New("PROXY_SECRET_PREVIOUS is set without PROXY_SECRET: refusing to start")
+	}
+	return current, previous, nil
+}
+
 // requireProxySecret is middleware that lets a request through only if it
 // carries the secret shared with the Cloudflare proxy. In production the API's
 // own address is public, so without this anyone could skip the proxy and talk
@@ -242,11 +269,19 @@ const (
 //
 // An empty secret switches the check off, for local development and compose,
 // where there is no proxy. Production must always set PROXY_SECRET.
-func requireProxySecret(next http.Handler, secret string) http.Handler {
+//
+// previous, when not empty, is accepted as well: the secret the proxy sent
+// until a rotation began. Requests it lets in are marked in the request log,
+// so it is clear when the proxy has switched and it can be removed.
+func requireProxySecret(next http.Handler, secret, previous string) http.Handler {
 	if secret == "" {
 		return next
 	}
 	want := []byte(secret)
+	var old []byte
+	if previous != "" {
+		old = []byte(previous)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" {
 			next.ServeHTTP(w, r)
@@ -255,9 +290,16 @@ func requireProxySecret(next http.Handler, secret string) http.Handler {
 		got := []byte(r.Header.Get(proxySecretHeader))
 		// ConstantTimeCompare takes the same time however many bytes match,
 		// so the secret cannot be guessed one byte at a time by timing replies.
-		if subtle.ConstantTimeCompare(got, want) != 1 {
+		// Both comparisons always run, so the time taken does not reveal
+		// which secret matched either.
+		current := subtle.ConstantTimeCompare(got, want) == 1
+		usedPrevious := old != nil && subtle.ConstantTimeCompare(got, old) == 1
+		if !current && !usedPrevious {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
+		}
+		if !current {
+			reqlog.MarkPreviousSecret(r.Context())
 		}
 		// The proxy reports the visitor's address in a header it sets itself.
 		// It is believed only here, after the secret proved the request came
