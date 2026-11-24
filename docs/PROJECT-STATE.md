@@ -337,11 +337,24 @@ depends on the Render service, so targeting it plans a Render update the free pl
 Done means the real secret rotated live with the probe reporting zero non-200 answers and Terraform
 "No changes" (owner's choice). Tests: the three phases of a rotation through the real router, the
 startup rule, and the log mark; 8 deliberate regressions, all caught (a first miss showed the startup
-rule lived only in `main()`, so it moved into a tested function); race detector clean. Not yet proven: Render's delete-variable call and wrangler reading the
-secret from a pipe, both first used in the live drill.
+rule lived only in `main()`, so it moved into a tested function); race detector clean.
 
-**⏭️ Next:** merge, deploy the API (no migration), then the live rotation on the owner's request,
-following docs/RUNBOOK.md §5.
+**Live rotation, 2026-11-24 (owner's request):** API `sha-f8606ec…` deployed (#68), then runbook §5 end
+to end with `infra/probe-site.sh` running throughout: **570 requests through the site, 0 not 200**.
+Render's logs showed requests marked `"proxy_secret":"previous"` until 13:19:43 UTC, the moment the
+new frontend deployment took over, and none in the 4 minutes after; then the previous secret was
+deleted and the API redeployed; Terraform ends at "No changes". The drill found three things:
+- A bug in `infra/set-render-env.sh` (never run before): it gave curl both the API key and the body on
+  standard input, so the body arrived empty and Render answered 400. Nothing wrong was stored; the PUT
+  now goes through Python's standard library, reading both from its environment.
+- The Cloudflare provider stored the updated secret as `plain_text` (readable through the account's
+  API); a second apply set `secret_text` again, confirmed through Cloudflare's API. The runbook now
+  checks for it. The exposure stayed inside the account, which with Terraform's state already held the
+  value, so it was not rotated again.
+- Avast's HTTPS scanning was intercepting Docker's traffic again after a restart; the owner re-added the
+  Web Shield exceptions for api.render.com, console.neon.tech and api.cloudflare.com.
+
+**⏭️ Next:** brief step 3, a scheduled passive (ZAP baseline) scan of the live site.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.

@@ -175,7 +175,7 @@ Rotate the leaked one first, then check the logs and the audit trail for use of 
 | Provider keys in `.env` (`RENDER_API_KEY`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, `PG_CONN_STR`) | Roll the key in that provider's dashboard with the same scope, update `.env` on every device, and confirm with `infra/terraform.sh plan` ("No changes"). |
 | Backup private key | Move the old key file aside (keep it until its backups expire), then generate a new pair straight into the file without printing it: `docker run --rm alpine:3.20 sh -c "apk add -q age >/dev/null && age-keygen 2>/dev/null" > ~/.sentinelops/backup-key.txt`. Save the file in the password manager, put its `# public key:` line's key in `infra/backup-recipient.txt` by pull request, then run **Backup** and the drill with the new key. Backups made with the old key stay readable by whoever has it until they expire (90 days); delete those artifacts if that matters. |
 
-**Rotating `PROXY_SECRET`** (not yet exercised live). For a few minutes the API accepts two
+**Rotating `PROXY_SECRET`** (*exercised live on 2026-11-24: 570 probe requests, 0 not 200*). For a few minutes the API accepts two
 secrets, the new one and `PROXY_SECRET_PREVIOUS`, so the API and the proxy can switch one after
 the other without refusing anyone. Run every step from the repository root in Git Bash. It needs an API image from 2026-11-24 or
 later, which knows `PROXY_SECRET_PREVIOUS`.
@@ -212,8 +212,17 @@ proxy_secret() {
    `infra/terraform.sh plan`. If the plan wants to set the Pages project's `PROXY_SECRET`
    (Cloudflare never returns secret values, so the state still holds the old one), apply it: the
    value is the one the proxy already has; the plan must change only the Pages project. Then
-   `infra/terraform.sh plan` must say "No changes".
-9. Stop the probe. It must report `0 not 200`.
+   `infra/terraform.sh plan` must say "No changes". **Watch for one provider quirk:** in the 2026-11-24
+   drill, applying the new value stored it on Cloudflare as `plain_text`, and the next plan wanted to
+   change only its `type` back to `secret_text`. Apply that too, then confirm Cloudflare holds a
+   secret (this prints the type, never the value):
+   ```bash
+   grep -m1 '^CLOUDFLARE_API_TOKEN=' .env | cut -d= -f2- | tr -d '\r' | sed 's/^/Authorization: Bearer /' |
+     curl -s -H @- "https://api.cloudflare.com/client/v4/accounts/$(grep -m1 '^CLOUDFLARE_ACCOUNT_ID=' .env | cut -d= -f2- | tr -d '\r')/pages/projects/sentinelops" |
+     python -I -c "import json,sys; print(json.load(sys.stdin)['result']['deployment_configs']['production']['env_vars']['PROXY_SECRET']['type'])"
+   ```
+   It must print `secret_text`.
+9. Stop the probe (Ctrl+C). It must report `0 not 200`.
 
 ---
 

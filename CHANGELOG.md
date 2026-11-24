@@ -42,6 +42,9 @@ first hardened production deployment.
 
 ### Fixed
 
+- `infra/set-render-env.sh` could not set a value: it gave curl both the API key and the request
+  body on standard input, so the body arrived empty and Render refused it. Found by the first live
+  rotation; it now sends the update with Python's standard library.
 - The API's CORS preflight now allows `PUT`. It listed every method but that one, so a browser
   refused the password change in local development, where the site and the API are separate
   origins. A test now checks the preflight for every method the API uses.
