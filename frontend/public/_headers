@@ -11,11 +11,21 @@
 # - HSTS: browsers already force HTTPS on .dev addresses (preloaded), but the
 #   header says so for every client. includeSubDomains covers the preview
 #   deployments, which are all HTTPS too.
+# - Permissions-Policy switches off device features the app never uses, so
+#   injected script could not ask for them either. The clipboard stays allowed:
+#   the admin screen copies invite and reset links.
+# - Cross-origin isolation: no other site's window may keep a handle on this
+#   one (COOP), no other site may embed these files (CORP), and this page loads
+#   nothing that has not opted in (COEP). Everything it loads is its own.
 /*
   ! Access-Control-Allow-Origin
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
   Content-Security-Policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Cache-Control: no-cache
 
