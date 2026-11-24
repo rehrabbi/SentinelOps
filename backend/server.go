@@ -21,10 +21,13 @@ import (
 // serverConfig is the environment-derived configuration the HTTP API needs.
 // main reads it from the environment; tests set it directly.
 type serverConfig struct {
-	FrontendOrigin string       // the one origin CORS allows, with credentials
-	SecureCookies  bool         // set the session cookie's Secure flag (true in production)
-	ProxySecret    string       // required in X-Proxy-Secret; empty switches the check off
-	Logger         *slog.Logger // where request logs go; nil means slog.Default()
+	FrontendOrigin string // the one origin CORS allows, with credentials
+	SecureCookies  bool   // set the session cookie's Secure flag (true in production)
+	ProxySecret    string // required in X-Proxy-Secret; empty switches the check off
+	// ProxySecretPrevious is also accepted, only while PROXY_SECRET is being
+	// rotated; empty (the normal state) accepts the current secret alone.
+	ProxySecretPrevious string
+	Logger              *slog.Logger // where request logs go; nil means slog.Default()
 }
 
 // newHandler builds the whole HTTP API: every route, its middleware, and the
@@ -166,7 +169,7 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return reqlog.Middleware(logger, visitorKey, requireProxySecret(noteVisitor, cfg.ProxySecret))
+	return reqlog.Middleware(logger, visitorKey, requireProxySecret(noteVisitor, cfg.ProxySecret, cfg.ProxySecretPrevious))
 }
 
 // visitorKey identifies the visitor for rate limiting: the address the proxy

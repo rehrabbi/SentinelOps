@@ -3,8 +3,9 @@
 //
 // What a line holds: a request ID (also returned to the caller as
 // X-Request-ID), the method, the path without its query string, the status,
-// the duration, the bytes sent, the visitor key, and the user ID when someone
-// is logged in. What it never holds: cookies, headers such as X-Proxy-Secret
+// the duration, the bytes sent, the visitor key, the user ID when someone is
+// logged in, and proxy_secret "previous" when a request came in with the
+// previous proxy secret during a rotation. What it never holds: cookies, headers such as X-Proxy-Secret
 // or Authorization, query strings, or request and response bodies, which is
 // where passwords and invite tokens travel.
 package reqlog
@@ -24,10 +25,12 @@ const maxPathLen = 256
 
 // slot carries what is only known deeper inside the handler chain back out to
 // the logger: the visitor key (set after the proxy check has decided whether
-// to trust the forwarded address) and the logged-in user (set by RequireAuth).
+// to trust the forwarded address), the logged-in user (set by RequireAuth),
+// and whether the previous proxy secret let the request in.
 type slot struct {
-	visitor string
-	userID  string
+	visitor        string
+	userID         string
+	previousSecret bool
 }
 
 type slotKey struct{}
@@ -44,6 +47,16 @@ func SetVisitor(ctx context.Context, visitor string) {
 func SetUser(ctx context.Context, userID string) {
 	if s, ok := ctx.Value(slotKey{}).(*slot); ok {
 		s.userID = userID
+	}
+}
+
+// MarkPreviousSecret records that this request was let in by the previous
+// proxy secret, which is accepted only while a rotation is under way. When no
+// line carries the mark any more, the proxy has switched to the new secret
+// and the previous one can be removed. The secret itself is never logged.
+func MarkPreviousSecret(ctx context.Context) {
+	if s, ok := ctx.Value(slotKey{}).(*slot); ok {
+		s.previousSecret = true
 	}
 }
 
@@ -78,6 +91,9 @@ func Middleware(logger *slog.Logger, visitor func(*http.Request) string, next ht
 		}
 		if s.userID != "" {
 			attrs = append(attrs, slog.String("user_id", s.userID))
+		}
+		if s.previousSecret {
+			attrs = append(attrs, slog.String("proxy_secret", "previous"))
 		}
 		level := slog.LevelInfo
 		switch {
