@@ -150,6 +150,12 @@ step that runs `infra/migrate.sh` on an empty database, restore the newest backu
 | The site too | Cloudflare ([status](https://www.cloudflarestatus.com)); Pages → `sentinelops` → Deployments (did the last deploy fail?). |
 | Neither, but users report errors | API logs: search for `"status":5` or for the `request_id` a user quotes. A database problem shows as errors on real routes while `/api/healthz` stays up (it never touches the database); check [Neon status](https://neonstatus.com). |
 
+**Every `/api` call answers 403 through the site** (the proxy and the API disagree on
+`PROXY_SECRET`; **Deploy frontend**'s last step fails the same way). The API's value is the one in
+Terraform's state, so give it to the proxy again and redeploy (`proxy_secret` is defined in §5):
+`proxy_secret | infra/set-pages-secret.sh`, then `gh workflow run deploy-frontend.yml --ref main`.
+That run's last step proves the fix. *Used on 2026-11-24.*
+
 **Roll back a bad release:**
 - API: put the previous tag back in `infra/api-image-tag.txt` (git history has it), then
   `infra/deploy-api.sh` and `infra/terraform.sh apply -refresh-only`. If the bad release ran a
@@ -175,7 +181,7 @@ Rotate the leaked one first, then check the logs and the audit trail for use of 
 | Provider keys in `.env` (`RENDER_API_KEY`, `CLOUDFLARE_API_TOKEN`, `NEON_API_KEY`, `PG_CONN_STR`) | Roll the key in that provider's dashboard with the same scope, update `.env` on every device, and confirm with `infra/terraform.sh plan` ("No changes"). |
 | Backup private key | Move the old key file aside (keep it until its backups expire), then generate a new pair straight into the file without printing it: `docker run --rm alpine:3.20 sh -c "apk add -q age >/dev/null && age-keygen 2>/dev/null" > ~/.sentinelops/backup-key.txt`. Save the file in the password manager, put its `# public key:` line's key in `infra/backup-recipient.txt` by pull request, then run **Backup** and the drill with the new key. Backups made with the old key stay readable by whoever has it until they expire (90 days); delete those artifacts if that matters. |
 
-**Rotating `PROXY_SECRET`** (*exercised live on 2026-11-24: 570 probe requests, 0 not 200*). For a few minutes the API accepts two
+**Rotating `PROXY_SECRET`** (*exercised live on 2026-11-24: 570 probe requests, 0 not 200; step 8 corrected afterwards, see below*). For a few minutes the API accepts two
 secrets, the new one and `PROXY_SECRET_PREVIOUS`, so the API and the proxy can switch one after
 the other without refusing anyone. Run every step from the repository root in Git Bash. It needs an API image from 2026-11-24 or
 later, which knows `PROXY_SECRET_PREVIOUS`.
@@ -199,22 +205,21 @@ proxy_secret() {
    `proxy_secret | infra/set-render-env.sh PROXY_SECRET`, then `infra/deploy-api.sh`. Its logs show
    "PROXY_SECRET_PREVIOUS is set" at start.
 5. Give the new secret to the proxy: `proxy_secret | infra/set-pages-secret.sh`, then run
-   **Deploy frontend** (`gh workflow run deploy-frontend.yml --ref main`) and wait for it to finish.
-   Not Terraform: the Pages project depends on the Render service, so targeting it would also try
-   to update Render, which the free plan refuses (and Render now holds a variable Terraform does
-   not know).
+   **Deploy frontend** (`gh workflow run deploy-frontend.yml --ref main`) and wait for it to finish;
+   its last step checks `/api/healthz` through the new deployment. wrangler is the **only** writer
+   of the proxy's secret: Terraform sets it once, at creation, and ignores it after that
+   (`ignore_changes` in `infra/frontend.tf`).
 6. Wait until requests stop arriving with the old secret: Render → `sentinelops-api` → Logs, search
    `proxy_secret`. Lines marked `"proxy_secret":"previous"` stop once the new deployment serves
    the site; give it a few minutes past the last one.
 7. Retire the old secret: `infra/set-render-env.sh --delete PROXY_SECRET_PREVIOUS`, then
    `infra/deploy-api.sh`. From here the old value is refused.
-8. Bring Terraform back in line: `infra/terraform.sh apply -refresh-only`, then
-   `infra/terraform.sh plan`. If the plan wants to set the Pages project's `PROXY_SECRET`
-   (Cloudflare never returns secret values, so the state still holds the old one), apply it: the
-   value is the one the proxy already has; the plan must change only the Pages project. Then
-   `infra/terraform.sh plan` must say "No changes". **Watch for one provider quirk:** in the 2026-11-24
-   drill, applying the new value stored it on Cloudflare as `plain_text`, and the next plan wanted to
-   change only its `type` back to `secret_text`. Apply that too, then confirm Cloudflare holds a
+8. Bring Terraform back in line: `infra/terraform.sh apply -refresh-only` (it records Render's new
+   value), then `infra/terraform.sh plan` must say "No changes". **Never apply a change to the Pages
+   project's `PROXY_SECRET` through Terraform.** In the 2026-11-24 drill this step applied it, as an
+   earlier version of this runbook said; the provider stored a wrong value, and because Cloudflare
+   never returns a secret's value, nothing showed it until the next frontend deployment refused
+   every API call for about two minutes (§4 has the fix). Confirm Cloudflare holds an encrypted
    secret (this prints the type, never the value):
    ```bash
    grep -m1 '^CLOUDFLARE_API_TOKEN=' .env | cut -d= -f2- | tr -d '\r' | sed 's/^/Authorization: Bearer /' |

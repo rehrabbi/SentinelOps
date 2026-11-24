@@ -59,8 +59,40 @@ jobs:
       # Uploads dist/ and compiles functions/ into the site's proxy. The project
       # name and branch must match infra/frontend.tf.
       - name: Upload to Cloudflare Pages
-        run: npx wrangler pages deploy dist --project-name sentinelops --branch main --commit-hash "$GITHUB_SHA"
+        id: upload
+        run: |
+          set -o pipefail
+          npx wrangler pages deploy dist --project-name sentinelops --branch main --commit-hash "$GITHUB_SHA" \
+            | tee "$RUNNER_TEMP/wrangler.log"
+          # The address of exactly this deployment, so the check below tests
+          # it rather than whichever deployment the main address serves.
+          url="$(grep -oE 'https://[0-9a-f]+\.sentinelops\.pages\.dev' "$RUNNER_TEMP/wrangler.log" | tail -1)"
+          if [ -z "$url" ]; then
+            echo "::error::wrangler printed no deployment address"
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: "false"
+
+      # /api/healthz through this deployment's own proxy needs its PROXY_SECRET
+      # to match the API's. A mismatch refuses every API call with 403, and on
+      # 2026-11-24 one went unnoticed until a deployment exposed it, for about
+      # two minutes. Failing here emails the owner at once. Retries cover the
+      # API waking up, which can take up to a minute.
+      - name: Check the API through this deployment
+        env:
+          DEPLOYMENT_URL: ${{ steps.upload.outputs.url }}
+        run: |
+          for attempt in $(seq 1 12); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$DEPLOYMENT_URL/api/healthz" || true)"
+            echo "attempt $attempt: $code"
+            if [ "$code" = "200" ]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$DEPLOYMENT_URL/api/healthz answered $code, not 200. A 403 means the proxy and the API disagree on PROXY_SECRET; see docs/RUNBOOK.md §4."
+          exit 1

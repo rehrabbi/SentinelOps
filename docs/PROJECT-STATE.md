@@ -366,8 +366,24 @@ Cloudflare Pages' default `Access-Control-Allow-Origin: *` on static files (remo
 (added; `.dev` is preloaded anyway). The two Informational notes are IGNOREd with reasons. A scan of the
 local container also flagged nginx's version in `Server`, now off (`server_tokens off`).
 
-**⏭️ Next:** merge (the frontend deploys itself), run **ZAP baseline** by hand and confirm it passes
-against production, then brief step 4, operational hygiene.
+Merged as #70; the first scheduled-workflow run against production **passed** (nothing of Medium or
+above). It also listed Lows that only warn: no `Permissions-Policy`, and no cross-origin isolation
+headers (COOP, COEP, CORP). Candidates for step 4.
+
+**Incident, 2026-11-24, 13:47:01 to 13:48:47 UTC (about 2 minutes):** the frontend deployment of #70
+refused every `/api` call with 403, so nobody could log in. Cause: rotation step 8 had applied the
+proxy's `PROXY_SECRET` through Terraform; the Cloudflare provider stored a wrong value (first as
+`plain_text`, then, after the type fix, still wrong). Cloudflare never returns secret values, so
+Terraform kept saying "No changes", and the running deployment, which carried wrangler's correct value,
+hid it until the next one. Fixed by setting the secret again with wrangler from Terraform's state
+(which matched Render) and redeploying. Prevention (#71): Terraform ignores that one value after
+creation (`ignore_changes`, proven by a plan that regenerates the secret and no longer touches
+Pages), wrangler is its only writer, and **Deploy frontend** now ends by checking `/api/healthz`
+through the exact deployment it uploaded, failing (and emailing) on anything but 200. Runbook §4 has
+the recovery, §5 step 8 is corrected. For the learning log at the stage's end: a drill's success
+criterion has to include the next deployment, not just the moment.
+
+**⏭️ Next:** brief step 4, operational hygiene.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.

@@ -49,6 +49,11 @@ first hardened production deployment.
 
 ### Fixed
 
+- The proxy's `PROXY_SECRET` is written only by `infra/set-pages-secret.sh`: Terraform sets it at
+  creation and ignores it afterwards. Applying it through the Cloudflare provider stored a wrong value
+  that Terraform could not see, and the next frontend deployment refused every API call for about two
+  minutes on 2026-11-24. **Deploy frontend** now ends by checking `/api/healthz` through the deployment
+  it uploaded, so such a mismatch fails the deploy at once.
 - `infra/set-render-env.sh` could not set a value: it gave curl both the API key and the request
   body on standard input, so the body arrived empty and Render refused it. Found by the first live
   rotation; it now sends the update with Python's standard library.
