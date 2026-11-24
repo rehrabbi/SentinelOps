@@ -16,7 +16,7 @@ Write down what you did as you go: a GitHub issue labelled `priority: high` is t
 | Terraform state | Neon project `sentinelops-tfstate` in its own organisation (`PG_CONN_STR`) |
 | API logs | Render dashboard → `sentinelops-api` → Logs; one JSON line per request, searchable by `request_id` (returned to callers as `X-Request-ID`) |
 | Uptime alerts | UptimeRobot (owner's account): the site and `/api/healthz` through the proxy, every 5 minutes, by email |
-| Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily), **ZAP baseline** (04:17 UTC Mondays), **Keep schedules alive** (05:41 UTC on the 1st, re-enables the others so GitHub's 60-day inactivity rule never pauses them); a failed scheduled run emails the owner |
+| Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily), **ZAP baseline** (04:17 UTC Mondays), **Render hours** (05:07 UTC Mondays), **Keep schedules alive** (05:41 UTC on the 1st, re-enables the others so GitHub's 60-day inactivity rule never pauses them); a failed scheduled run emails the owner |
 | Audit anchors | branch `audit-anchors`, file `anchors.log` (protected: no force-push, no deletion) |
 | Backups | GitHub Actions artifacts `sentinelops-db-<UTC time>`, 90 days, encrypted with `age` |
 | Backup private key | owner's password manager, and `~/.sentinelops/backup-key.txt` on the machine that restores |
@@ -266,3 +266,19 @@ or logs in, so the failure is a finding, not damage.
    `.zap/rules.tsv` as `IGNORE` with the reason in a comment above it.
 4. **Confirm:** run **ZAP baseline** by hand once the fix is live (`gh workflow run zap-baseline.yml`);
    it must pass.
+
+---
+
+## 8. Render hours failed
+
+Every free Render service shares 750 hours a month; when they run out, Render suspends **all**
+of them, production included, until the 1st. The API alone uses up to 744, so the check fails when
+a second free service is running, or when the API is already suspended.
+
+1. Open the run: its page lists every free web service and whether it is running. Or run
+   `infra/render-hours.sh` locally.
+2. **A second free service is running:** suspend or delete it in the Render dashboard (only the API
+   should be on the free plan), then run **Render hours** again; it must pass.
+3. **The API is suspended:** if the hours ran out, production stays down until the 1st of next
+   month; the only way back sooner is a paid instance for the API (a cost decision for the owner).
+   If someone suspended it by hand, resume it in the dashboard. Either way, record it as an incident.

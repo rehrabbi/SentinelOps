@@ -13,3 +13,7 @@
 # the browser revalidate the page, so a deploy is picked up at once, while the
 # hashed files under /assets are cached for a year (frontend/public/_headers).
 10015	IGNORE	(Re-examine Cache-control Directives)
+# Informational: "storable and cacheable content". Deliberate: the hashed
+# files under /assets are cached for a year, and nothing personal is ever
+# served from them (API responses go through the proxy, not this cache rule).
+10049	IGNORE	(Storable and Cacheable Content)
