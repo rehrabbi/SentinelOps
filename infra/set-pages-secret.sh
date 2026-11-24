@@ -4,11 +4,13 @@
 # command line or in output. It takes effect for the NEXT deployment: run the
 # "Deploy frontend" workflow afterwards.
 #
-# Why not Terraform: the Pages project reads the API's address from the Render
-# service, so targeting it also plans an update to Render, which the free plan
-# refuses (render-oss/terraform-provider-render#80), and during a rotation
-# Render holds PROXY_SECRET_PREVIOUS, which Terraform does not know about. The
-# last step of a rotation brings Terraform back in line (docs/RUNBOOK.md).
+# This is the ONLY writer of the proxy's secret: Terraform sets it once, when
+# it creates the project, and ignores it afterwards (infra/frontend.tf). On
+# 2026-11-24 an apply of a new value through the Cloudflare provider stored a
+# wrong one, which Terraform could not see because Cloudflare never returns
+# secret values; the next deployment refused every API call. Targeting the
+# Pages project in Terraform would also plan a Render update, which the free
+# plan refuses (render-oss/terraform-provider-render#80).
 #
 # Usage:
 #   <command that prints the new value> | infra/set-pages-secret.sh
