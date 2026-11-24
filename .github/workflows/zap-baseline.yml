@@ -1,0 +1,66 @@
+name: ZAP baseline
+
+# Every Monday, and on demand: OWASP ZAP's baseline scan of the live site. It
+# crawls https://sentinelops.pages.dev for a minute and checks every response
+# passively (headers, cookies, CSP, CORS, information leaks). It never sends an
+# attack and never logs in, so it cannot change data. Requests to /api without
+# a session are refused before the database is touched, so it does not wake it.
+#
+# Fails on any finding of Medium risk or above that is not triaged as IGNORE in
+# .zap/rules.tsv (see .zap/judge.py); a failed scheduled run emails the owner.
+# The HTML, JSON and Markdown reports are kept as an artifact for 90 days, and a
+# table of findings appears on the run's page.
+on:
+  schedule:
+    - cron: "17 4 * * 1" # 04:17 UTC on Mondays, clear of Backup and Audit verify
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zap-baseline
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Passive scan of the live site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: .zap
+          sparse-checkout-cone-mode: false
+
+      # The official image, ZAP 2.17.0, pinned by digest so a changed image
+      # cannot slip in under the same tag.
+      - name: Scan
+        run: |
+          mkdir zap
+          cp .zap/rules.tsv zap/
+          # ZAP runs as its own user inside the container and writes its
+          # reports into this directory.
+          chmod a+w zap
+          # -I: ZAP's per-rule warnings do not fail this step; the judge
+          # below applies the policy. ZAP still fails it if the scan errors,
+          # for example when the site cannot be reached.
+          docker run --rm -v "$PWD/zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af \
+            zap-baseline.py -t https://sentinelops.pages.dev -c rules.tsv -I \
+              -r report.html -J report.json -w report.md
+
+      - name: Judge findings
+        run: python3 .zap/judge.py zap/report.json .zap/rules.tsv
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: zap-baseline-${{ github.run_id }}
+          path: |
+            zap/report.html
+            zap/report.json
+            zap/report.md
+          retention-days: 90
+          if-no-files-found: warn
