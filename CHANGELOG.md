@@ -12,6 +12,9 @@ first hardened production deployment.
 
 ### Added
 
+- A weekly passive scan of the live site with OWASP ZAP's baseline (`.github/workflows/zap-baseline.yml`,
+  Mondays and on demand). It never attacks or logs in; any finding of Medium risk or above that is not
+  triaged in `.zap/rules.tsv` fails the run. Reports are kept 90 days and summarised on the run page.
 - `PROXY_SECRET` can be rotated without refusing anyone. During a rotation the API also accepts
   `PROXY_SECRET_PREVIOUS`, compares both in constant time, warns at every start while it is set, and
   marks each request it let in with `"proxy_secret":"previous"` in the request log, so it is clear
@@ -37,6 +40,10 @@ first hardened production deployment.
 
 ### Changed
 
+- The site's security headers, after the first ZAP scan: the CSP no longer allows inline styles
+  (`style-src 'self'`; the production build has none), `Strict-Transport-Security` is set, and
+  Cloudflare Pages' default `Access-Control-Allow-Origin: *` on static files is removed. The container
+  image's nginx no longer announces its version.
 - Pruning also deletes password resets a week after they are used or expire.
 - The admin screen is now titled **Users**, and the logged-in view links to Account security.
 

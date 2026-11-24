@@ -354,7 +354,20 @@ deleted and the API redeployed; Terraform ends at "No changes". The drill found 
 - Avast's HTTPS scanning was intercepting Docker's traffic again after a restart; the owner re-added the
   Web Shield exceptions for api.render.com, console.neon.tech and api.cloudflare.com.
 
-**⏭️ Next:** brief step 3, a scheduled passive (ZAP baseline) scan of the live site.
+**Step 3, a scheduled passive scan (decided 2026-11-24):** `.github/workflows/zap-baseline.yml` runs
+OWASP ZAP's baseline (official image, ZAP 2.17.0, pinned by digest) against https://sentinelops.pages.dev
+every Monday at 04:17 UTC and on demand: a minute of crawling, passive checks only, no login, no attacks.
+`.zap/judge.py` fails the run on any finding of **Medium or above** not marked `IGNORE` in
+`.zap/rules.tsv`, where each accepted finding carries its reason; reports go to a 90-day artifact and a
+table on the run page (no GitHub issues). The first scan of production (run locally) found two Mediums
+and a Low, all fixed in `frontend/public/_headers`: `style-src 'unsafe-inline'` (the production build
+has no inline styles; checked in a browser on every screen, favicon included, with no CSP violations),
+Cloudflare Pages' default `Access-Control-Allow-Origin: *` on static files (removed with `!`), and no HSTS
+(added; `.dev` is preloaded anyway). The two Informational notes are IGNOREd with reasons. A scan of the
+local container also flagged nginx's version in `Server`, now off (`server_tokens off`).
+
+**⏭️ Next:** merge (the frontend deploys itself), run **ZAP baseline** by hand and confirm it passes
+against production, then brief step 4, operational hygiene.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.
