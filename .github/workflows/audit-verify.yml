@@ -29,14 +29,14 @@ jobs:
       contents: write # to append to audit-anchors; main stays protected
     steps:
       # Only the file naming the image Render runs is needed from main.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           sparse-checkout: infra/api-image-tag.txt
           sparse-checkout-cone-mode: false
 
       # The anchor history. Credentials are kept here, as this checkout pushes.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: audit-anchors
           path: anchors

@@ -16,7 +16,7 @@ Write down what you did as you go: a GitHub issue labelled `priority: high` is t
 | Terraform state | Neon project `sentinelops-tfstate` in its own organisation (`PG_CONN_STR`) |
 | API logs | Render dashboard → `sentinelops-api` → Logs; one JSON line per request, searchable by `request_id` (returned to callers as `X-Request-ID`) |
 | Uptime alerts | UptimeRobot (owner's account): the site and `/api/healthz` through the proxy, every 5 minutes, by email |
-| Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily), **ZAP baseline** (04:17 UTC Mondays); a failed scheduled run emails the owner |
+| Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily), **ZAP baseline** (04:17 UTC Mondays), **Keep schedules alive** (05:41 UTC on the 1st, re-enables the others so GitHub's 60-day inactivity rule never pauses them); a failed scheduled run emails the owner |
 | Audit anchors | branch `audit-anchors`, file `anchors.log` (protected: no force-push, no deletion) |
 | Backups | GitHub Actions artifacts `sentinelops-db-<UTC time>`, 90 days, encrypted with `age` |
 | Backup private key | owner's password manager, and `~/.sentinelops/backup-key.txt` on the machine that restores |

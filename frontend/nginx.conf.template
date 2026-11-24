@@ -31,6 +31,11 @@ server {
     add_header Cache-Control           $cache_control always;
     add_header X-Content-Type-Options  "nosniff" always;
     add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
+    # The same isolation headers as frontend/public/_headers, which explains them.
+    add_header Permissions-Policy           "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
+    add_header Cross-Origin-Opener-Policy   "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
     # No 'unsafe-inline' on style-src: the production build links its CSS from
     # a file; only Vite's dev server injects a <style> tag. No HSTS here: this
     # image serves plain http locally, where browsers ignore it.
