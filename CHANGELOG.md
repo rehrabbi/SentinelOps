@@ -12,6 +12,9 @@ first hardened production deployment.
 
 ### Added
 
+- **Render hours** (`render-hours.yml`, Mondays and on demand, and `infra/render-hours.sh` for local
+  use): projects the worst case for Render's 750 free hours a month and fails when a second free
+  service could exhaust them, which would suspend production, or when the API is suspended.
 - `keep-schedules-alive.yml`: on the 1st of each month, re-enables every workflow through GitHub's
   API, so the 60-day inactivity rule for public repositories never pauses the scheduled checks.
 - A weekly passive scan of the live site with OWASP ZAP's baseline (`.github/workflows/zap-baseline.yml`,

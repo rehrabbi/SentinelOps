@@ -393,15 +393,18 @@ criterion has to include the next deployment, not just the moment.
   Users screen, reset link, a new incident through the cross-origin API, no console errors). A monthly
   `keep-schedules-alive.yml` re-enables every workflow in `.github/workflows` through the API, which
   restarts GitHub's 60-day inactivity clock for scheduled runs without committing anything.
-- **B, written, waiting on a new GitHub environment:** `infra/render-hours.sh` projects the worst case
+- **B, built:** `infra/render-hours.sh` projects the worst case
   for Render's 750 free hours (every free web service that is not suspended, awake all month) and fails
   above 750 or when the API is suspended; `render-hours.yml` runs it every Monday with the Render key
   from a `render` environment limited to `main` (owner's choice, knowing Render keys cannot be limited).
-  Tested against the workspace (720 of 750 for November) and against made-up service lists.
+  Tested against the workspace (720 of 750 for November) and against made-up service lists. Environment
+  `render` created 2026-11-24 (owner-approved), limited to `main`, holding `RENDER_API_KEY` (piped from
+  `.env`, never printed).
 - **C, waiting on the owner's Backblaze account:** the nightly Backup also uploads the same encrypted
   file to a private Backblaze B2 bucket (10 GB free, no card), with a key that can only write files.
 
-**⏭️ Next:** the owner approves the `render` environment (B) and creates the B2 account and bucket (C).
+**⏭️ Next:** the owner creates the Backblaze account, a private bucket with a 90-day lifecycle, and a
+write-only key limited to it (C); then the Backup job uploads there too.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.
