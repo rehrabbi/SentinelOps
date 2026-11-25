@@ -43,18 +43,19 @@ function App() {
   // the same transition means both land in one render; otherwise the page's own
   // guard (e.g. /admin's "not an admin, go home") would see the signed-out state
   // first and send the person to "/" instead.
-  useEffect(() => {
-    onSessionExpired(() => {
-      if (authRef.current.kind !== "authenticated") return;
-      const ended: AuthState = { kind: "anonymous", sessionEnded: true };
-      authRef.current = ended;
-      startTransition(() => {
-        setAuth(ended);
-        navigate("/signin", { replace: true });
-      });
-    });
-    return () => onSessionExpired(() => {});
-  }, [navigate]);
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        if (authRef.current.kind !== "authenticated") return;
+        const ended: AuthState = { kind: "anonymous", sessionEnded: true };
+        authRef.current = ended;
+        startTransition(() => {
+          setAuth(ended);
+          navigate("/signin", { replace: true });
+        });
+      }),
+    [navigate]
+  );
 
   // Ask the server who is logged in. Runs on load, and again after anything
   // that may have ended this browser's session from elsewhere.

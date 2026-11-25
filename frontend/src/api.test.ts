@@ -12,14 +12,15 @@ function respond(status: number, body?: unknown): void {
 }
 
 const expired = vi.fn()
+let unsubscribe = () => {}
 
 beforeEach(() => {
   expired.mockClear()
-  onSessionExpired(expired)
+  unsubscribe = onSessionExpired(expired)
 })
 
 afterEach(() => {
-  onSessionExpired(() => {})
+  unsubscribe()
   vi.unstubAllGlobals()
 })
 
@@ -59,5 +60,23 @@ describe('onSessionExpired', () => {
     respond(403)
     await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
     expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('stops running once unsubscribed', async () => {
+    unsubscribe()
+    respond(401)
+    await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('unsubscribing an old handler leaves a newer one in place', async () => {
+    const newer = vi.fn()
+    const unsubscribeNewer = onSessionExpired(newer)
+    unsubscribe()
+    respond(401)
+    await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
+    expect(newer).toHaveBeenCalledTimes(1)
+    expect(expired).not.toHaveBeenCalled()
+    unsubscribeNewer()
   })
 })
