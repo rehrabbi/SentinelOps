@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Field } from './Field'
@@ -95,5 +97,16 @@ describe('Field', () => {
     )
     const texts = describedBy(screen.getByLabelText('Severity')).map((el) => el.textContent)
     expect(texts).toEqual(['How bad is it?', 'Saved drafts are kept for a day.'])
+  })
+})
+
+// jsdom applies no media queries, so this reads the stylesheet: forced colours drop background
+// images, so the drawn chevron must give way to the system's own select arrow there.
+describe('Field.css', () => {
+  it('hands a select back to the system arrow in forced-colours mode', () => {
+    const css = readFileSync(join(import.meta.dirname, 'Field.css'), 'utf8')
+    const block = css.slice(css.indexOf('@media (forced-colors: active)'))
+    expect(block).toMatch(/select\.ui-field-control\s*\{[^}]*appearance:\s*auto/)
+    expect(block).toMatch(/background-image:\s*none/)
   })
 })

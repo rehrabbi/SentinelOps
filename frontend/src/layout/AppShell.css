@@ -96,6 +96,14 @@
   background: var(--color-signal);
 }
 
+/* Forced colours replace backgrounds, which would erase the current-page bar; draw it in the
+   system's text colour instead. */
+@media (forced-colors: active) {
+  .ui-app-nav a[aria-current='page']::after {
+    background: CanvasText;
+  }
+}
+
 .ui-user-menu {
   grid-area: user;
   position: relative;
