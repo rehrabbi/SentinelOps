@@ -38,6 +38,46 @@
   outline: none;
 }
 
+/* Before the session check answers: the page colour and the still mark (also drawn by index.html
+   before any script runs), then a spinner if the wait is long enough to notice. */
+.ui-loading-frame {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Below the mark, out of the flow: the mark stays exactly where index.html first drew it. */
+.ui-loading-frame .ui-loading-spinner {
+  position: absolute;
+  top: calc(50% + 2.5rem);
+}
+
+.ui-loading-mark {
+  display: block;
+  fill: var(--color-border);
+}
+
+.ui-loading-mark .ui-loading-pupil {
+  fill: var(--color-signal);
+}
+
+.ui-page-loading {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-8);
+}
+
+.ui-loading-spinner {
+  color: var(--color-text-muted);
+  animation: ui-loading-appear var(--dur-base) linear 400ms both;
+}
+
+@keyframes ui-loading-appear {
+  from {
+    opacity: 0;
+  }
+}
+
 .ui-shell-brand {
   display: inline-flex;
   align-items: center;

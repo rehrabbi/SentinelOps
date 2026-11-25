@@ -2,6 +2,7 @@ import { startTransition, useEffect, useRef, useState, type ReactNode } from "re
 import { getMe, logout, onSessionExpired, type User } from "./api";
 import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
+import { LoadingFrame } from "./layout/LoadingFrame";
 import { PublicShell } from "./layout/PublicShell";
 import { useRouteFocus } from "./layout/useRouteFocus";
 import { AcceptInvite } from "./pages/AcceptInvite";
@@ -69,13 +70,7 @@ function App() {
 
   useEffect(refreshSession, []);
 
-  if (auth.kind === "loading") {
-    return (
-      <PublicShell>
-        <p className="status loading">Checking your session…</p>
-      </PublicShell>
-    );
-  }
+  if (auth.kind === "loading") return <LoadingFrame />;
 
   const onLoggedIn = (user: User) => setAuth({ kind: "authenticated", user });
   const onLoggedOut = () => setAuth({ kind: "anonymous" });

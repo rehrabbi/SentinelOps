@@ -115,6 +115,17 @@ describe('routes', () => {
   })
 })
 
+describe('while the session check is pending', () => {
+  it('shows neither shell, so a signed-in reload never flashes the public header', () => {
+    getMe.mockReturnValue(new Promise(() => {}))
+    renderAt('/')
+    expect(screen.queryByRole('banner')).toBeNull()
+    expect(screen.queryByRole('contentinfo')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe('Checking your session')
+  })
+})
+
 describe('route changes', () => {
   beforeEach(() => {
     document.title = ''
