@@ -136,7 +136,7 @@
   color: var(--color-text);
 }
 
-/* H1 on the type scale; the class beats the legacy h1 rule in base.css. */
+/* H1 on the type scale. */
 .auth-title {
   margin: 0;
   font: 600 2.25rem/2.75rem var(--font-sans);

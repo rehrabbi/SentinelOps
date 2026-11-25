@@ -117,7 +117,7 @@
   max-width: 38rem;
 }
 
-/* Display on the type scale (brand.md); the class beats the legacy h1 rule in base.css. */
+/* Display on the type scale (brand.md). */
 .landing-title {
   margin: 0;
   font: 600 2.5rem/2.75rem var(--font-sans);

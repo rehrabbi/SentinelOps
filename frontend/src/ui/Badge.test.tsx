@@ -42,7 +42,7 @@ describe('StatusBadge', () => {
       const { container } = render(<StatusBadge status={status} />)
       const badge = screen.getByText(status).closest('.ui-badge')
       expect(badge?.classList.contains(`ui-status-${status}`)).toBe(true)
-      // Never the legacy App.css name, which styles a different pill.
+      // Kit classes are namespaced ui- (src/ui/namespaces.test.ts); never the bare status-<name>.
       expect(badge?.classList.contains(`status-${status}`)).toBe(false)
       expect(container.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
       expect(container.textContent).toBe(`Status: ${status}`)

@@ -1,6 +1,6 @@
 /*
  * The incident overview: headline counts and three small charts above the list.
- * Classes are prefixed overview- (the kit owns ui-, App.css owns the plain names).
+ * Classes are prefixed overview- (the kit owns ui-).
  * Every colour is a token, so both themes work; SVG marks take theirs through these classes.
  * Layout follows the overview's own width (container queries), not the viewport's, so it fits
  * whatever column the page gives it.

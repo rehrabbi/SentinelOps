@@ -1,5 +1,4 @@
 import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
-import "./App.css";
 import { getMe, logout, onSessionExpired, type User } from "./api";
 import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
@@ -84,7 +83,7 @@ function App() {
     try {
       await logout();
     } catch {
-      // see above
+      // Ignored on purpose: the local sign-out below happens either way.
     }
     onLoggedOut();
     navigate("/", { replace: true });
