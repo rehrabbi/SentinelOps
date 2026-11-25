@@ -1,0 +1,51 @@
+/* Shared by AppShell and PublicShell. */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  /* #root still centres text for the legacy screens; the shells set their own reading order. */
+  text-align: start;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+/* First thing a keyboard reaches; shown only while focused. */
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-toast);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-signal);
+  color: var(--color-on-signal);
+  font: 600 0.875rem/1.25rem var(--font-sans);
+  text-decoration: none;
+  transform: translateY(calc(-100% - var(--space-4)));
+}
+
+.skip-link:focus-visible {
+  transform: none;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Main takes focus from the skip link; it needs no ring of its own. */
+.shell-main:focus {
+  outline: none;
+}
+
+.shell-brand {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: 2.75rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+}
+
+.shell-brand:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}

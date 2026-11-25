@@ -1,0 +1,61 @@
+/*
+ * Severity and status badges (brand board section 06, docs/brand.md "Severity and status").
+ * The token colour as text on a tint of itself over the surface (--tint-badge: 16% at night,
+ * 10% by day).
+ * Every pair clears 4.5:1 on its tint (tables in docs/brand.md).
+ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 1.5rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font: 600 0.8125rem/1rem var(--font-sans);
+  white-space: nowrap;
+  color: var(--badge-color);
+  background: color-mix(in srgb, var(--badge-color) var(--tint-badge), var(--color-surface));
+  vertical-align: middle;
+}
+
+.badge-status {
+  font-weight: 500;
+}
+
+.badge-word {
+  text-transform: capitalize;
+}
+
+.badge-bars {
+  flex: none;
+  width: 14px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.badge-bars .off {
+  opacity: 0.28;
+}
+
+.badge-glyph {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.sev-critical { --badge-color: var(--color-sev-critical); }
+.sev-high { --badge-color: var(--color-sev-high); }
+.sev-medium { --badge-color: var(--color-sev-medium); }
+.sev-low { --badge-color: var(--color-sev-low); }
+
+.status-open { --badge-color: var(--color-status-open); }
+.status-investigating { --badge-color: var(--color-status-investigating); }
+.status-resolved { --badge-color: var(--color-status-resolved); }
+.status-closed { --badge-color: var(--color-status-closed); }
+
+/* Windows High Contrast and other forced colours: keep an edge so the badge is still a shape. */
+@media (forced-colors: active) {
+  .badge {
+    border: 1px solid CanvasText;
+  }
+}
