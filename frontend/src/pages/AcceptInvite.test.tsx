@@ -1,0 +1,125 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { User } from '../api'
+import { setMatchMedia } from '../test/setup'
+import { AcceptInvite } from './AcceptInvite'
+
+const maria: User = {
+  id: 'u1',
+  email: 'm.santos@example.com',
+  fullName: 'Maria Santos',
+  role: 'analyst',
+  createdAt: '2026-11-01T00:00:00Z',
+  updatedAt: '2026-11-01T00:00:00Z',
+}
+
+type Reply = { status: number; body?: unknown }
+
+/** Answer each request by "METHOD /path"; anything unlisted is a 404. */
+function serve(routes: Record<string, Reply>) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const key = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`
+    const reply = routes[key] ?? { status: 404 }
+    return new Response(reply.body === undefined ? null : JSON.stringify(reply.body), {
+      status: reply.status,
+    })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+function Where() {
+  return <p data-testid="where">{useLocation().pathname}</p>
+}
+
+function renderInvite(onLoggedIn = vi.fn()) {
+  render(
+    <MemoryRouter initialEntries={['/invite']}>
+      <Routes>
+        <Route path="/invite" element={<AcceptInvite onLoggedIn={onLoggedIn} />} />
+        <Route path="/" element={<p>Home</p>} />
+      </Routes>
+      <Where />
+    </MemoryRouter>,
+  )
+  return onLoggedIn
+}
+
+async function fill(password: string, confirm: string) {
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('Full name'), 'Maria Santos')
+  await user.type(screen.getByLabelText('Password'), password)
+  await user.type(screen.getByLabelText('Confirm password'), confirm)
+  await user.click(screen.getByRole('button', { name: 'Create account' }))
+}
+
+beforeEach(() => {
+  window.history.replaceState(null, '', '/invite#tok-123')
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('AcceptInvite', () => {
+  it('needs the full link: without a token it says so and offers sign-in', () => {
+    window.history.replaceState(null, '', '/invite')
+    renderInvite()
+    expect(screen.getByRole('heading', { level: 1, name: 'Accept your invite' })).toBeTruthy()
+    expect(screen.getByText(/needs the full invite link/i)).toBeTruthy()
+    expect(screen.queryByLabelText('Full name')).toBeNull()
+    expect(screen.getByRole('link', { name: /sign in/i }).getAttribute('href')).toBe('/signin')
+  })
+
+  it('reads the token once and clears it from the address bar', () => {
+    renderInvite()
+    expect(window.location.hash).toBe('')
+    expect(screen.getByLabelText('Full name')).toBeTruthy()
+  })
+
+  it('has a level-one heading and new-password fields of at least 12 characters', () => {
+    renderInvite()
+    expect(screen.getByRole('heading', { level: 1, name: 'Accept your invite' })).toBeTruthy()
+    for (const label of ['Password', 'Confirm password']) {
+      const input = screen.getByLabelText(label)
+      expect(input.getAttribute('autocomplete')).toBe('new-password')
+      expect(input.getAttribute('minlength')).toBe('12')
+    }
+  })
+
+  it('shows "The passwords do not match" and sends nothing', async () => {
+    const fetchMock = serve({})
+    renderInvite()
+    await fill('correct-horse-battery-2', 'correct-horse-battery-3')
+    expect(await screen.findByText('The passwords do not match')).toBeTruthy()
+    expect(screen.getByLabelText('Confirm password').getAttribute('aria-invalid')).toBe('true')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('creates the account, logs in and goes home', async () => {
+    serve({
+      'POST /api/invites/accept': { status: 200, body: maria },
+      'POST /api/sessions': { status: 200, body: maria },
+    })
+    const onLoggedIn = renderInvite()
+    await fill('correct-horse-battery-2', 'correct-horse-battery-2')
+    await waitFor(() => expect(onLoggedIn).toHaveBeenCalledWith(maria))
+    expect(screen.getByTestId('where').textContent).toBe('/')
+  })
+
+  it('shows the server message when the invite is refused', async () => {
+    serve({ 'POST /api/invites/accept': { status: 400, body: { error: 'This invite has expired' } } })
+    renderInvite()
+    await fill('correct-horse-battery-2', 'correct-horse-battery-2')
+    expect(await screen.findByRole('alert')).toBeTruthy()
+  })
+
+  it('under reduced motion has the form on screen from the first render', () => {
+    setMatchMedia('(prefers-reduced-motion: reduce)', true)
+    renderInvite()
+    const form = screen.getByLabelText('Full name').closest('form') as HTMLElement
+    expect(form.style.opacity).not.toBe('0')
+  })
+})

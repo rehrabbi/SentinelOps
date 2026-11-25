@@ -138,7 +138,7 @@ function App() {
           user ? (
             <Navigate to="/" replace />
           ) : (
-            pub(legacy(<AcceptInvite onLoggedIn={onLoggedIn} />))
+            pub(<AcceptInvite onLoggedIn={onLoggedIn} />)
           )
         }
       />
@@ -146,7 +146,7 @@ function App() {
           link in a browser that holds their own session. */}
       <Route
         path="/reset"
-        element={pub(legacy(<ResetPassword onSessionChanged={refreshSession} />))}
+        element={pub(<ResetPassword onSessionChanged={refreshSession} />)}
       />
       <Route path="/privacy" element={pub(<Privacy />)} />
       <Route

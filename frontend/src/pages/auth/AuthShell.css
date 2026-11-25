@@ -1,0 +1,383 @@
+/*
+ * The shared scene and layout of the sign-in, accept-invite and reset-password pages
+ * (brand board section 03, "Wake"). The invite and reset pages are the quiet variant: the same
+ * eye and rings, but no scan, ping or trace (see the end of this file).
+ *
+ * Sign-in timeline, from the first frame:
+ *   0 ms      the heading, form and note settle in (320 ms, 12 px rise); the form takes input at once
+ *   100 ms    the range rings open out behind the eye (900 ms)
+ *   200 ms    the eye wakes: lids part, then the pupil turns in (Logo, ends ~840 ms)
+ *   500 ms    a scan crosses the page, left to right, at a constant speed like a sweep (1400 ms)
+ *   820 ms    one ping leaves the pupil and fades past the first rings (1300 ms)
+ *   ~550-850  as the scan's leading edge reaches the form, it traces the form's top edge in step
+             with it, then the trace fades (the start and length depend on the screen width)
+ * Everything is transform and opacity, plays once, and never covers or blocks the form.
+ * Reduced motion: the scene fades in over 200 ms; nothing travels, nothing turns.
+ */
+
+.auth {
+  --auth-eye: 80px;
+  --auth-top: var(--space-5);
+  /* When the scan's leading edge reaches the form's left edge, and how long it takes to cross it.
+     The scan moves at a constant speed, so these follow from where the form sits at each width. */
+  --auth-trace-at: 550ms;
+  --auth-trace-for: 1000ms;
+  /* The quiet zone: an ellipse around the heading and its subtitle where the ring lines fade out,
+     so the text sits on a clean background. Measured from the pupil (the rings' centre) to the
+     middle of the heading block (measured in the browser: 116 px on phones, 120 px from 768 px).
+     Fully clear for the inner 62%, which covers the text with a margin, then the lines fade back. */
+  --auth-quiet-y: 116px;
+  --auth-quiet-rx: 285px;
+  --auth-quiet-ry: 100px;
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  justify-items: center;
+  padding-block: var(--auth-top) var(--space-6);
+}
+
+/* The decoration: behind everything, clipped to the page column, faded out at the top and bottom. */
+.auth-scene {
+  position: absolute;
+  inset: 0 calc(-1 * var(--space-4));
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 3rem, #000 calc(100% - 4rem), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 3rem, #000 calc(100% - 4rem), transparent);
+}
+
+/* The rings' layer and the ping's layer share one frame, centred on the eye's pupil. */
+.auth-field {
+  position: absolute;
+  top: calc(var(--auth-top) + var(--auth-eye) / 2);
+  left: 50%;
+  width: 1400px;
+  height: 1400px;
+  margin: -700px 0 0 -700px;
+}
+
+/* Range rings, thinning out with distance, and faded out behind the heading (the quiet zone).
+   The two masks multiply (intersect). */
+.auth-range {
+  -webkit-mask-image:
+    radial-gradient(closest-side, #000 22%, transparent 78%),
+    radial-gradient(
+      ellipse var(--auth-quiet-rx) var(--auth-quiet-ry) at 50% calc(50% + var(--auth-quiet-y)),
+      transparent 62%,
+      #000 100%
+    );
+  -webkit-mask-composite: source-in;
+  mask-image:
+    radial-gradient(closest-side, #000 22%, transparent 78%),
+    radial-gradient(
+      ellipse var(--auth-quiet-rx) var(--auth-quiet-ry) at 50% calc(50% + var(--auth-quiet-y)),
+      transparent 62%,
+      #000 100%
+    );
+  mask-composite: intersect;
+}
+
+.auth-range path {
+  fill: none;
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.auth-range path:first-child {
+  stroke: color-mix(in srgb, var(--color-signal) 28%, var(--color-border-subtle));
+}
+
+/* The ping: hidden until it plays, so without animation there is nothing left over. */
+.auth-ping {
+  fill: none;
+  stroke: var(--color-signal);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The scan: a crisp leading edge with a faint wake behind it, strongest where the content is.
+   Hidden until it plays. */
+.auth-beam {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 28%;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-signal) 9%, transparent) 75%,
+    color-mix(in srgb, var(--color-signal) 18%, transparent) calc(100% - 1px),
+    color-mix(in srgb, var(--color-signal) 75%, transparent) calc(100% - 1px)
+  );
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 75%, transparent);
+}
+
+.auth-head {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+/* The mark is square; CSS sets its size so it can grow on wider screens. */
+.auth-eye {
+  width: var(--auth-eye);
+  height: var(--auth-eye);
+  margin-bottom: var(--space-3);
+  /* The ink of the lids, from the text colour like everywhere else. */
+  color: var(--color-text);
+}
+
+/* H1 on the type scale; the class beats the legacy h1 rule in base.css. */
+.auth-title {
+  margin: 0;
+  font: 600 2.25rem/2.75rem var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+.auth-lede {
+  margin: 0;
+  font: 400 1rem/1.5rem var(--font-sans);
+  color: var(--color-text-muted);
+  text-wrap: pretty;
+}
+
+.auth-panel {
+  position: relative;
+  width: min(100%, 25rem);
+  margin-top: var(--space-6);
+  gap: var(--space-4);
+  padding: var(--space-5) 20px;
+}
+
+/* The scan's trace along the top edge, inside the rounded corners. Hidden until it plays. */
+.auth-panel::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  inset-inline: var(--radius-md);
+  height: 1px;
+  background: var(--color-signal);
+  opacity: 0;
+  transform-origin: left center;
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.auth-submit {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+/* Same look as a field's error (Field.css), for a message about the form as a whole. */
+.auth-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}
+
+.auth-error-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.auth-note {
+  max-width: 25rem;
+  margin: var(--space-5) 0 0;
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text-muted);
+  text-align: center;
+  text-wrap: pretty;
+}
+
+@media (min-width: 768px) {
+  .auth {
+    --auth-eye: 96px;
+    --auth-top: var(--space-6);
+    --auth-trace-at: 760ms;
+    --auth-trace-for: 570ms;
+    --auth-quiet-y: 120px;
+    --auth-quiet-rx: 350px;
+    --auth-quiet-ry: 90px;
+    padding-bottom: var(--space-7);
+  }
+
+  .auth-scene {
+    inset-inline: calc(-1 * var(--space-5));
+  }
+
+  .auth-panel {
+    padding: var(--space-5);
+  }
+}
+
+@media (min-width: 1200px) {
+  .auth {
+    --auth-trace-at: 850ms;
+    --auth-trace-for: 400ms;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-head > *:not(.auth-eye),
+  .auth-panel,
+  .auth-note {
+    animation: auth-settle 320ms var(--ease-out) both;
+  }
+
+  /* A short cascade down the page; the form itself starts at once. */
+  .auth-head > .auth-lede {
+    animation-delay: 40ms;
+  }
+
+  .auth-note {
+    animation-delay: 80ms;
+  }
+
+  .auth-range {
+    animation: auth-rings 900ms var(--ease-out) 100ms both;
+  }
+
+  .auth-ping {
+    animation: auth-ping 1300ms var(--ease-out) 820ms both;
+  }
+
+  .auth-beam {
+    animation: auth-scan 1400ms linear 500ms both;
+  }
+
+  /* Drawn at the scan's own speed (linear), then it fades. */
+  .auth-panel::before {
+    animation:
+      auth-trace var(--auth-trace-for) linear var(--auth-trace-at) both,
+      auth-trace-fade calc(var(--auth-trace-for) + 700ms) linear var(--auth-trace-at) both;
+  }
+}
+
+/* base.css shortens every animation to nothing under reduced motion; this one fade is kept on
+   purpose (brand: "Lock and wake become a 200 ms fade"), so it is marked important too. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-scene,
+  .auth-eye {
+    animation: auth-fade 200ms linear both !important;
+  }
+
+  .auth-beam,
+  .auth-ping,
+  .auth-panel::before {
+    display: none;
+  }
+}
+
+/* Deliberately CSS keyframes, not Motion: this is non-interactive ambient decoration (CSP-safe,
+   transform and opacity only, off under reduced motion); Motion with the presets stays the rule for
+   interactive state changes. */
+@keyframes auth-settle {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes auth-rings {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes auth-ping {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(6);
+  }
+}
+
+/* From just off the left edge to just past the right (the beam is 28% of the width). */
+@keyframes auth-scan {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  10%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(360%);
+  }
+}
+
+@keyframes auth-trace {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes auth-trace-fade {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes auth-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The quiet variant (invite and reset): people arrive from a link to do one job, so the eye wakes
+   and the rings open, but nothing sweeps across the form. */
+.auth-quiet .auth-beam,
+.auth-quiet .auth-ping,
+.auth-quiet .auth-panel::before {
+  display: none;
+}
+
+/* A plain message in the panel (a link that needs its token, the confirmation after a reset). */
+.auth-text {
+  margin: 0;
+  font: 400 1rem/1.5rem var(--font-sans);
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.auth-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.auth-link {
+  justify-self: start;
+  font: 500 0.9375rem/1.5rem var(--font-sans);
+  color: var(--color-signal);
+  text-underline-offset: 3px;
+}
