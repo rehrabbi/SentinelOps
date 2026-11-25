@@ -96,8 +96,6 @@ function App() {
         {page}
       </AppShell>
     ) : null;
-  // Today's screens keep their old column (App.css) until each is redesigned.
-  const legacy = (page: ReactNode) => <div className="app">{page}</div>;
   const pub = (page: ReactNode, headerAction?: ReactNode) => (
     <PublicShell headerAction={headerAction}>{page}</PublicShell>
   );
@@ -153,7 +151,7 @@ function App() {
         path="/account"
         element={
           user ? (
-            signedIn(legacy(<AccountPage user={user} onLoggedOut={onLoggedOut} />))
+            signedIn(<AccountPage user={user} onLoggedOut={onLoggedOut} />)
           ) : (
             <Navigate to="/signin" replace />
           )
@@ -163,7 +161,7 @@ function App() {
         path="/admin"
         element={
           user && user.role === "admin" ? (
-            signedIn(legacy(<UsersPage currentUserId={user.id} />))
+            signedIn(<UsersPage currentUserId={user.id} />)
           ) : (
             <Navigate to="/" replace />
           )

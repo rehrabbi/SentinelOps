@@ -80,3 +80,10 @@
   cursor: progress;
   opacity: 1;
 }
+
+/* A finger needs more than a pointer does: the same 44 px as the selects beside them. */
+@media (pointer: coarse) {
+  .ui-btn {
+    min-height: 2.75rem;
+  }
+}
