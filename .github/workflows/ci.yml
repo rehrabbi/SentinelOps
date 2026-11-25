@@ -1,12 +1,13 @@
 name: CI
 
 # Run on every push to main and on every pull request targeting main, so a branch
-# is checked before it is merged rather than after.
+# is checked before it is merged rather than after. Pull requests into the redesign
+# branch are checked too, so the frontend redesign is held to the same bar.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, redesign]
 
 # Least privilege. The default token can write to the repository; this workflow only
 # needs to read the code, so everything else is dropped.
@@ -102,6 +103,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm test
 
       # Runs tsc -b and then the Vite production build, so a type error fails CI.
       - name: Type check and build
