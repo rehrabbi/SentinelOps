@@ -4,9 +4,9 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-22 · **Current release:** ✅ **v0.6.0, observe and recover**, live at
-> https://sentinelops.pages.dev, with all nine checks required. In progress: **Hardening review**
-> (1.0.0, issue #63, milestone #6). Full detail in §6.
+> **Last updated:** 2026-11-25 · **Current release:** ✅ **v1.0.0, the first hardened deployment**, live at
+> https://sentinelops.pages.dev, with all nine checks required. Next: plan what comes after 1.0.0.
+> Full detail in §6.
 
 ---
 
@@ -279,7 +279,21 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
 
-### ⏭️ IN PROGRESS: Hardening review (1.0.0, issue #63, milestone #6)
+### ⏭️ NEXT STEP: plan what comes after 1.0.0
+
+v1.0.0 was released on 2026-11-25, closing issue #63 and milestone #6. From here versions follow semantic
+versioning (see CHANGELOG). Candidates, none started:
+1. **Frontend tests**, the oldest known gap: component tests, and a browser test of the login and
+   reset flows in CI.
+2. **Transactional audit for authentication events**, so a lost entry fails the login, like role
+   changes.
+3. **Environments**, still deferred while every free Render service shares 750 hours.
+4. **Return API deploys to Terraform** once render-oss/terraform-provider-render#105 ships.
+
+Operating routines: run `infra/restore-drill.sh` at least monthly (also on a copy from Backblaze now
+and then); follow `docs/RUNBOOK.md` for any alert.
+
+### ✅ Hardening review (released as v1.0.0, issue #63, milestone #6)
 
 Chosen 2026-11-22 over separate environments, which are deferred: every free Render service shares 750
 instance-hours a month, production already uses about 744 (uptime checks keep it awake), and running
@@ -422,10 +436,17 @@ criterion has to include the next deployment, not just the moment.
   which may reset any account, the only admin's included; the API still refuses an admin's own account.
   Audited as `command-line` with no `created_by`. One test, six deliberate regressions, all caught (one
   only after the test was tightened to require a helpful error).
-- **Still to do:** a restore drill of the newest GitHub backup and of the same night's B2 copy; the stage's
-  learning-log entry, closing the open questions; the 1.0.0 promise (semantic versioning from here: a
-  major version for anything that breaks the HTTP API or how it is run, minor for features, patch for
-  fixes) in CHANGELOG and README; then the release PR, and the tag once the owner says so.
+- **Restore drills, 2026-11-25:** both passed. The newest GitHub backup (`sentinelops-db-20261125T0116Z`)
+  and the same file downloaded from Backblaze (19,869 bytes, SHA-1 `31ab9d0a…`, identical) each restored
+  to schema 7, with 1 user, 1 incident and 4 audit entries, and anchor `4:6b9c…` still holds. The drill
+  first failed because Avast intercepted the container's download of `age` from
+  `dl-cdn.alpinelinux.org`; the owner added that exception.
+- **The 1.0.0 promise:** semantic versioning from here: a major version for anything that breaks the HTTP
+  API or how it is run, minor for features, patch for fixes (CHANGELOG, README).
+- The stage's learning-log entry is written and the open questions are closed, except the Render
+  provider, still pending upstream.
+
+Released as **v1.0.0** on 2026-11-25.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.
@@ -876,7 +897,8 @@ it. The same scanning breaks winget's `msstore` source, so use `--source winget`
 is also installed natively at `D:\Program Files\Terraform`, useful only for `terraform fmt`.
 Since a reboot on 2026-11-21, Avast also intercepts HTTPS from **inside Docker containers**, so the
 providers failed there too. Fixed by Web Shield website exceptions for `api.render.com`,
-`console.neon.tech` and `api.cloudflare.com` (HTTPS scanning stays on for everything else). Check with
+`console.neon.tech`, `api.cloudflare.com` and, for the restore drill's `age` install,
+`dl-cdn.alpinelinux.org` (HTTPS scanning stays on for everything else). Check with
 `docker run --rm curlimages/curl:8.11.1 -skv -o /dev/null https://api.render.com/ 2>&1 | grep issuer`:
 the issuer must not be Avast. Docker Desktop may also quit on its own; start it again before Terraform.
 

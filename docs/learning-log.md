@@ -1416,17 +1416,80 @@ monitoring in #60, the runbook in #61; released as v0.6.0.)*
 
 ---
 
+## Stage: Hardening review (issue #63, milestone #6, released as v1.0.0)
+
+**Decisions:** the last gaps before the deployment could honestly be called hardened, chosen over
+separate environments (deferred: all free Render services share 750 hours a month, and production
+already uses about 744). In order:
+- password change, "log out everywhere", admin-issued resets, and a command-line reset for a locked-out
+  only admin;
+- `PROXY_SECRET` rotation without refusing anyone;
+- a weekly passive scan of the live site (OWASP ZAP baseline);
+- operational hygiene: Node 24 actions, schedules that cannot pause, a Render hours check, a second
+  backup copy;
+- the 1.0.0 review, with a restore drill of both backup copies.
+
+**What happened:** every piece went live, and three drills surfaced real problems. The browser check of
+password change found the API's CORS preflight never listed `PUT`. The first live secret rotation found
+`set-render-env.sh` could not set a value at all. And after that rotation, the next frontend deploy
+refused every API call for about two minutes: Terraform had written a wrong value to the proxy's secret,
+which Cloudflare never shows back. Each was fixed with a test or a check that would catch it again, and
+the outage is recorded in the project state.
+
+**Concepts learned:**
+- **A changed password must end the other sessions.** Otherwise whoever stole a session keeps it.
+  Change keeps the current session, reset and "log out everywhere" end all of them, and a change needs
+  the current password, so a stolen session alone cannot lock the owner out.
+- **No one resets their own account through the app.** An admin's stolen session must not be enough to
+  take over that admin. The way back for a locked-out only admin is the command line, which needs the
+  database login: the same trust as the `invite` command that created the first admin.
+- **Overlap credentials to rotate them.** Two places cannot change a secret at the same instant, so for
+  a few minutes the API accepts the old and the new one, and marks requests that used the old one. When
+  the marks stop, the old one goes. 570 probe requests during the live rotation; none refused.
+- **A drill's verdict must include the next deployment.** The rotation passed every check at the time;
+  the damage surfaced on the following deploy. The fix was structural (one writer for the secret, and a
+  health check at the end of every frontend deploy), not a note to be more careful.
+- **Never let a tool write what it cannot read back.** Cloudflare returns no secret values, so Terraform
+  reported "No changes" over a wrong one. Now Terraform sets the proxy's secret once and ignores it.
+- **Browsers catch what server tests cannot.** CORS, CSP and cross-origin isolation live in the browser.
+  The integration tests called the API directly; the `PUT` preflight only failed in a real page, and a
+  test now covers it.
+- **Passive scanning is cheap and finds real things.** ZAP's first run found inline styles allowed for
+  no reason (the production build has none), Cloudflare's default wildcard CORS on static files, and
+  missing HSTS; then a permissions policy and cross-origin isolation cleared the rest.
+- **Read a credential's real capabilities, not its preset's name.** Backblaze's "Write Only" key could
+  delete files and change retention. What protects the backups is a compliance-mode lock that each
+  upload sets on itself, which nobody can shorten.
+- **Check a credential before storing it.** The first B2 key failed in CI, most likely a newline from a
+  clipboard pipe. The second was tested against Backblaze before being stored as exact bytes.
+- **A backup copy counts only once it has been restored.** The copy downloaded from Backblaze was
+  restored and checked against the audit anchor, the same as the GitHub one.
+- **When no API reports a limit, project the worst case.** Render does not expose hours used, so the
+  weekly check assumes every free service stays awake and fails above 750.
+- **Quiet projects need their safety nets most.** GitHub pauses scheduled workflows after 60 days
+  without commits; re-enabling them through the API restarts that clock without fake commits.
+- **Local security software is part of the environment.** Avast intercepted Docker's HTTPS twice this
+  stage: the three provider hosts after a restart, then the drill's package server. The exceptions are
+  recorded per machine in the project state.
+- **Semantic versioning starts meaning something at 1.0.0.** From here, a major version for anything
+  that breaks the HTTP API or how it is run, a minor one for features, a patch for fixes.
+
+*(Password change and resets in #64 to #66 and #77; rotation in #67 to #69 and #71; ZAP in #70; hygiene
+in #72 to #76; released as v1.0.0.)*
+
+---
+
 ## Questions to revisit later
-- Revisit if the Go learning curve slows the security/cloud learning too much (fallback:
-  a TypeScript/Node backend). Decided against for now in favor of cloud-native depth.
+- ~~Revisit if the Go learning curve slows the security/cloud learning too much~~ Settled at 1.0.0: the
+  whole backend is Go, and it did not.
 - ~~Account enumeration~~: closed in v0.5.0 by removing open sign-up; accounts come from invites.
 - ~~Expired `sessions` rows are never cleaned up~~: pruned on login, at most hourly, since v0.5.0.
 - Render's Terraform provider cannot update free-plan services (render-oss/terraform-provider-render#80).
   When a release includes the fix (#105), return to `terraform apply` and delete `infra/deploy-api.sh`.
-- `actions/checkout` v4.4.0 runs on Node.js 20, which GitHub has deprecated; move every workflow to a
-  newer pinned release.
-- Scheduled workflows pause after 60 days without a commit. Decide how the audit check stays alive
-  if the repository goes quiet.
+  Still open upstream at 1.0.0 (latest provider release v1.9.1), so it stays a known gap.
+- ~~`actions/checkout` v4.4.0 runs on Node.js 20~~ Resolved 2026-11-24: every action on Node.js 24.
+- ~~Scheduled workflows pause after 60 days without a commit~~ Resolved 2026-11-24: a monthly workflow
+  re-enables them through the API.
 - ~~`PROXY_SECRET` rotation is written in the runbook but has never run~~ Resolved 2026-11-24: the API
   accepts `PROXY_SECRET_PREVIOUS` during a rotation, which ran live with no refused requests.
 - ~~Backups live 90 days as GitHub artifacts, all under one GitHub account~~ Resolved 2026-11-25: a
