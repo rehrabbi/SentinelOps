@@ -407,9 +407,12 @@ criterion has to include the next deployment, not just the moment.
   offers only compliance; owner's choice over governance through the API),
   lifecycle hides files after 90 days and deletes them a day later. Key `sentinelops-backup-writer`:
   Backblaze's "Write Only" preset, limited to that bucket. It turned out to include `deleteFiles` and
-  several bucket-settings permissions (but not `writeBucketRetentions` or `bypassGovernance`), which is why
-  Object Lock was switched on: a leaked key still cannot remove a backup before its 90 days. The key's
-  secret went from Backblaze's Copy button through the clipboard into GitHub, unseen; stored as `B2_KEY_ID` and
+  bucket-settings permissions, and once Object Lock was on, `writeBucketRetentions` too, so a leaked key
+  could lower the bucket's default lock. Hence every upload sets its own compliance lock for 90 days
+  (`infra/b2-upload.py`), which nobody can shorten. The first key (`…0001`) failed to authorize in CI
+  (`bad_auth_token`, most likely a newline or wrong value from the first clipboard transfer); the second
+  (`…0002`, `sentinelops-backup-writer-2`) was checked against Backblaze from the owner's machine before
+  being stored, as exact bytes, never displayed; stored as `B2_KEY_ID` and
   `B2_APPLICATION_KEY` in the `backup` environment. A B2 failure fails the run after the GitHub artifact
   is stored.
 
