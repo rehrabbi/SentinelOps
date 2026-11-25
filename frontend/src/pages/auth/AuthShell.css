@@ -25,7 +25,10 @@
   /* The quiet zone: an ellipse around the heading and its subtitle where the ring lines fade out,
      so the text sits on a clean background. Measured from the pupil (the rings' centre) to the
      middle of the heading block (measured in the browser: 116 px on phones, 120 px from 768 px).
-     Fully clear for the inner 62%, which covers the text with a margin, then the lines fade back. */
+     Fully clear for the inner 62%, which covers the text with a margin, then the lines fade back.
+     AuthShell.tsx measures the laid-out text and sets --auth-quiet-fit-*, which win when present:
+     the same shape, centred on the text, grown only when a line would reach past the clear middle
+     (narrow phones, long titles, large default font sizes). */
   --auth-quiet-y: 116px;
   --auth-quiet-rx: 285px;
   --auth-quiet-ry: 100px;
@@ -64,7 +67,8 @@
   -webkit-mask-image:
     radial-gradient(closest-side, #000 22%, transparent 78%),
     radial-gradient(
-      ellipse var(--auth-quiet-rx) var(--auth-quiet-ry) at 50% calc(50% + var(--auth-quiet-y)),
+      ellipse var(--auth-quiet-fit-rx, var(--auth-quiet-rx)) var(--auth-quiet-fit-ry, var(--auth-quiet-ry))
+        at 50% calc(50% + var(--auth-quiet-fit-y, var(--auth-quiet-y))),
       transparent 62%,
       #000 100%
     );
@@ -72,7 +76,8 @@
   mask-image:
     radial-gradient(closest-side, #000 22%, transparent 78%),
     radial-gradient(
-      ellipse var(--auth-quiet-rx) var(--auth-quiet-ry) at 50% calc(50% + var(--auth-quiet-y)),
+      ellipse var(--auth-quiet-fit-rx, var(--auth-quiet-rx)) var(--auth-quiet-fit-ry, var(--auth-quiet-ry))
+        at 50% calc(50% + var(--auth-quiet-fit-y, var(--auth-quiet-y))),
       transparent 62%,
       #000 100%
     );

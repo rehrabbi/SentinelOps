@@ -4,8 +4,10 @@
   box-sizing: border-box;
 }
 
+/* Sizes are relative to the reader's own default font size (18 px and 16 px at the usual 16 px
+   default), so a larger default in the browser's settings makes the whole interface larger. */
 :root {
-  font: 18px/145% var(--font-sans);
+  font: 112.5%/145% var(--font-sans);
   letter-spacing: 0.18px;
   color: var(--color-text-muted);
   background: var(--color-bg);
@@ -16,7 +18,7 @@
   -webkit-text-size-adjust: 100%;
 
   @media (max-width: 1024px) {
-    font-size: 16px;
+    font-size: 100%;
   }
 }
 
