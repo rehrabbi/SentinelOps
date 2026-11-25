@@ -35,7 +35,7 @@ keep working at the same paths.
   unchanged.
 - A shared set of interface parts (buttons, fields, severity and status badges, cards, toasts) used on
   every screen.
-- Frontend tests (Vitest and Testing Library, 289 of them) that run in CI and cover the overview data,
+- Frontend tests (Vitest and Testing Library, 292 of them) that run in CI and cover the overview data,
   sign-in, invite and reset flows, focus handling and the theme.
 - A neutral loading frame while the session is checked, and a retry button when the incident list
   fails to load.

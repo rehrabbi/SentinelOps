@@ -322,7 +322,7 @@ Owner to-dos still open:
 - Packages allowed for this stage: the two fonts and `motion` at runtime; Vitest, Testing Library, jsdom
   and `@resvg/resvg-js` for development only. Nothing else without asking.
 - CSP and security headers are unchanged: no inline style or script, no external origins.
-- Tests: `cd frontend && npm test`, required in CI. 289 tests in 32 files at 15b.
+- Tests: `cd frontend && npm test`, required in CI. 292 tests in 32 files before launch.
 - Signed-in screens load lazily; public pages are 428.72 kB of JavaScript (139.27 kB gzip).
 - The credit line in the public footer names the owner by the GitHub handle `rehrabbi`, a call made by the
   builder for the owner to confirm. There is no terms-of-service page beside the privacy notice.
