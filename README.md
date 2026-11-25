@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/dashboard.png" alt="The incidents screen in the dark theme: three headline counts, charts by severity, status and day, and the list below" width="700">
+  <img src="docs/images/dashboard.png" alt="The incidents screen in the dark theme: three headline counts, charts by severity, status and day" width="700">
 </p>
 
 ---
