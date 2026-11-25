@@ -381,3 +381,8 @@
   color: var(--color-signal);
   text-underline-offset: 3px;
 }
+
+/* Focus lands here programmatically (the confirmation after a reset); it is not a control, so no ring. */
+.auth-confirmation:focus {
+  outline: none;
+}

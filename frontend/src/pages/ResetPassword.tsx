@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { motion } from 'motion/react'
 import { acceptPasswordReset } from '../api'
@@ -25,12 +25,22 @@ export function ResetPassword({ onSessionChanged }: { onSessionChanged: () => vo
   const [confirm, setConfirm] = useState('')
   const [mismatch, setMismatch] = useState(false)
   const [status, setStatus] = useState<FormStatus>({ kind: 'idle' })
+  const doneRef = useRef<HTMLDivElement>(null)
+  const doneMessageId = useId()
 
   useEffect(() => {
     if (window.location.hash) {
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
+
+  // The submit button that had focus is gone once the confirmation replaces the form, so focus would
+  // fall to the page. Move it to the confirmation: it is named and described, so a screen reader
+  // reads "Password reset" and the message as focus lands.
+  const done = status.kind === 'done'
+  useEffect(() => {
+    if (done) doneRef.current?.focus()
+  }, [done])
 
   if (!token) {
     return (
@@ -70,7 +80,6 @@ export function ResetPassword({ onSessionChanged }: { onSessionChanged: () => vo
 
   // One shell for both states, so the confirmation replaces only the panel's content: the eye and
   // rings do not start over.
-  const done = status.kind === 'done'
   return (
     <AuthShell
       quiet
@@ -80,13 +89,17 @@ export function ResetPassword({ onSessionChanged }: { onSessionChanged: () => vo
       {done ? (
         // The swap from the form is an interactive state change, so it uses Motion's presets.
         <motion.div
-          className="auth-actions"
-          role="status"
+          ref={doneRef}
+          className="auth-actions auth-confirmation"
+          role="group"
+          aria-label="Password reset"
+          aria-describedby={doneMessageId}
+          tabIndex={-1}
           variants={variants('fadeUp', reduced)}
           initial="initial"
           animate="show"
         >
-          <p className="auth-text">
+          <p className="auth-text" id={doneMessageId}>
             Your password was changed and every session of your account was logged out.
           </p>
           <Link to="/signin" replace className="auth-link">

@@ -26,6 +26,31 @@ function renderReset(onSessionChanged = vi.fn()) {
   return onSessionChanged
 }
 
+
+/** No jest-dom here, so "visible" is checked by hand: not hidden, not display:none, visibility or opacity 0. */
+function isShown(el: HTMLElement): boolean {
+  for (let e: HTMLElement | null = el; e; e = e.parentElement) {
+    const css = getComputedStyle(e)
+    if (e.hidden || css.display === 'none' || css.visibility === 'hidden' || css.opacity === '0') return false
+  }
+  return true
+}
+
+/**
+ * Fails if the form is hidden on the first frame: no element from the form up to the page root has
+ * an inline opacity of 0 or a transform (a Motion variant would set these inline), and the form
+ * and its first input pass Testing Library's visibility check.
+ */
+function expectShownAtOnce(form: HTMLElement, firstInput: HTMLElement) {
+  for (let el: HTMLElement | null = form; el; el = el.parentElement) {
+    expect(el.style.opacity, `${el.tagName}.${el.className} opacity`).not.toBe('0')
+    expect(el.style.transform, `${el.tagName}.${el.className} transform`).toMatch(/^(|none)$/)
+    expect(el.style.clipPath, `${el.tagName}.${el.className} clip-path`).toBe('')
+  }
+  expect(isShown(form)).toBe(true)
+  expect(isShown(firstInput)).toBe(true)
+}
+
 async function fill(password: string, confirm: string) {
   const user = userEvent.setup()
   await user.type(screen.getByLabelText('New password'), password)
@@ -95,17 +120,26 @@ describe('ResetPassword', () => {
     expect(screen.getByRole('alert').textContent).not.toBe('')
   })
 
-  it('under reduced motion shows the form, and later the confirmation, with nothing hidden', async () => {
+  it('under reduced motion shows the form on the first render, and later the confirmation', async () => {
     setMatchMedia('(prefers-reduced-motion: reduce)', true)
     serve(204)
     renderReset()
-    const form = screen.getByLabelText('New password').closest('form') as HTMLElement
-    expect(form.style.opacity).not.toBe('0')
+    const input = screen.getByLabelText('New password')
+    expectShownAtOnce(input.closest('form') as HTMLElement, input)
     await fill('correct-horse-battery-2', 'correct-horse-battery-2')
-    const done = (await screen.findByText(/every session of your account was logged out/i)).closest(
-      '[role="status"]',
-    ) as HTMLElement
-    expect(done).toBeTruthy()
+    const done = await screen.findByRole('group', { name: 'Password reset' })
     expect(done.style.opacity).not.toBe('0')
+    expect(isShown(done)).toBe(true)
+  })
+
+  it('moves focus to the named, described confirmation after a successful reset', async () => {
+    serve(204)
+    renderReset()
+    await fill('correct-horse-battery-2', 'correct-horse-battery-2')
+    const done = await screen.findByRole('group', { name: 'Password reset' })
+    await waitFor(() => expect(document.activeElement).toBe(done))
+    expect(document.activeElement).not.toBe(document.body)
+    const description = document.getElementById(done.getAttribute('aria-describedby') ?? '')
+    expect(description?.textContent).toMatch(/every session of your account was logged out/i)
   })
 })
