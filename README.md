@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/dashboard.png" alt="SentinelOps incident dashboard" width="700">
+  <img src="docs/images/dashboard.png" alt="The incidents screen in the dark theme: three headline counts, charts by severity, status and day" width="700">
 </p>
 
 ---
@@ -59,15 +59,34 @@ is described in the [changelog](CHANGELOG.md).
 
 ## Screens
 
-| Sign in | Incident list |
+| Landing page | Sign in |
 |---|---|
-| <img src="docs/images/login.png" alt="Login screen" width="380"> | <img src="docs/images/incident-list.png" alt="Incident list with severity and status badges" width="380"> |
+| <img src="docs/images/landing.png" alt="The landing page: the headline 'Incident tracking, watched closely.', Sign in and Have an invite buttons, and the eye mark inside nested diamonds" width="380"> | <img src="docs/images/login.png" alt="The sign-in screen: the eye mark above a card with email and password fields and a Sign in button" width="380"> |
 
-<p align="center">
-  <img src="docs/images/admin-roles.png" alt="Admin screen for changing user roles" width="620">
-</p>
+| Incidents and overview | The same screen in the light theme |
+|---|---|
+| <img src="docs/images/dashboard.png" alt="The incidents screen in the dark theme: three headline counts and charts by severity, status and day" width="380"> | <img src="docs/images/incidents-light.png" alt="The incidents screen in the light theme, with the same counts and charts on a pale background" width="380"> |
 
-<p align="center"><em>The admin screen. Your own row is locked, because an admin may not change their own role.</em></p>
+| Incident list | Users (admin) |
+|---|---|
+| <img src="docs/images/incident-list.png" alt="The incident list: each row has a title, a severity badge, the report time and a status control" width="380"> | <img src="docs/images/admin-roles.png" alt="The users screen: an invite form and one row per account with a role selector, Save and Reset password" width="380"> |
+
+| Account | Privacy notice |
+|---|---|
+| <img src="docs/images/account.png" alt="The account screen: a change-password form and a Log out everywhere button" width="380"> | <img src="docs/images/privacy.png" alt="The public privacy notice, opening with a short version of what the app keeps" width="380"> |
+
+<p align="center"><em>On the users screen your own row is locked, because an admin may not change their own role. Screenshots are from the local stack with test data.</em></p>
+
+### Brand and design
+
+The mark is called Facet: an eye drawn in straight lines, with a signal-blue diamond for the
+pupil. The look is a watchtower at night: deep ink-blue surfaces and one ice-blue signal colour,
+with a light theme that follows the system setting (or the toggle in the account menu). Type is
+Space Grotesk, with JetBrains Mono for IDs, timestamps and counts, both served from the site itself
+because the Content Security Policy allows no other origin. Motion is bold on the landing and
+sign-in pages and quiet where people work, and it respects `prefers-reduced-motion`. The details are
+in [docs/brand.md](docs/brand.md), and the reasons for the choices are in
+[docs/adr/0001-frontend-design-system.md](docs/adr/0001-frontend-design-system.md).
 
 ## Architecture
 
@@ -156,8 +175,9 @@ the threat it answers.
 
 Listed openly, because a portfolio that hides its weak spots is not worth much.
 
-- The frontend has no automated tests. The API's behaviour, including its security
-  controls, is covered by integration tests that run on every pull request.
+- The frontend's tests run in jsdom, so they check behaviour, focus and wording but not
+  layout or real rendering; those were checked by hand in a browser. The API's behaviour,
+  including its security controls, is covered by integration tests that run on every pull request.
 - The audit log is tamper evident, not tamper proof. A database superuser can drop the
   triggers and rebuild the whole hash chain. The scheduled anchor check catches any rebuild
   that reaches back before the last anchor, but entries written since the last run, at most
@@ -180,7 +200,7 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 | Data access | `database/sql` with the pgx driver, hand written SQL | No ORM hiding the database |
 | Database | PostgreSQL 17 in Docker, bound to localhost | Matches the managed Postgres it will deploy onto |
 | Migrations | golang-migrate, SQL embedded with `go:embed` | Versioned schema, one explicit `migrate` subcommand |
-| Frontend | React 19, Vite, TypeScript | Fast dev loop, typed API boundary |
+| Frontend | React 19, Vite, TypeScript, plain CSS tokens, Motion, Vitest | Fast dev loop, typed API boundary, a design system that fits a strict CSP ([ADR 0001](docs/adr/0001-frontend-design-system.md)) |
 | Auth | Server side sessions, bcrypt, `HttpOnly` cookie | Instant revocation, and it teaches cookie security properly |
 | Config | 12 factor environment variables, git ignored `.env` | Secrets never reach the repository |
 | Containers | Multi-stage builds: distroless for the API, `nginx-unprivileged` for the frontend | Small, non-root images with no shell in the API image |
@@ -238,6 +258,13 @@ so it suits a scheduled job.
 
 ```bash
 cd backend && go run . verify-audit
+```
+
+The frontend has its own tests (Vitest and Testing Library). CI runs them on every pull
+request, and `npm run lint` and `npm run build` (which type-checks first) run beside them:
+
+```bash
+cd frontend && npm test
 ```
 
 ### Or run the whole stack in containers
@@ -375,6 +402,13 @@ reset links; `PROXY_SECRET` rotation without refusing anyone, exercised live; a 
 scan and the headers it led to; Node 24 actions, schedules that cannot pause, a Render hours check, and
 a second backup copy in Backblaze B2, locked for 90 days.
 
+**v1.1.0, in progress.** The frontend redesign is built and merged on the `redesign` branch: a new
+brand and logo, a public landing page and privacy notice, every screen redone, an incident overview
+with charts, a light and dark theme, motion that respects reduced-motion settings, an accessibility
+and performance pass, and 289 frontend tests. The API, database and authentication rules are
+unchanged. What remains is a final review of the whole branch, then one pull request from
+`redesign` into `main`, which deploys it. The tag follows that merge.
+
 Deferred: `dev`, `staging`, and `prod` environments. Every free Render service shares 750
 instance-hours a month and production already uses about 744, so a hosted staging environment would
 put production at risk.
@@ -390,6 +424,8 @@ fixes. The known gaps above are the honest list of what 1.0.0 does not do.
 |---|---|
 | [docs/PROJECT-STATE.md](docs/PROJECT-STATE.md) | Where the project stands, every locked decision, the exact next step |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | What to do when production breaks: a failed audit check, a failed backup, restores, outages, leaked secrets |
+| [docs/brand.md](docs/brand.md) | The brand guide: voice, logo, palette with contrast tables, type, motion |
+| [docs/adr/0001-frontend-design-system.md](docs/adr/0001-frontend-design-system.md) | Why the frontend is built the way it is: tokens, CSP, accessibility, performance |
 | [docs/learning-log.md](docs/learning-log.md) | Decisions and why, concepts, security and debugging lessons |
 | [docs/WAYS-OF-WORKING.md](docs/WAYS-OF-WORKING.md) | The collaboration contract behind how this is built |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each release |

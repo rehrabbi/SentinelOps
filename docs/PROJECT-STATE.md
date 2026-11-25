@@ -5,8 +5,9 @@
 > has the blow-by-blow history.
 >
 > **Last updated:** 2026-11-25 · **Current release:** ✅ **v1.0.0, the first hardened deployment**, live at
-> https://sentinelops.pages.dev, with all nine checks required. Next: plan what comes after 1.0.0.
-> Full detail in §6.
+> https://sentinelops.pages.dev, with all nine checks required. **In progress:** the frontend redesign
+> is built on the `redesign` branch (Tasks 0 to 15a merged into it) and heads for v1.1.0. Next: the final
+> review of the whole branch, then the launch pull request into `main`. Full detail in §6.
 
 ---
 
@@ -245,6 +246,11 @@ device; PATCH was rebased on top of it — see the learning log's git lesson.)
   monochrome buttons, link-styled toggle, and the incident dashboard (form, rows, colored
   severity/status **badges** driven by className).
 
+> The three `frontend/src` entries above (`App.tsx`, `incidents.tsx`, `App.css`) describe the
+> frontend as released in v1.0.0. On the `redesign` branch they are replaced by the structure in the
+> "Frontend redesign" entry of §6 (`ui/`, `layout/`, `pages/`, `overview/`, `theme/`, `motion/`,
+> `brand/`, `styles/`), and `App.css` is gone.
+
 **Git:** GitHub Flow on a protected `main`; features shipped via PRs #1–#6 (auth middleware,
 logout, branch-retention docs, frontend auth, registration UI, incident domain) plus the
 incident-UI PR. Merged branches are archived as `merged/*` (never deleted) — see
@@ -277,14 +283,59 @@ real credentials.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
+## 6. ⏭️ THE EXACT NEXT STEP — final review, then launch
 
-### ⏭️ NEXT STEP: plan what comes after 1.0.0
+### ⏭️ NEXT STEP: final review of `redesign`, then the launch pull request (v1.1.0)
 
-v1.0.0 was released on 2026-11-25, closing issue #63 and milestone #6. From here versions follow semantic
-versioning (see CHANGELOG). Candidates, none started:
-1. **Frontend tests**, the oldest known gap: component tests, and a browser test of the login and
-   reset flows in CI.
+The frontend redesign stage (issue #79, milestone #7) is built. Every task, 0 to 15a, was a pull request
+into the long-lived `redesign` branch (cut from `main` at c6aa1cd), merged on green CI and archived as
+`merged/rd-task-<n>`. The tip of `redesign` was db2ad8c when Task 15b (documentation and screenshots) was
+cut from it; pull request #96 carries 15b into `redesign`. The live site still shows the v1.0.0 look: nothing reaches `main`, and so nothing deploys,
+until the launch pull request.
+
+In order:
+1. **Final review of the whole `redesign` branch** against `main`, as one diff: behaviour parity with
+   v1.0.0 (login, invites, resets, roles, incidents, account security), the security headers, and the
+   documentation matching the code.
+2. **Launch pull request `redesign` into `main`**, opened for the owner to look at before it merges. Every
+   merge to `main` deploys to production.
+3. **Release v1.1.0**, tag and release notes from the CHANGELOG's Unreleased entry. The tag happens only
+   on the owner's word.
+
+Owner to-dos still open:
+- Upload `docs/images/social-card.png` as the GitHub social preview (repository settings, which only the
+  owner can change).
+- Turn on 2FA for Backblaze.
+
+**Locked decisions for this stage** (reasons in `docs/adr/0001-frontend-design-system.md`; values in
+`docs/brand.md`; the spec is `docs/superpowers/specs/2026-11-25-frontend-redesign-design.md`):
+- Direction: a watchtower at night. Deep ink-blue base, one ice-blue signal colour (`#86d8ff` at night,
+  `#0a6ea8` by day), severity on its own colour scale so the signal never means danger.
+- Logo: Facet, an eye of straight lines with a diamond pupil. Icons and logo files come from
+  `frontend/src/brand/geometry.ts` (`npm run icons`).
+- Type: Space Grotesk and JetBrains Mono through `@fontsource`, self-hosted because of the CSP.
+- Styling: plain CSS tokens in `frontend/src/styles/tokens.css`, one class prefix per area (`ui-`,
+  `landing-`, `auth-`, `signin-`, `incidents-`, `overview-`, `users-`, `account-`, `privacy-`). No framework.
+- Themes: follow the system; toggle in the account menu; choice in `localStorage` (`sentinelops.theme`).
+- Motion: `motion` 14.12.0 with presets (`frontend/src/motion/presets.ts`), reduced motion respected. The
+  landing idle scan plays once (WCAG 2.2.2). Error toasts never auto-dismiss.
+- Packages allowed for this stage: the two fonts and `motion` at runtime; Vitest, Testing Library, jsdom
+  and `@resvg/resvg-js` for development only. Nothing else without asking.
+- CSP and security headers are unchanged: no inline style or script, no external origins.
+- Tests: `cd frontend && npm test`, required in CI. 289 tests in 32 files at 15b.
+- Signed-in screens load lazily; public pages are 427.96 kB of JavaScript (139.02 kB gzip).
+- The credit line in the public footer names the owner by the GitHub handle `rehrabbi`, a call made by the
+  builder for the owner to confirm. There is no terms-of-service page beside the privacy notice.
+- Frontend layout on the branch: `src/ui/` (the kit), `src/layout/` (app and public shells, route focus,
+  error boundary), `src/pages/`, `src/overview/` (counts and charts), `src/theme/`, `src/motion/`,
+  `src/brand/` (logo) and `src/styles/` (tokens, base).
+- Known smaller item, deferred: with two status saves in flight, focus goes to whichever row finishes
+  first.
+
+### After v1.1.0: candidates, none started
+
+1. **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
+   component tests exist now).
 2. **Transactional audit for authentication events**, so a lost entry fails the login, like role
    changes.
 3. **Environments**, still deferred while every free Render service shares 750 hours.
