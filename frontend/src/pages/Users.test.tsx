@@ -317,6 +317,22 @@ describe('Users page', () => {
     expect(reset().getAttribute('aria-describedby')).toBe(alert.id)
   })
 
+  it('does not double the full stop when the server message already ends with one', async () => {
+    const u = setup()
+    createPasswordReset
+      .mockResolvedValueOnce({ email: BOB.email, expiresAt: '2026-11-25T10:00:00Z', token: 'first-link-fixture' })
+      .mockRejectedValueOnce(new api.ApiError(429, 'Too many requests.'))
+    renderPage()
+    await screen.findByText('Bob Reporter')
+    const reset = () => screen.getByRole('button', { name: 'Reset password for Bob Reporter' })
+    await u.click(reset())
+    await screen.findByRole('textbox', { name: 'Password reset link' })
+    await u.click(reset())
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Too many requests. The link shown before was not replaced: it still works until it expires.',
+    )
+  })
+
   it('a re-issue that never reaches the server does not promise the old link still works', async () => {
     const u = setup()
     createPasswordReset

@@ -45,7 +45,7 @@ const ROLE_DESCRIPTION: Record<Role, string> = {
 function resetFailed(err: unknown, replacing: boolean): string {
   if (err instanceof ApiError) {
     return replacing
-      ? `${err.message}. The link shown before was not replaced: it still works until it expires.`
+      ? `${err.message.replace(/[.!?]$/, '')}. The link shown before was not replaced: it still works until it expires.`
       : err.message
   }
   return replacing
