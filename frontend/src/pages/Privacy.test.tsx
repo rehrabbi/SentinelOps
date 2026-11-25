@@ -44,7 +44,7 @@ describe('privacy notice', () => {
       /1 hour/,
       /audit log/i,
       /IP address/i,
-      /erased on request/i,
+      /cannot be erased on request/i,
       /one log line for every request/i,
       /cookies, request headers, query strings/i,
       /90 days/,
@@ -88,6 +88,33 @@ describe('privacy notice', () => {
     for (const banned of [/GDPR/, /CCPA/, /terms of service/i, /take your privacy/i]) {
       expect(text, String(banned)).not.toMatch(banned)
     }
+  })
+
+  it('says what the audit log and backups really hold', async () => {
+    await renderPrivacy()
+    const text = (screen.getByRole('main').textContent ?? '').replace(/ +/g, ' ')
+    for (const item of [
+      /email address of the person an invite, role change or password reset was for/i,
+      /even if they never created an account/i,
+      /reset holds the account it is for/i,
+      /when there are new entries/i,
+      /any signed-in GitHub user can download/i,
+      /about 90 days/,
+      /rolling 6 hour history/i,
+      /administrators cannot do it in the app/i,
+      /Deleting an account is not currently supported/i,
+      /do not put your email address or anything about your account/i,
+    ]) {
+      expect(text, String(item)).toMatch(item)
+    }
+  })
+
+  it('control: with motion on, the shown-at-once check fails, so the reduced-motion check means something', async () => {
+    setMatchMedia('(prefers-reduced-motion: reduce)', false)
+    const h1 = await renderPrivacy()
+    const article = screen.getByRole('main').querySelector<HTMLElement>('.privacy') as HTMLElement
+    expect(article.style.opacity).toBe('0')
+    expect(() => expectShownAtOnce(h1, article)).toThrow()
   })
 
   it('under reduced motion shows the whole page on the first render', async () => {

@@ -117,9 +117,9 @@ export function Privacy() {
       <Section title="Invite and reset links">
         <p>
           SentinelOps does not send email. An administrator gives you an invite or a password-reset
-          link directly. The server keeps only a SHA-256 hash of the token in it, together with the
-          email address it was issued for, the role (for an invite), who issued it, and when it was
-          made, used and expires.
+          link directly. The server keeps only a SHA-256 hash of the token in it. An invite also holds the
+          email address and role it was issued for, and a reset holds the account it is for. Both
+          record who issued them, and when they were made, used and expire.
         </p>
         <p>
           An invite works once, within <Mono>24 hours</Mono>. A reset link works once, within{' '}
@@ -140,13 +140,15 @@ export function Privacy() {
           Each entry holds the time, the account that acted and a copy of its email address, the
           action, what it was done to, whether it succeeded, a few details of the action (for
           example the old and new role), and the IP address the request came from. A failed sign-in
-          with an email address that has no account stores the address that was typed.
+          with an email address that has no account stores the address that was typed. An entry
+          also keeps the email address of the person an invite, role change or password reset was
+          for, even if they never created an account.
         </p>
         <p>
           Entries are kept. Each is chained by hash to the one before it, and the database refuses
           to change or delete them. Every <Mono>6 hours</Mono> a scheduled check verifies the chain
-          and records its newest entry number and hash, with no personal data, on a branch of the
-          public GitHub repository. The point of the log is that it cannot be rewritten, which also
+          and, when there are new entries, records the newest entry’s number and hash, with no
+          personal data, on a branch of the public GitHub repository. The point of the log is that it cannot be rewritten, which also
           means entries cannot be erased on request, and the copy of your email address in an entry
           stays as it was if your address changes later.
         </p>
@@ -174,13 +176,16 @@ export function Privacy() {
       <Section title="Backups">
         <p>
           Every night, at <Mono>02:47 UTC</Mono>, the whole database is dumped and encrypted with
-          age before it is stored. Two copies are kept for <Mono>90 days</Mono>: a GitHub Actions
-          artifact and a file in a private Backblaze bucket. Only the operator holds the key.
+          age before it is stored. Two copies are kept for about <Mono>90 days</Mono>: a GitHub
+          Actions artifact and a file in a private Backblaze bucket, which deletes its copy a day
+          after the lock ends. Only the operator holds the key.
         </p>
         <p>
-          The GitHub repository is public, and so are its workflow artifacts, but these files are
-          unreadable without the key. A backup holds everything the database held that night, so
-          anything removed from the live database stays in older backups until they expire.
+          The GitHub repository is public, so any signed-in GitHub user can download the encrypted
+          GitHub copies, but they cannot be read without the key. A backup holds everything the
+          database held that night, so anything removed from the live database stays in older
+          backups until they expire. Separately, the database provider keeps a rolling{' '}
+          <Mono>6 hour</Mono> history of the live database, for restoring it to an earlier moment.
         </p>
       </Section>
 
@@ -253,14 +258,17 @@ export function Privacy() {
 
       <Section title="Your choices">
         <p>
-          The app has no self-service way to delete your account or export your data. To see,
-          correct or remove what is stored about you, ask the administrator who invited you, or
-          open an issue in the <a href={`${REPO}/issues`}>GitHub repository</a> and ask for a way
-          to get in touch. Issues there are public, so leave your details out of it.
+          The app has no self-service way to see, correct or delete your data, and administrators
+          cannot do it in the app either: they can change roles and issue invites and resets. The
+          operator can look up or correct an account’s details directly in the database. Deleting
+          an account is not currently supported. To ask, open an issue in the{' '}
+          <a href={`${REPO}/issues`}>GitHub repository</a>. Issues there are public, so do not put
+          your email address or anything about your account in it; ask for a private way to get in
+          touch.
         </p>
         <p>
-          Two things cannot be removed on request: audit log entries, which the database will not
-          change, and backups, which expire after <Mono>90 days</Mono>.
+          Whatever is decided about an account, audit log entries stay, because the database will not
+          change them, and backups stay until they expire after about <Mono>90 days</Mono>.
         </p>
         <p>
           You can sign out at any time, and “Log out everywhere” on the Account page ends every
