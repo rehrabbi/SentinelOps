@@ -78,8 +78,8 @@ jobs:
       # The second, independent copy: the same ciphertext in a private
       # Backblaze B2 bucket, outside GitHub, kept 90 days by the bucket's
       # lifecycle rule. The key is limited to that bucket and cannot read it;
-      # the bucket's Object Lock keeps every file for 90 days in compliance
-      # mode, so neither a leaked key nor anyone else can delete one sooner.
+      # every upload carries its own 90-day compliance lock, which nobody, a
+      # leaked key included, can shorten, so no copy can be deleted sooner.
       # Runs after the artifact upload, so a B2 failure still leaves that copy.
       - name: Copy to Backblaze B2
         env:
