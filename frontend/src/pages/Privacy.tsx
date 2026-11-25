@@ -69,7 +69,7 @@ export function Privacy() {
           </li>
           <li>It has no analytics, no advertising and no trackers, and it sends no email.</li>
           <li>
-            The data sits with five providers, named below. Backups keep a copy for{' '}
+            The data sits with five providers, named below. Backups keep a copy for about{' '}
             <Mono>90 days</Mono>, and the audit log cannot be edited or erased, so a request to
             delete has limits (see “Your choices”).
           </li>
@@ -258,8 +258,9 @@ export function Privacy() {
 
       <Section title="Your choices">
         <p>
-          The app has no self-service way to see, correct or delete your data, and administrators
-          cannot do it in the app either: they can change roles and issue invites and resets. The
+          The app has no self-service way to see, correct or delete your data. Administrators can
+          see each account’s email, name and role, but in the app they can only change roles and
+          issue invites and resets, not correct or delete anything. The
           operator can look up or correct an account’s details directly in the database. Deleting
           an account is not currently supported. To ask, open an issue in the{' '}
           <a href={`${REPO}/issues`}>GitHub repository</a>. Issues there are public, so do not put
