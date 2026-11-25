@@ -16,6 +16,11 @@ vi.mock('./api', async (importOriginal) => {
 
 import * as api from './api'
 import App from './App'
+// The signed-in screens load lazily; importing them here puts their code in the module cache up
+// front, so a test waits for the app, not for the first transform of a module.
+import './pages/Account'
+import './pages/Incidents'
+import './pages/Users'
 
 function user(role: Role): User {
   return {
@@ -123,6 +128,17 @@ describe('while the session check is pending', () => {
     expect(screen.queryByRole('contentinfo')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull()
     expect(screen.getByRole('status').textContent).toBe('Checking your session')
+  })
+
+  it('uses the check main.tsx already started instead of asking again', async () => {
+    const started = Promise.resolve(user('analyst'))
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App firstSessionCheck={started} />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('heading', { level: 1, name: 'Incidents' })).toBeTruthy()
+    expect(getMe).not.toHaveBeenCalled()
   })
 })
 

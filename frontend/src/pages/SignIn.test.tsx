@@ -13,6 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getIncidents, type User } from '../api'
 import App from '../App'
 import { SignIn } from './SignIn'
+// The signed-in screens load lazily; importing them here puts their code in the module cache up
+// front, so a test waits for the app, not for the first transform of a module.
+import './Account'
+import './Incidents'
+import './Users'
 
 // These tests use the real api.ts with fetch stubbed, so the messages on screen are the ones the
 // API client really produces for each response.

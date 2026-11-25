@@ -1,18 +1,23 @@
-import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, startTransition, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { getMe, logout, onSessionExpired, type User } from "./api";
-import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
-import { LoadingFrame } from "./layout/LoadingFrame";
+import { LoadingFrame, PageLoading } from "./layout/LoadingFrame";
 import { PublicShell } from "./layout/PublicShell";
 import { useRouteFocus } from "./layout/useRouteFocus";
 import { AcceptInvite } from "./pages/AcceptInvite";
-import { AccountPage } from "./pages/Account";
-import { Incidents } from "./pages/Incidents";
 import { Landing } from "./pages/Landing";
 import { Privacy } from "./pages/Privacy";
 import { ResetPassword } from "./pages/ResetPassword";
 import { SignIn } from "./pages/SignIn";
-import { UsersPage } from "./pages/Users";
+
+// The signed-in screens load on demand, as their own files, so the public pages (landing, sign
+// in, invite, reset, privacy) never download them. They come from this site like every other
+// script, so the CSP's script-src 'self' covers them.
+const loadIncidents = () => import("./pages/Incidents");
+const Incidents = lazy(() => loadIncidents().then((m) => ({ default: m.Incidents })));
+const AccountPage = lazy(() => import("./pages/Account").then((m) => ({ default: m.AccountPage })));
+const UsersPage = lazy(() => import("./pages/Users").then((m) => ({ default: m.UsersPage })));
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
 // still asking the server (GET /api/me) whether a session exists.
@@ -23,9 +28,18 @@ type AuthState =
   | { kind: "anonymous"; sessionEnded?: boolean }
   | { kind: "authenticated"; user: User };
 
-function App() {
+export interface AppProps {
+  /**
+   * The session check main.tsx started before the first render, used once instead of asking
+   * again on mount. Without it (as in tests) App asks itself.
+   */
+  firstSessionCheck?: Promise<User | null>;
+}
+
+function App({ firstSessionCheck }: AppProps) {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   // Titles every page and, after an in-app navigation, moves focus to the new page's heading.
   useRouteFocus(auth.kind === "loading" ? null : auth.kind === "authenticated");
@@ -60,15 +74,28 @@ function App() {
 
   // Ask the server who is logged in. Runs on load, and again after anything
   // that may have ended this browser's session from elsewhere.
-  function refreshSession() {
-    getMe()
+  function refreshSession(check: Promise<User | null> = getMe()) {
+    check
       .then((user) =>
         setAuth(user ? { kind: "authenticated", user } : { kind: "anonymous" })
       )
       .catch(() => setAuth({ kind: "anonymous" }));
   }
 
-  useEffect(refreshSession, []);
+  // On load, use the check main.tsx already started, if any. It is one promise for the app's
+  // life, so this runs once (twice in development's StrictMode, sharing that one request).
+  useEffect(() => {
+    refreshSession(firstSessionCheck ?? getMe());
+  }, [firstSessionCheck]);
+
+  // Someone on the sign-in or invite page is about to land on the incidents screen: fetch its
+  // code while they type, so it is ready when they arrive. Never on the landing page itself.
+  const aboutToSignIn = auth.kind === "anonymous" && (pathname === "/signin" || pathname === "/invite");
+  useEffect(() => {
+    if (!aboutToSignIn) return;
+    const timer = setTimeout(() => void loadIncidents().catch(() => {}), 1000);
+    return () => clearTimeout(timer);
+  }, [aboutToSignIn]);
 
   if (auth.kind === "loading") return <LoadingFrame />;
 
@@ -92,7 +119,7 @@ function App() {
   const signedIn = (page: ReactNode) =>
     user ? (
       <AppShell user={user} onLogout={handleLogout}>
-        {page}
+        <Suspense fallback={<PageLoading />}>{page}</Suspense>
       </AppShell>
     ) : null;
   const pub = (page: ReactNode, headerAction?: ReactNode) => (
@@ -143,7 +170,7 @@ function App() {
           link in a browser that holds their own session. */}
       <Route
         path="/reset"
-        element={pub(<ResetPassword onSessionChanged={refreshSession} />)}
+        element={pub(<ResetPassword onSessionChanged={() => refreshSession()} />)}
       />
       <Route path="/privacy" element={pub(<Privacy />)} />
       <Route
