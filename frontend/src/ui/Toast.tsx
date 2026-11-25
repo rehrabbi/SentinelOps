@@ -5,14 +5,18 @@ import { useReducedMotion } from '../motion/useReducedMotion'
 import {
   dismissToast,
   getToasts,
+  latestToastId,
   subscribeToasts,
   type ToastItem,
   type ToastKind,
 } from './toast-store'
 import './Toast.css'
 
-// How long each kind stays up. Errors stay longer: they take longer to read and act on.
-const DURATION: Record<ToastKind, number> = { info: 5000, success: 5000, error: 8000 }
+// How long each kind stays up. Info and success only confirm something the screen already shows
+// (the new incident is in the list, the new role is in its row), so they may go by themselves;
+// the clock stops while the pointer or focus is on one, or the tab is hidden. An error says
+// something the person may need to act on, so it stays until they dismiss it (WCAG 2.2.1).
+const DURATION: Record<ToastKind, number | null> = { info: 5000, success: 5000, error: null }
 
 // Read before the message, so the kind is in words as well as colour and icon.
 const KIND_LABEL: Record<ToastKind, string> = { info: 'Note:', success: 'Done:', error: 'Error:' }
@@ -46,6 +50,18 @@ function KindIcon({ kind }: { kind: ToastKind }) {
   )
 }
 
+/**
+ * The toast to announce: the newest one, while it is on screen, if it arrived after this Toaster
+ * mounted (one already showing when the page changes was read where it first appeared).
+ */
+function useNewest(items: readonly ToastItem[]): ToastItem | null {
+  const [before] = useState(latestToastId)
+  const latest = latestToastId()
+  if (latest <= before) return null
+  // Once the newest is dismissed, nothing is announced: an older toast never moves up into its place.
+  return items.find((item) => item.id === latest) ?? null
+}
+
 /** True while the page is in a background tab, so toasts do not expire unseen. */
 function usePageHidden(): boolean {
   const [hidden, setHidden] = useState(() => document.visibilityState === 'hidden')
@@ -66,12 +82,12 @@ function Toast({ item, pageHidden, reduced }: { item: ToastItem; pageHidden: boo
 
   // Count down only while nobody is reading it; resume from where it stopped.
   useEffect(() => {
-    if (paused) return
+    if (paused || remaining.current === null) return
     const started = Date.now()
     const timer = setTimeout(() => dismissToast(item.id), remaining.current)
     return () => {
       clearTimeout(timer)
-      remaining.current = Math.max(0, remaining.current - (Date.now() - started))
+      if (remaining.current !== null) remaining.current = Math.max(0, remaining.current - (Date.now() - started))
     }
   }, [paused, item.id])
 
@@ -110,25 +126,31 @@ function Toast({ item, pageHidden, reduced }: { item: ToastItem; pageHidden: boo
 }
 
 /**
- * Where toast() messages appear: one polite live region, bottom right (bottom, full width, on
- * phones). The shells mount it once; do not mount another.
+ * Where toast() messages appear: bottom right (bottom, full width, on phones). The shells mount it
+ * once; do not mount another.
+ *
+ * Announcing is kept apart from the visible stack. A polite live region holds only the newest
+ * toast, so a screen reader reads each message once, as it arrives: never the older ones again
+ * when the stack changes, and nothing when one goes. (aria-relevant="additions" on the stack
+ * itself would say the same, but screen readers honour it unevenly.)
  */
 export function Toaster() {
   const items = useSyncExternalStore(subscribeToasts, getToasts, getToasts)
   const reduced = useReducedMotion()
   const pageHidden = usePageHidden()
+  const newest = useNewest(items)
 
   return (
-    // Announce each new toast on its own: not the whole stack again, and not removals.
-    <div
-      className="ui-toaster"
-      role="status"
-      aria-live="polite"
-      aria-atomic="false"
-      aria-relevant="additions"
-      aria-label="Notifications"
-    >
-      <ol className="ui-toaster-list">
+    <div className="ui-toaster">
+      <p className="visually-hidden" role="status">
+        {newest ? (
+          // Keyed, so a repeated message is a new node and is read again.
+          <span key={newest.id}>
+            {KIND_LABEL[newest.kind]} {newest.message}
+          </span>
+        ) : null}
+      </p>
+      <ol className="ui-toaster-list" aria-label="Notifications">
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <Toast key={item.id} item={item} pageHidden={pageHidden} reduced={reduced} />

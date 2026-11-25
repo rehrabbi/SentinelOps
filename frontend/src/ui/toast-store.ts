@@ -54,3 +54,8 @@ export function subscribeToasts(listener: Listener): () => void {
 export function getToasts(): readonly ToastItem[] {
   return items
 }
+
+/** The id of the most recent toast() call (0 before the first), whether or not it is still shown. */
+export function latestToastId(): number {
+  return nextId - 1
+}
