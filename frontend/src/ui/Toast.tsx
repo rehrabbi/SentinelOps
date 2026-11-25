@@ -55,6 +55,7 @@ function KindIcon({ kind }: { kind: ToastKind }) {
  * mounted (one already showing when the page changes was read where it first appeared).
  */
 function useNewest(items: readonly ToastItem[]): ToastItem | null {
+  // A toast raised before its Toaster mounts is shown but not announced, by design.
   const [before] = useState(latestToastId)
   const latest = latestToastId()
   if (latest <= before) return null

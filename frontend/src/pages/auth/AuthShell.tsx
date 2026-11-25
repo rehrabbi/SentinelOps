@@ -49,6 +49,8 @@ function useQuietZone(section: RefObject<HTMLElement | null>) {
       for (const el of head.children) {
         if (!(el instanceof HTMLElement) || el.classList.contains('auth-eye')) continue
         const box = el.getBoundingClientRect()
+        // offsetLeft/offsetTop are measured from the offsetParent: this relies on .auth being
+        // positioned (so it is that parent) and .auth-head staying unpositioned.
         const x = rootBox.left + el.offsetLeft - box.left
         const y = rootBox.top + el.offsetTop - box.top
         const range = document.createRange()
