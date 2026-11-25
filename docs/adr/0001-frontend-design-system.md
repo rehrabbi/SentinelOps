@@ -75,7 +75,8 @@ chunks. Tokens are plain CSS for the same reason: nothing has to be injected at 
 - The landing page's idle scan plays once and stops. WCAG 2.2.2 wants a way to pause motion that
   lasts more than 5 seconds, and reduced motion is not a pause control. The hero motion ends about
   4.2 seconds after load.
-- Error toasts never dismiss themselves and are not evicted by newer toasts. Info and success
+- Error toasts never dismiss themselves, and a newer toast pushes one out only when all three
+  toasts on screen are errors. Info and success
   toasts go after 5 seconds, pausing on hover, focus or a hidden tab; they only confirm what the
   screen already shows (WCAG 2.2.1).
 - The per-day chart can be shown as a table, so keyboard and touch users can read each day.

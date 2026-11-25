@@ -283,14 +283,14 @@ real credentials.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — pick a direction
+## 6. ⏭️ THE EXACT NEXT STEP — final review, then launch
 
 ### ⏭️ NEXT STEP: final review of `redesign`, then the launch pull request (v1.1.0)
 
 The frontend redesign stage (issue #79, milestone #7) is built. Every task, 0 to 15a, was a pull request
 into the long-lived `redesign` branch (cut from `main` at c6aa1cd), merged on green CI and archived as
 `merged/rd-task-<n>`. The tip of `redesign` was db2ad8c when Task 15b (documentation and screenshots) was
-cut from it. The live site still shows the v1.0.0 look: nothing reaches `main`, and so nothing deploys,
+cut from it; pull request #96 carries 15b into `redesign`. The live site still shows the v1.0.0 look: nothing reaches `main`, and so nothing deploys,
 until the launch pull request.
 
 In order:
