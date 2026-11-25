@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { changePassword, logoutEverywhere, type User } from '../api'
 import { Button } from '../ui/Button'
@@ -26,6 +26,7 @@ export function AccountPage({ user, onLoggedOut }: { user: User; onLoggedOut: ()
 
 function ChangePasswordForm({ email }: { email: string }) {
   const formRef = useRef<HTMLFormElement>(null)
+  const errorId = useId()
   const doneRef = useRef<HTMLParagraphElement>(null)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -83,6 +84,8 @@ function ChangePasswordForm({ email }: { email: string }) {
           onChange={(e) => setCurrent(e.target.value)}
           required
           autoComplete="current-password"
+          aria-describedby={status.kind === 'error' && !mismatch ? errorId : undefined}
+          aria-invalid={status.kind === 'error' && !mismatch ? true : undefined}
         />
         <Field
           label="New password"
@@ -106,7 +109,7 @@ function ChangePasswordForm({ email }: { email: string }) {
           error={mismatch && status.kind === 'error' ? status.message : undefined}
         />
         {status.kind === 'error' && !mismatch && (
-          <p className="account-error" role="alert">
+          <p id={errorId} className="account-error" role="alert">
             {status.message}
           </p>
         )}

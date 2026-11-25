@@ -87,7 +87,9 @@ describe('Account page', () => {
     renderPage()
     await fill(u, 'wrong-password-1', 'brand-new-password', 'brand-new-password')
     await u.click(screen.getByRole('button', { name: 'Change password' }))
-    expect((await screen.findByRole('alert')).textContent).toBe('current password is incorrect')
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe('current password is incorrect')
+    expect(screen.getByLabelText('Current password').getAttribute('aria-describedby')).toBe(alert.id)
     expect(onLoggedOut).not.toHaveBeenCalled()
     // Still on the Account page, fields kept so the person can correct the one that was wrong.
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeTruthy()

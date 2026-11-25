@@ -94,6 +94,9 @@ export function UsersPage({ currentUserId }: { currentUserId: string }) {
   // A reset link lets whoever holds it choose this person's password, so it is shown once, in the
   // row, and handed over by the admin like an invite. Throws on failure; the row shows why.
   async function issueReset(userId: string) {
+    // Drop whatever link is showing before asking for a new one, so the old link is never on
+    // screen beside a request for its replacement.
+    setShownReset(null)
     const reset = await createPasswordReset(userId)
     setShownReset({ userId, reset })
   }
@@ -179,6 +182,7 @@ function UserRow({
 }) {
   const errorId = useId()
   const selfNoteId = useId()
+  const draftId = useId()
   const selectRef = useRef<HTMLSelectElement>(null)
   const resetButtonRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<HTMLTextAreaElement>(null)
@@ -244,7 +248,7 @@ function UserRow({
     resetButtonRef.current?.querySelector('button')?.focus()
   }
 
-  const describedBy = [error ? errorId : null, isSelf ? selfNoteId : null].filter(Boolean).join(' ')
+  const describedBy = [error ? errorId : null, isSelf ? selfNoteId : null, dirty && !isSelf ? draftId : null].filter(Boolean).join(' ')
 
   return (
     <li className="users-row" aria-busy={saving || issuing || undefined}>
@@ -259,6 +263,11 @@ function UserRow({
             You can't change your own role, so there is always one admin left.
           </p>
         )}
+        {dirty && !isSelf && (
+          <p id={draftId} className="users-note">
+            Currently {cap(user.role)}. Not saved until you press Save.
+          </p>
+        )}
         {error && (
           <p id={errorId} className="users-error" role="alert">
             {error}
@@ -268,7 +277,7 @@ function UserRow({
       <div className="users-controls">
         <select
           ref={selectRef}
-          className="users-select"
+          className={dirty && !isSelf ? 'users-select users-select-changed' : 'users-select'}
           aria-label={`Role for ${user.fullName}`}
           aria-describedby={describedBy || undefined}
           aria-invalid={error ? true : undefined}
@@ -278,21 +287,24 @@ function UserRow({
         >
           <RoleOptions />
         </select>
-        <Button
-          variant="secondary"
-          onClick={save}
-          disabled={isSelf || !dirty}
-          busy={saving}
-          aria-label={`Save role for ${user.fullName}`}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
+        {!isSelf && (
+          <Button
+            variant="secondary"
+            onClick={save}
+            disabled={!dirty}
+            busy={saving}
+            aria-label={`Save role for ${user.fullName}`}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        )}
         {!isSelf && (
           <div ref={resetButtonRef}>
             <Button
               variant="ghost"
               onClick={issueReset}
               busy={issuing}
+              aria-describedby={error ? errorId : undefined}
               aria-label={`Reset password for ${user.fullName}`}
             >
               {issuing ? 'Creating…' : 'Reset password'}
@@ -303,6 +315,7 @@ function UserRow({
       {shownReset && (
         <div className="users-row-link">
           <OneTimeLink
+            key={shownReset.token}
             ref={linkRef}
             label="Password reset link"
             link={`${window.location.origin}/reset#${shownReset.token}`}
@@ -332,6 +345,7 @@ function UserRow({
 function InviteForm() {
   const formRef = useRef<HTMLFormElement>(null)
   const linkRef = useRef<HTMLTextAreaElement>(null)
+  const errorId = useId()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('reporter')
   const [status, setStatus] = useState<
@@ -386,6 +400,8 @@ function InviteForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="off"
+          aria-describedby={status.kind === 'error' ? errorId : undefined}
+          aria-invalid={status.kind === 'error' ? true : undefined}
         />
         <Field label="Role" hint={ROLE_DESCRIPTION[role]}>
           {(control) => (
@@ -401,12 +417,13 @@ function InviteForm() {
         </div>
       </form>
       {status.kind === 'error' && (
-        <p className="users-error" role="alert">
+        <p id={errorId} className="users-error" role="alert">
           {status.message}
         </p>
       )}
       {status.kind === 'issued' && (
         <OneTimeLink
+          key={status.invite.token}
           ref={linkRef}
           label="Invite link"
           link={link}
