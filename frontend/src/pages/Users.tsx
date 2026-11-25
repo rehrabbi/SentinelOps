@@ -38,6 +38,21 @@ const ROLE_DESCRIPTION: Record<Role, string> = {
   admin: 'Does what an analyst does, and manages users, invites and password resets.',
 }
 
+// Why a reset link could not be made. When it was to replace a link already shown, also say what
+// became of that one. The server issues a link in one transaction, so a refusal it answered left
+// the earlier link working. If it could not be reached, the request may or may not have arrived,
+// so nobody knows whether the earlier link still works.
+function resetFailed(err: unknown, replacing: boolean): string {
+  if (err instanceof ApiError) {
+    return replacing
+      ? `${err.message.replace(/[.!?]$/, '')}. The link shown before was not replaced: it still works until it expires.`
+      : err.message
+  }
+  return replacing
+    ? "Couldn't create a new reset link. The link shown before may have stopped working, so create a new one before you send it."
+    : 'Could not create the reset link'
+}
+
 function cap(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1)
 }
@@ -187,6 +202,7 @@ function UserRow({
   const resetButtonRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<HTMLTextAreaElement>(null)
   const wasSaving = useRef(false)
+  const wasIssuing = useRef(false)
   const [choice, setChoice] = useState<Role>(user.role)
   const [saving, setSaving] = useState(false)
   const [issuing, setIssuing] = useState(false)
@@ -204,6 +220,17 @@ function UserRow({
     }
     wasSaving.current = saving
   }, [saving])
+
+  // A failed reset: the button was disabled while it ran, which drops focus. Put it back on the
+  // button, beside the message that says what happened.
+  useEffect(() => {
+    if (wasIssuing.current && !issuing && error) {
+      const active = document.activeElement
+      const stranded = !active || active === document.body || (active as HTMLButtonElement).disabled
+      if (stranded) resetButtonRef.current?.querySelector('button')?.focus()
+    }
+    wasIssuing.current = issuing
+  }, [issuing, error])
 
   // When this row's link appears, put the cursor on it so it is read out and ready to copy.
   const hasLink = shownReset !== null
@@ -232,12 +259,14 @@ function UserRow({
   }
 
   async function issueReset() {
+    // A link already on screen leaves it as the request starts (see UsersPage.issueReset).
+    const replacing = shownReset !== null
     setIssuing(true)
     setError(null)
     try {
       await onIssueReset(user.id)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create the reset link')
+      setError(resetFailed(err, replacing))
     } finally {
       setIssuing(false)
     }
@@ -277,6 +306,7 @@ function UserRow({
       <div className="users-controls">
         <select
           ref={selectRef}
+          name="role"
           className={dirty && !isSelf ? 'users-select users-select-changed' : 'users-select'}
           aria-label={`Role for ${user.fullName}`}
           aria-describedby={describedBy || undefined}

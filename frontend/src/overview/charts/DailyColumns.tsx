@@ -1,4 +1,4 @@
-import { useState, type PointerEvent } from 'react'
+import { useId, useState, type PointerEvent } from 'react'
 import { dayDomain } from '../stats'
 import { formatCount, incidents, longDate, shortDate } from '../format'
 import { capLabel, columnPath, MONO_CHAR, useWidth } from './geometry'
@@ -7,7 +7,9 @@ import { Grow } from './motion'
 // Incidents reported per UTC day: one column per day, one colour (a single series needs no
 // legend; the heading names it). The axis never runs below 4, so one incident is a short column
 // on a calm scale rather than a spike to the top. The busiest day carries its count on its cap;
-// hovering a day reads out its date and count. Screen readers get the same numbers as text.
+// hovering a day reads out its date and count. "Show as table" swaps the chart for the same
+// numbers as a table, so a keyboard or a finger reaches every day too. Screen readers get the
+// numbers as text either way.
 
 export interface DailyColumnsProps {
   days: { date: string; count: number }[]
@@ -24,6 +26,8 @@ const MAX_COLUMN = 24
 export function DailyColumns({ days, reduced }: DailyColumnsProps) {
   const [ref, width] = useWidth<HTMLDivElement>(320)
   const [active, setActive] = useState<number | null>(null)
+  const [asTable, setAsTable] = useState(false)
+  const tableId = useId()
 
   const counts = days.map((d) => d.count)
   const max = Math.max(0, ...counts)
@@ -54,23 +58,64 @@ export function DailyColumns({ days, reduced }: DailyColumnsProps) {
   }
 
   const busyDays = days.filter((d) => d.count > 0)
+  const summary =
+    first && last
+      ? total === 0
+        ? `No incidents reported from ${longDate(first.date)} to ${longDate(last.date)}, in UTC.`
+        : `${incidents(total)} reported from ${longDate(first.date)} to ${longDate(last.date)}, in UTC, on ${busyDays.length} ${busyDays.length === 1 ? 'day' : 'days'}. Days not listed had none.`
+      : null
 
   return (
     <div className="overview-daily">
-      <p className="overview-readout" aria-hidden="true">
-        {active !== null ? (
-          <>
-            <span className="overview-readout-date">{shortDate(days[active].date)}</span>{' '}
-            <span className="overview-readout-count">{formatCount(days[active].count)}</span> reported
-          </>
-        ) : (
-          <>
-            <span className="overview-readout-count">{formatCount(total)}</span> reported in {days.length} days
-          </>
-        )}
-      </p>
+      <div className="overview-daily-bar">
+        <p className="overview-readout" aria-hidden="true">
+          {asTable ? null : active !== null ? (
+            <>
+              <span className="overview-readout-date">{shortDate(days[active].date)}</span>{' '}
+              <span className="overview-readout-count">{formatCount(days[active].count)}</span> reported
+            </>
+          ) : (
+            <>
+              <span className="overview-readout-count">{formatCount(total)}</span> reported in {days.length} days
+            </>
+          )}
+        </p>
+        <button
+          type="button"
+          className="overview-daily-toggle"
+          aria-controls={asTable ? tableId : undefined}
+          onClick={() => setAsTable((v) => !v)}
+        >
+          {asTable ? 'Show as chart' : 'Show as table'}
+        </button>
+      </div>
 
-      <div ref={ref} className="overview-daily-plot">
+      {asTable ? (
+        <div id={tableId} className="overview-daily-table-wrap">
+          <p className="overview-daily-summary">{summary}</p>
+          {busyDays.length > 0 ? (
+            <table className="overview-daily-table">
+              <caption className="visually-hidden">Incidents reported per day, last {days.length} days, UTC</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Day (UTC)</th>
+                  <th scope="col">Reported</th>
+                </tr>
+              </thead>
+              <tbody>
+                {busyDays.map((d) => (
+                  <tr key={d.date}>
+                    <th scope="row">{longDate(d.date)}</th>
+                    <td>{formatCount(d.count)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div ref={ref} className="overview-daily-plot" hidden={asTable}>
         <svg
           className="overview-daily-svg"
           viewBox={`0 0 ${width} ${HEIGHT}`}
@@ -151,13 +196,11 @@ export function DailyColumns({ days, reduced }: DailyColumnsProps) {
         </svg>
       </div>
 
-      {first && last ? (
+      {/* The chart is drawn for eyes only; this is the same data for a screen reader. Not needed
+          while the visible table is showing. */}
+      {summary && !asTable ? (
         <div className="visually-hidden">
-          <p>
-            {total === 0
-              ? `No incidents reported from ${longDate(first.date)} to ${longDate(last.date)}, in UTC.`
-              : `${incidents(total)} reported from ${longDate(first.date)} to ${longDate(last.date)}, in UTC, on ${busyDays.length} ${busyDays.length === 1 ? 'day' : 'days'}. Days not listed had none.`}
-          </p>
+          <p>{summary}</p>
           {busyDays.length > 0 ? (
             <ul>
               {busyDays.map((d) => (

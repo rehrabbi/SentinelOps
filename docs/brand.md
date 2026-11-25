@@ -212,7 +212,7 @@ only, plays once, and never stands between someone and their work.
 |---|---|---|---|
 | Wake | The eye starts shut, showing only the empty diamond socket. The lids part, then the pupil fades in, turning from a quarter turn and growing from half size. | Lids 560 ms ease-out after 200 ms; pupil 420 ms ease-out from 420 ms | `<Logo animated>`, the sign-in moment |
 | Lock | The lids slide together until their points touch the pupil, the pupil ticks a quarter turn with a small scale pop, and the lids part. | Close 270 ms ease-in-out, tick 360 ms ease-out, open 360 ms ease-out | After sign-in succeeds |
-| Idle scan | The pupil glides 4 units left, right and back, and one diamond ping passes under the lids. | 8 s loop, ease-in-out | Landing hero only |
+| Idle scan | The pupil glides 4 units left, right and back, and one diamond ping passes under the lids. Once, as the wake settles: it does not loop, so the hero is still within 5 s (WCAG 2.2.2) and nothing keeps pulling the eye from the words. | Glide 3.2 s ease-in-out, ping 1.8 s ease-out, both from 1 s | Landing hero only |
 
 Under `prefers-reduced-motion: reduce`, nothing travels or turns. Lock and wake become a 200 ms
 fade or nothing at all (the `Logo` component simply renders still), and the idle scan doesn't run.
@@ -258,5 +258,5 @@ Don't:
 - Rotate, stretch or rearrange the mark and wordmark, or set the wordmark in another font.
 - Use the signal colour for severity, or a severity colour for anything that isn't severity.
 - Use `--color-border-subtle` as the edge of an input or button.
-- Loop the idle scan anywhere except the landing hero, or animate anything under reduced motion
-  beyond a short fade.
+- Loop the idle scan, play it anywhere except the landing hero, or animate anything under reduced
+  motion beyond a short fade.

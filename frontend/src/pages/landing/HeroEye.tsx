@@ -5,10 +5,11 @@ import { useReducedMotion } from '../../motion/useReducedMotion'
 
 /**
  * The hero's eye: the Facet mark drawn large, waking once on mount (the same wake as
- * `<Logo animated>`), then keeping watch with the idle scan, which plays here and nowhere else
- * (docs/brand.md, Motion). The scan is CSS (Landing.css): the pupil glides 4 units left, right
- * and back, and one diamond ping passes under the lids, on an 8 s loop. Its group wraps the
- * pupil, so it never fights Motion for the pupil's own transform.
+ * `<Logo animated>`), then looking about once with the idle scan, which plays here and nowhere
+ * else (docs/brand.md, Motion). The scan is CSS (Landing.css): the pupil glides 4 units left,
+ * right and back, and one diamond ping passes under the lids, once; it does not loop, so all of
+ * it is over within 5 s. Its group wraps the pupil, so it never fights Motion for the pupil's own
+ * transform.
  *
  * Decorative: the page's heading names the product. Under reduced motion the eye is drawn still
  * and the scan does not run.

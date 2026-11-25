@@ -4,8 +4,10 @@
   box-sizing: border-box;
 }
 
+/* Sizes are relative to the reader's own default font size (18 px and 16 px at the usual 16 px
+   default), so a larger default in the browser's settings makes the whole interface larger. */
 :root {
-  font: 18px/145% var(--font-sans);
+  font: 112.5%/145% var(--font-sans);
   letter-spacing: 0.18px;
   color: var(--color-text-muted);
   background: var(--color-bg);
@@ -16,7 +18,7 @@
   -webkit-text-size-adjust: 100%;
 
   @media (max-width: 1024px) {
-    font-size: 16px;
+    font-size: 100%;
   }
 }
 
@@ -56,50 +58,7 @@ body {
   }
 }
 
-/* Current screens: type and spacing from the old index.css, kept until each screen is redesigned.
-   The page frame (width, centring, borders) now belongs to the shells. */
-h1,
-h2 {
-  font-family: var(--font-sans);
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-
+/* Paragraphs carry no margin of their own; every layout spaces them with gap or its own rule. */
 p {
   margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--font-mono);
-  display: inline-flex;
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--color-surface-raised);
 }

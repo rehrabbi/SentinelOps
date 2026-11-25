@@ -1,7 +1,7 @@
 /*
  * The admin screen (Users.tsx, OneTimeLink.tsx): invite form, user list, one-time links. A work
- * screen, so steady and quiet. Classes are prefixed users- (the kit owns ui-, App.css owns the
- * plain names). Colours, spacing and type come from the tokens.
+ * screen, so steady and quiet. Classes are prefixed users- (the kit owns ui-). Colours,
+ * spacing and type come from the tokens.
  */
 .users-page {
   display: grid;

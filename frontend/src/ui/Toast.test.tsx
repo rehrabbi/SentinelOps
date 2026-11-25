@@ -10,20 +10,51 @@ afterEach(() => {
 })
 
 describe('toast', () => {
-  it('shows messages in one polite live region', () => {
+  it('shows every toast in a labelled list, and announces only the newest in one polite region', () => {
     render(<Toaster />)
     act(() => {
       toast('Incident INC-0142 saved', 'success')
       toast('Could not reach the server. Try again.', 'error')
     })
+    const list = screen.getByRole('list', { name: 'Notifications' })
+    expect(within(list).getByText('Incident INC-0142 saved')).toBeTruthy()
+    expect(within(list).getByText('Could not reach the server. Try again.')).toBeTruthy()
+
     const regions = screen.getAllByRole('status')
     expect(regions).toHaveLength(1)
-    expect(regions[0].getAttribute('aria-live')).toBe('polite')
-    // New toasts are read on their own; older ones and removals are not re-read.
-    expect(regions[0].getAttribute('aria-atomic')).toBe('false')
-    expect(regions[0].getAttribute('aria-relevant')).toBe('additions')
-    expect(within(regions[0]).getByText('Incident INC-0142 saved')).toBeTruthy()
-    expect(within(regions[0]).getByText('Could not reach the server. Try again.')).toBeTruthy()
+    // role="status" is polite and atomic: it reads its whole (one-message) content.
+    expect(regions[0].textContent).toBe('Error: Could not reach the server. Try again.')
+  })
+
+  it('never re-reads an older toast when the newest goes', async () => {
+    render(<Toaster />)
+    act(() => {
+      toast('Incident reported', 'success')
+      toast('Maria Santos is now analyst', 'success')
+    })
+    const region = screen.getByRole('status')
+    expect(region.textContent).toBe('Done: Maria Santos is now analyst')
+    const dismissNewest = screen.getAllByRole('button', { name: 'Dismiss' })[1]
+    await userEvent.click(dismissNewest)
+    await waitFor(() => expect(screen.queryByText('Maria Santos is now analyst')).toBeNull())
+    expect(region.textContent).toBe('')
+  })
+
+  it('reads a repeated message again, as a new announcement', () => {
+    render(<Toaster />)
+    act(() => toast('Incident reported', 'success'))
+    const first = screen.getByRole('status').firstElementChild
+    act(() => toast('Incident reported', 'success'))
+    const second = screen.getByRole('status').firstElementChild
+    expect(second?.textContent).toBe('Done: Incident reported')
+    expect(second).not.toBe(first)
+  })
+
+  it('does not announce toasts that were already showing when it mounted', () => {
+    act(() => toast('Incident reported', 'success'))
+    render(<Toaster />)
+    expect(screen.getByText('Incident reported')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('')
   })
 
   it('names the kind in words, not only colour', () => {
@@ -52,6 +83,15 @@ describe('toast', () => {
     )
     await userEvent.click(dismiss)
     await waitFor(() => expect(screen.queryByText('Invite link copied')).toBeNull())
+  })
+
+  it('never dismisses an error by itself', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    render(<Toaster />)
+    act(() => toast('Could not save the incident.', 'error'))
+    act(() => vi.advanceTimersByTime(10 * 60_000))
+    vi.useRealTimers()
+    expect(screen.getByText('Could not save the incident.')).toBeTruthy()
   })
 
   it('dismisses itself after a while', async () => {

@@ -15,11 +15,21 @@ let items: readonly ToastItem[] = []
 let nextId = 1
 const listeners = new Set<Listener>()
 
-// At most this many on screen; the oldest goes first.
+// At most this many on screen. Over the cap, the oldest non-error goes first: errors stay until
+// dismissed, so one is dropped only when every toast shown is an error.
 const MAX_VISIBLE = 3
 
 function emit() {
   for (const listener of listeners) listener()
+}
+
+function evict(list: readonly ToastItem[]): readonly ToastItem[] {
+  const next = [...list]
+  while (next.length > MAX_VISIBLE) {
+    const i = next.findIndex((t) => t.kind !== 'error')
+    next.splice(i === -1 ? 0 : i, 1)
+  }
+  return next
 }
 
 /**
@@ -28,7 +38,7 @@ function emit() {
  */
 export function toast(message: string, kind: ToastKind = 'info'): number {
   const id = nextId++
-  items = [...items, { id, message, kind }].slice(-MAX_VISIBLE)
+  items = evict([...items, { id, message, kind }])
   emit()
   return id
 }
@@ -53,4 +63,9 @@ export function subscribeToasts(listener: Listener): () => void {
 
 export function getToasts(): readonly ToastItem[] {
   return items
+}
+
+/** The id of the most recent toast() call (0 before the first), whether or not it is still shown. */
+export function latestToastId(): number {
+  return nextId - 1
 }

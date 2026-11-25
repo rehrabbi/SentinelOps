@@ -1,7 +1,7 @@
 /*
  * The incident screen (Incidents.tsx): report form, overview, list. A work screen, so it is
- * steady and dense rather than showy. Classes are prefixed incidents- (the kit owns ui-, and
- * App.css owns the plain names). Colours, spacing and type come from the tokens.
+ * steady and dense rather than showy. Classes are prefixed incidents- (the kit owns ui-).
+ * Colours, spacing and type come from the tokens.
  */
 .incidents-page {
   display: grid;

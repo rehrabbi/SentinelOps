@@ -178,7 +178,7 @@ export function Incidents() {
           <EmptyState
             headingLevel={3}
             title="No incidents yet"
-            body="Nothing has been reported. When something goes wrong, report it and it will show up here."
+            body="There are none you can see yet. When something goes wrong, report it and it will show up here."
           />
         )}
         {list.kind === 'ready' && list.incidents.length > 0 && (
@@ -286,6 +286,7 @@ function IncidentRow({
           </svg>
           <select
             ref={selectRef}
+            name="status"
             className="incidents-status-select"
             aria-label={`Status for ${incident.title}`}
             aria-describedby={error ? errorId : undefined}

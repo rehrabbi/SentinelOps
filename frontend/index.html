@@ -30,7 +30,12 @@
     <meta name="twitter:image:alt" content="The SentinelOps logo, an eye drawn in straight lines, above the line: Incident tracking, watched closely." />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- On screen until the app starts: the same frame as LoadingFrame (src/layout/LoadingFrame.tsx). -->
+      <div class="ui-shell ui-loading-frame">
+        <svg class="ui-loading-mark" viewBox="0 0 64 64" width="48" height="48" aria-hidden="true" focusable="false"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="ui-loading-pupil" d="M32 24L40 32L32 40L24 32Z"/></svg>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

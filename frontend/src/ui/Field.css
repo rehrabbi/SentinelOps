@@ -53,6 +53,16 @@ select.ui-field-control {
   background-repeat: no-repeat;
 }
 
+/* Forced colours (Windows High Contrast) drop background images, and the chevron with them, so
+   hand the select back to the system, which draws its own arrow in the system's colours. */
+@media (forced-colors: active) {
+  select.ui-field-control {
+    appearance: auto;
+    padding-right: var(--space-3);
+    background-image: none;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .ui-field-control:hover:not(:disabled, :focus-visible) {
     border-color: var(--color-text-muted);

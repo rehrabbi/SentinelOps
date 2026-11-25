@@ -1,5 +1,8 @@
 .theme-toggle {
   display: inline-flex;
+  /* With a large default font on a narrow screen, the three choices wrap rather than overflow. */
+  flex-wrap: wrap;
+  max-width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);

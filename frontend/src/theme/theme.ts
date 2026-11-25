@@ -42,9 +42,16 @@ function systemPrefersDark(): boolean {
   return window.matchMedia(DARK_QUERY).matches
 }
 
-/** Apply the remembered choice. Call once before the first render. */
+/**
+ * Apply the remembered choice, and keep following the system while that choice is "system".
+ * Call once before the first render. (The toggle follows the system too while it is mounted, but
+ * on signed-in screens it lives in a menu that is usually closed.)
+ */
 export function initTheme(): void {
   applyTheme(resolveTheme(readChoice(), systemPrefersDark()))
+  window.matchMedia(DARK_QUERY).addEventListener('change', (event) => {
+    if (readChoice() === 'system') applyTheme(event.matches ? 'dark' : 'light')
+  })
 }
 
 export function useTheme(): {

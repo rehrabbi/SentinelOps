@@ -26,7 +26,16 @@ export interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 }
 
 /** A labelled form control with optional hint and error, wired for screen readers. */
-export function Field({ label, hint, error, children, id, className, ...inputProps }: FieldProps) {
+export function Field({
+  label,
+  hint,
+  error,
+  children,
+  id,
+  className,
+  'aria-describedby': describedByProp,
+  ...inputProps
+}: FieldProps) {
   const autoId = useId()
   const controlId = id ?? `${autoId}-control`
   const hintId = `${autoId}-hint`
@@ -34,8 +43,11 @@ export function Field({ label, hint, error, children, id, className, ...inputPro
   const hasError = error !== undefined && error !== null && error !== false && error !== ''
   const hasHint = hint !== undefined && hint !== null && hint !== false && hint !== ''
 
-  // The error is read before the hint: it is the thing to act on.
-  const describedBy = [hasError ? errorId : null, hasHint ? hintId : null].filter(Boolean).join(' ')
+  // The error is read before the hint: it is the thing to act on. Anything the caller points at
+  // (a message elsewhere on the page) is kept, after both.
+  const describedBy = [hasError ? errorId : null, hasHint ? hintId : null, describedByProp || null]
+    .filter(Boolean)
+    .join(' ')
 
   const control: FieldControlProps = {
     id: controlId,

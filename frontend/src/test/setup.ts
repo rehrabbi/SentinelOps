@@ -50,6 +50,8 @@ export function setMatchMedia(query: string, value: boolean): void {
 }
 
 beforeEach(() => {
+  // jsdom has no layout, so no scrolling; its scrollTo only logs "not implemented".
+  window.scrollTo = () => {}
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,

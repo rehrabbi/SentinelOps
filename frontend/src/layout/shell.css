@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100svh;
-  /* Reading order starts at the left; legacy screens centre themselves inside their own .app column. */
+  /* Reading order starts at the left. */
   text-align: start;
   color: var(--color-text-muted);
   background: var(--color-bg);
@@ -31,9 +31,51 @@
   outline-offset: 2px;
 }
 
-/* Main takes focus from the skip link; it needs no ring of its own. */
-.ui-shell-main:focus {
+/* Main takes focus from the skip link; it needs no ring of its own. Nor does a page's heading,
+   which takes focus after a navigation (useRouteFocus) only so the new page is announced. */
+.ui-shell-main:focus,
+[data-route-focus]:focus {
   outline: none;
+}
+
+/* Before the session check answers: the page colour and the still mark (also drawn by index.html
+   before any script runs), then a spinner if the wait is long enough to notice. */
+.ui-loading-frame {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Below the mark, out of the flow: the mark stays exactly where index.html first drew it. */
+.ui-loading-frame .ui-loading-spinner {
+  position: absolute;
+  top: calc(50% + 2.5rem);
+}
+
+.ui-loading-mark {
+  display: block;
+  fill: var(--color-border);
+}
+
+.ui-loading-mark .ui-loading-pupil {
+  fill: var(--color-signal);
+}
+
+.ui-page-loading {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-8);
+}
+
+.ui-loading-spinner {
+  color: var(--color-text-muted);
+  animation: ui-loading-appear var(--dur-base) linear 400ms both;
+}
+
+@keyframes ui-loading-appear {
+  from {
+    opacity: 0;
+  }
 }
 
 .ui-shell-brand {
@@ -48,4 +90,24 @@
 .ui-shell-brand:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 4px;
+}
+
+/* A screen that failed to load, inside its shell (RouteErrorBoundary). */
+.ui-route-error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding-block: var(--space-8);
+}
+
+.ui-route-error-title {
+  margin: 0;
+  color: var(--color-text);
+  font: 600 1.5rem/2rem var(--font-sans);
+}
+
+.ui-route-error-message {
+  margin: 0;
+  color: var(--color-danger);
+  font: 400 0.9375rem/1.4rem var(--font-sans);
 }

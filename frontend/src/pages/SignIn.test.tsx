@@ -13,6 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getIncidents, type User } from '../api'
 import App from '../App'
 import { SignIn } from './SignIn'
+// The signed-in screens load lazily; importing them here puts their code in the module cache up
+// front, so a test waits for the app, not for the first transform of a module.
+import './Account'
+import './Incidents'
+import './Users'
 
 // These tests use the real api.ts with fetch stubbed, so the messages on screen are the ones the
 // API client really produces for each response.
@@ -68,11 +73,11 @@ function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>
 }
 
-function renderSignIn(onLoggedIn = vi.fn()) {
+function renderSignIn(onLoggedIn = vi.fn(), sessionEnded = false) {
   render(
     <MemoryRouter initialEntries={['/signin']}>
       <Routes>
-        <Route path="/signin" element={<SignIn onLoggedIn={onLoggedIn} />} />
+        <Route path="/signin" element={<SignIn onLoggedIn={onLoggedIn} sessionEnded={sessionEnded} />} />
         <Route path="/" element={<p>Home</p>} />
       </Routes>
       <Where />
@@ -113,6 +118,42 @@ describe('SignIn', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Invalid email or password')
   })
 
+  it('ties wrong credentials to both fields and puts the cursor back in the password', async () => {
+    serve({ 'POST /api/sessions': { status: 401 } })
+    renderSignIn()
+    await signIn('m.santos@example.com', 'not-the-password')
+    const alert = await screen.findByRole('alert')
+    const email = screen.getByLabelText('Email')
+    const password = screen.getByLabelText('Password') as HTMLInputElement
+    for (const field of [email, password]) {
+      expect(field.getAttribute('aria-invalid')).toBe('true')
+      expect(field.getAttribute('aria-describedby')?.split(' ')).toContain(alert.id)
+    }
+    await waitFor(() => expect(document.activeElement).toBe(password))
+    expect(password.selectionStart).toBe(0)
+    expect(password.selectionEnd).toBe(password.value.length)
+  })
+
+  it('leaves the fields valid when the error is not about them, and returns focus to the button', async () => {
+    serve({ 'POST /api/sessions': { status: 429, headers: { 'Retry-After': '60' } } })
+    renderSignIn()
+    await signIn('m.santos@example.com', 'not-the-password')
+    await screen.findByRole('alert')
+    expect(screen.getByLabelText('Email').hasAttribute('aria-invalid')).toBe(false)
+    expect(screen.getByLabelText('Password').hasAttribute('aria-invalid')).toBe(false)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Sign in' })))
+  })
+
+  it('never shows the session-ended notice beside a sign-in error', async () => {
+    serve({ 'POST /api/sessions': { status: 401 } })
+    renderSignIn(vi.fn(), true)
+    expect(screen.getByRole('alert').textContent).toContain('Your session ended')
+    await signIn('m.santos@example.com', 'not-the-password')
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Invalid email or password'))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.queryByText('Your session ended. Sign in again.')).toBeNull()
+  })
+
   it('shows the wait after too many attempts', async () => {
     serve({ 'POST /api/sessions': { status: 429, headers: { 'Retry-After': '120' } } })
     renderSignIn()
@@ -150,6 +191,24 @@ describe('a session that ends mid-use', () => {
     expect(await screen.findByText('Your session ended. Sign in again.')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/signin')
+    // The person is told where they are: focus moves to the page heading, and the notice is read.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: 'Sign in' })),
+    )
+  })
+
+  it('after signing in, lands on the incidents screen with focus on its heading', async () => {
+    serve({
+      'GET /api/me': { status: 401 },
+      'POST /api/sessions': { status: 200, body: maria },
+      'GET /api/incidents': { status: 200, body: [] },
+    })
+    renderApp('/signin')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await signIn('m.santos@example.com', 'correct-horse-battery')
+    const incidents = await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    await waitFor(() => expect(document.activeElement).toBe(incidents))
+    await waitFor(() => expect(document.title).toBe('Incidents · SentinelOps'))
   })
 
   // /admin sends anyone who is not an admin to "/"; the expiry must still end on the sign-in screen.

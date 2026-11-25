@@ -1,6 +1,6 @@
 /*
  * The account screen (Account.tsx): change password, log out everywhere. Steady and quiet.
- * Classes are prefixed account- (the kit owns ui-, App.css owns the plain names).
+ * Classes are prefixed account- (the kit owns ui-).
  */
 .account-page {
   display: grid;

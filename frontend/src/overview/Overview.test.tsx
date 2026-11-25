@@ -1,4 +1,5 @@
 import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Incident, IncidentSeverity, IncidentStatus } from '../api'
 import { setMatchMedia } from '../test/setup'
@@ -249,6 +250,43 @@ describe('Overview accessibility', () => {
   it('says so when nothing was reported in the window', () => {
     setMatchMedia(REDUCE, true)
     render(<Overview incidents={[incident('closed', 'low', '2026-01-01T00:00:00Z')]} now={NOW} />)
+    expect(screen.getByText('No incidents reported from 27 October 2026 to 25 November 2026, in UTC.')).toBeTruthy()
+  })
+})
+
+describe('Overview per-day table', () => {
+  it('swaps the chart for a visible table of every day with incidents, and back', async () => {
+    setMatchMedia(REDUCE, true)
+    const user = userEvent.setup()
+    const { container } = render(<Overview incidents={SAMPLE} now={NOW} />)
+    const toggle = screen.getByRole('button', { name: 'Show as table' })
+    await user.click(toggle)
+
+    const table = screen.getByRole('table', { name: /incidents reported per day/i })
+    const rows = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.textContent)
+    expect(rows).toEqual(['12 November 20266', '24 November 20264'])
+    expect(within(table).getAllByRole('rowheader').map((h) => h.textContent)).toEqual(['12 November 2026', '24 November 2026'])
+    // The chart is out of the way, and its screen-reader copy is not read twice.
+    expect((container.querySelector('.overview-daily-plot') as HTMLElement).hidden).toBe(true)
+    expect(screen.queryByText('12 November 2026: 6')).toBeNull()
+    // Focus stays on the switch, which now offers the way back.
+    expect(document.activeElement).toBe(toggle)
+    expect(toggle.textContent).toBe('Show as chart')
+    expect(toggle.getAttribute('aria-controls')).toBe(table.parentElement?.id)
+
+    await user.click(toggle)
+    expect(screen.queryByRole('table')).toBeNull()
+    expect((container.querySelector('.overview-daily-plot') as HTMLElement).hidden).toBe(false)
+  })
+
+  it('says so instead of an empty table when nothing was reported', async () => {
+    setMatchMedia(REDUCE, true)
+    render(<Overview incidents={[incident('closed', 'low', '2026-01-01T00:00:00Z')]} now={NOW} />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Show as table' }))
+    expect(screen.queryByRole('table')).toBeNull()
     expect(screen.getByText('No incidents reported from 27 October 2026 to 25 November 2026, in UTC.')).toBeTruthy()
   })
 })

@@ -76,7 +76,7 @@ function ChangePasswordForm({ email }: { email: string }) {
       </h2>
       <form ref={formRef} className="account-form" onSubmit={handleSubmit}>
         {/* Lets a password manager tie the new password to this account. */}
-        <input type="email" value={email} readOnly hidden autoComplete="username" />
+        <input type="email" name="username" value={email} readOnly hidden autoComplete="username" />
         <Field
           label="Current password"
           type="password"

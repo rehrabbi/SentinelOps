@@ -32,12 +32,18 @@ export class ApiError extends Error {
 
 // What the app does when the session ends under it (it expired, or was ended
 // from another device). App registers this once; there is only ever one.
-let sessionExpiredHandler: () => void = () => {}
+const noHandler = () => {}
+let sessionExpiredHandler: () => void = noHandler
 
 // onSessionExpired sets the handler that runs when a request comes back 401
-// because the session has ended mid-use. Registering again replaces it.
-export function onSessionExpired(handler: () => void): void {
+// because the session has ended mid-use. Registering again replaces it. The
+// returned function unregisters it, and only it: if another handler has been
+// registered since, that one stays.
+export function onSessionExpired(handler: () => void): () => void {
     sessionExpiredHandler = handler
+    return () => {
+        if (sessionExpiredHandler === handler) sessionExpiredHandler = noHandler
+    }
 }
 
 // The 401s that do not mean "your session ended while you were working":
