@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setMatchMedia } from '../test/setup'
 import { expectShownAtOnce, isShown } from '../test/visibility'
 
@@ -38,8 +38,31 @@ function panelOf(button: HTMLElement) {
   return panel as HTMLElement
 }
 
+/** An IntersectionObserver that never reports anything: the page as it is before any scrolling. */
+class SilentObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return []
+  }
+}
+
+/** The scroll-revealed blocks: the workflow steps and the safeguard groups. */
+function gatedBlocks(main: HTMLElement) {
+  const steps = within(main).getAllByRole('listitem').filter((li) => li.matches('.landing-flow-step'))
+  const groups = [...main.querySelectorAll<HTMLElement>('.landing-guard-group')]
+  expect(steps).toHaveLength(3)
+  expect(groups).toHaveLength(4)
+  return [...steps, ...groups]
+}
+
 beforeEach(() => {
   window.history.replaceState(null, '', '/')
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('landing page', () => {
@@ -149,5 +172,28 @@ describe('landing page', () => {
 
     await user.click(inviteButton())
     expectShownAtOnce(panelOf(inviteButton()))
+  })
+
+  describe('with an observer that has not fired (nothing scrolled yet)', () => {
+    beforeEach(() => {
+      vi.stubGlobal('IntersectionObserver', SilentObserver)
+    })
+
+    it('with motion, keeps the below-the-fold blocks at their entrance state but in the accessibility tree', async () => {
+      await renderLanding()
+      const main = screen.getByRole('main')
+      for (const block of gatedBlocks(main)) {
+        expect(block.style.opacity, block.className).toBe('0')
+      }
+      // Hidden only visually, for the entrance: still headings and text to assistive technology.
+      expect(within(main).getByRole('heading', { level: 3, name: 'Getting in' })).toBeTruthy()
+      expect(within(main).getByRole('heading', { level: 3, name: 'Report it' })).toBeTruthy()
+    })
+
+    it('under reduced motion, shows them on the first render anyway', async () => {
+      setMatchMedia('(prefers-reduced-motion: reduce)', true)
+      await renderLanding()
+      expectShownAtOnce(...gatedBlocks(screen.getByRole('main')))
+    })
   })
 })

@@ -37,9 +37,10 @@
   overflow: hidden;
 }
 
+/* Positioned, like the copy after it: both stay at z-index auto and paint in source order, so the
+   rings, which spread behind the copy, always sit under it. */
 .landing-hero-eye {
   position: relative;
-  z-index: -1;
   justify-self: center;
   width: var(--landing-eye);
   height: var(--landing-eye);
@@ -110,6 +111,7 @@
 }
 
 .landing-hero-copy {
+  position: relative;
   display: grid;
   justify-items: start;
   max-width: 38rem;
@@ -502,5 +504,17 @@
   100% {
     opacity: 0;
     transform: scale(5);
+  }
+}
+
+/* Printing: whatever has not scrolled into view yet is still at its entrance state (inline opacity
+   and transform from Motion). The hook reveals it before printing; this makes sure the printout
+   never catches a frame of the fade. */
+@media print {
+  .landing-hero-copy > *,
+  .landing-flow-step,
+  .landing-guard-group {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

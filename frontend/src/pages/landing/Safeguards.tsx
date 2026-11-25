@@ -66,7 +66,7 @@ const GROUPS: Group[] = [
     title: 'Checked from outside',
     facts: [
       {
-        text: 'Strict security headers: the content security policy allows only this site’s own files, and no other site may frame it.',
+        text: 'Strict security headers: scripts, styles and data requests may come only from the site itself, and no other site may frame it.',
       },
       {
         text: 'Every Monday an automated passive scan checks the live site’s headers, cookies and responses.',
@@ -81,7 +81,7 @@ export function Safeguards() {
   const reduced = useReducedMotion()
   const titleId = useId()
   const gridRef = useRef<HTMLDivElement>(null)
-  const seen = useSeenOnce(gridRef, 0.1)
+  const seen = useSeenOnce(gridRef)
   const fadeUp = variants('fadeUp', reduced)
 
   return (
