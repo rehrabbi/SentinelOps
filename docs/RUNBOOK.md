@@ -240,7 +240,7 @@ proxy_secret() {
 |---|---|
 | A user forgot their password | An admin opens **Users**, presses **Reset password** on that row, and sends the link to that person only, over a channel other than the site itself. It works once, for 1 hour, and a new one replaces it. Using it logs that account out everywhere. |
 | A session may be stolen (a lost device, an unfamiliar login in the audit log) | The user opens **Account security** and changes their password, which ends every other session, or presses **Log out everywhere**. If the user cannot log in, an admin issues a reset link, which ends all of their sessions when used. |
-| An admin forgot their password | Another admin issues them a reset link: nobody can reset their own account. If they are the only admin, there is no in-app path; it needs direct database access with the owner login. |
+| An admin forgot their password | Another admin issues them a reset link (nobody can reset their own account in the app). If they are the only admin, issue it from the command line, which needs the owner database login: `cd backend`, then `DATABASE_URL="$(grep -m1 '^PROD_DATABASE_URL=' ../.env \| cut -d= -f2- \| tr -d '\r')" go run . reset-password --email <their address> --site https://sentinelops.pages.dev`. It prints a one-time link, valid 1 hour, audited as `command-line`; hand it only to them. |
 
 **Confirm:** the audit log shows `user.password_reset`, `user.password_changed` or `user.logout_all`
 for that account, with the number of sessions ended:

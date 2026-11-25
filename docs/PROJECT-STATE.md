@@ -416,7 +416,16 @@ criterion has to include the next deployment, not just the moment.
   `B2_APPLICATION_KEY` in the `backup` environment. A B2 failure fails the run after the GitHub artifact
   is stored.
 
-**⏭️ Next:** brief step 5, the 1.0.0 review: every open question in the learning log, then the release.
+**Step 5, the 1.0.0 review (decided 2026-11-25):**
+- **The sole-admin lockout is closed:** `reset-password`, a CLI subcommand like `invite` (`cli.go`), issues a
+  one-time reset link with database access; `account.IssueReset` takes a nil issuer for the command line,
+  which may reset any account, the only admin's included; the API still refuses an admin's own account.
+  Audited as `command-line` with no `created_by`. One test, six deliberate regressions, all caught (one
+  only after the test was tightened to require a helpful error).
+- **Still to do:** a restore drill of the newest GitHub backup and of the same night's B2 copy; the stage's
+  learning-log entry, closing the open questions; the 1.0.0 promise (semantic versioning from here: a
+  major version for anything that breaks the HTTP API or how it is run, minor for features, patch for
+  fixes) in CHANGELOG and README; then the release PR, and the tag once the owner says so.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.

@@ -166,8 +166,8 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
 - The free API sleeps after 15 idle minutes, and the first request after that gets Render's
   502 page for up to a minute while it wakes.
 - There is no email, so an admin hands reset links over by hand. If the only admin forgets
-  their password, nobody can issue them a link; that needs a second admin or direct database
-  access.
+  their password, the link comes from the command line instead (`go run . reset-password`), which
+  needs the database login.
 - Render's Terraform provider cannot update free-plan services, so new API images are
   deployed with `infra/deploy-api.sh` until an upstream fix ships.
 
