@@ -1,0 +1,214 @@
+/*
+ * The incident screen (Incidents.tsx): report form, overview, list. A work screen, so it is
+ * steady and dense rather than showy. Classes are prefixed incidents- (the kit owns ui-, and
+ * App.css owns the plain names). Colours, spacing and type come from the tokens.
+ */
+.incidents-page {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+  text-align: start;
+}
+
+.incidents-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.incidents-h1 {
+  margin: 0;
+  font: 600 2rem/1.2 var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.incidents-page .overview {
+  margin-bottom: 0;
+}
+
+.incidents-h2 {
+  margin: 0 0 var(--space-3);
+  font: 500 0.75rem/1rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.incidents-section {
+  min-width: 0;
+}
+
+.incidents-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.incidents-severity-field {
+  max-width: 14rem;
+}
+
+.incidents-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.incidents-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.incidents-load-error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.incidents-error {
+  margin: 0;
+  color: var(--color-danger);
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+.incidents-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.incidents-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  min-width: 0;
+}
+
+.incidents-row:first-child {
+  border-top: 0;
+}
+
+.incidents-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* Long titles and unbroken strings wrap inside the row instead of widening the page. */
+.incidents-title,
+.incidents-desc {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.incidents-title {
+  font: 600 1rem/1.5rem var(--font-sans);
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.incidents-desc {
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+  color: var(--color-text-muted);
+  white-space: pre-line;
+}
+
+.incidents-meta {
+  margin: 0;
+  font: 400 0.75rem/1.125rem var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.incidents-side {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+/* The status control: its glyph and colour come from the status token (the same ones as the
+   badges), and the word is always in the select, so colour is never the only cue. */
+.incidents-status {
+  --incidents-status-color: var(--color-text-muted);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--incidents-status-color);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--incidents-status-color) var(--tint-badge), var(--color-surface));
+  color: var(--incidents-status-color);
+}
+
+.incidents-status-open { --incidents-status-color: var(--color-status-open); }
+.incidents-status-investigating { --incidents-status-color: var(--color-status-investigating); }
+.incidents-status-resolved { --incidents-status-color: var(--color-status-resolved); }
+.incidents-status-closed { --incidents-status-color: var(--color-status-closed); }
+
+.incidents-status-glyph {
+  position: absolute;
+  inset-inline-start: var(--space-2);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.incidents-status-select {
+  min-height: 2rem;
+  padding: 0 var(--space-2) 0 calc(var(--space-2) + 12px + 6px);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: 500 0.875rem/1.25rem var(--font-sans);
+}
+
+.incidents-status:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.incidents-status-select:focus-visible {
+  outline: none;
+}
+
+.incidents-status-select:disabled {
+  opacity: 0.6;
+}
+
+.incidents-row[aria-busy='true'] .incidents-status {
+  opacity: 0.7;
+}
+
+@media (pointer: coarse) {
+  .incidents-status-select {
+    min-height: 2.75rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .incidents-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .incidents-side {
+    justify-items: start;
+  }
+
+  .incidents-status-select {
+    min-height: 2.75rem;
+  }
+}
