@@ -1,0 +1,120 @@
+/*
+ * The privacy notice (Privacy.tsx). A document, not a screen: one column about 65 characters wide
+ * inside PublicShell's main, body text in Space Grotesk, durations and identifiers in JetBrains
+ * Mono. The only motion is a short entrance from Motion's presets (fadeUp); under reduced motion
+ * the content is there from the first frame.
+ */
+
+.privacy {
+  max-width: 65ch;
+  margin-inline: auto;
+  padding-block: var(--space-6) var(--space-8);
+  color: var(--color-text);
+  font: 400 1rem/1.65 var(--font-sans);
+}
+
+.privacy-head {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.privacy-h1 {
+  margin: 0;
+  font: 600 2.25rem/1.15 var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.privacy-lede {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.privacy-updated {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.privacy-section {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-6);
+}
+
+.privacy-section p,
+.privacy-list,
+.privacy-defs {
+  margin: 0;
+}
+
+.privacy-h2 {
+  margin: 0;
+  font: 600 1.375rem/1.3 var(--font-sans);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.privacy-list {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: 1.25em;
+}
+
+.privacy-list li::marker {
+  color: var(--color-signal);
+}
+
+.privacy-defs {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.privacy-defs > div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.privacy-defs dt {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.privacy-defs dd {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.privacy-mono {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.privacy a {
+  color: var(--color-signal);
+  text-underline-offset: 0.2em;
+}
+
+.privacy a:hover {
+  color: var(--color-signal-strong);
+}
+
+@media (min-width: 768px) {
+  .privacy-h1 {
+    font-size: 2.75rem;
+  }
+
+  .privacy-defs > div {
+    grid-template-columns: 11rem 1fr;
+    gap: var(--space-4);
+  }
+}
