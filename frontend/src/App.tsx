@@ -108,7 +108,7 @@ function App() {
         path="/"
         element={
           user
-            ? signedIn(legacy(<Incidents />))
+            ? signedIn(<Incidents />)
             : pub(
                 <Landing />,
                 <Link to="/signin" className="ui-btn ui-btn-primary">
