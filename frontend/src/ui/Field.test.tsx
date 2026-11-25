@@ -58,4 +58,42 @@ describe('Field', () => {
     expect(select.getAttribute('aria-invalid')).toBe('true')
     expect(describedBy(select).map((el) => el.textContent)).toEqual(['Pick one'])
   })
+
+  it('keeps a passed aria-describedby, after its own error and hint', () => {
+    render(
+      <>
+        <p id='form-error'>Invalid email or password</p>
+        <Field label='Password' hint='At least 12 characters.' error='Too short' aria-describedby='form-error' />
+      </>,
+    )
+    const texts = describedBy(screen.getByLabelText('Password')).map((el) => el.textContent)
+    expect(texts).toEqual(['Too short', 'At least 12 characters.', 'Invalid email or password'])
+  })
+
+  it('keeps a passed aria-describedby on its own when there is no error or hint', () => {
+    render(
+      <>
+        <p id='form-error'>Invalid email or password</p>
+        <Field label='Email' aria-describedby='form-error' />
+      </>,
+    )
+    expect(describedBy(screen.getByLabelText('Email')).map((el) => el.textContent)).toEqual(['Invalid email or password'])
+  })
+
+  it('passes a merged aria-describedby to a custom control too', () => {
+    render(
+      <>
+        <p id='elsewhere'>Saved drafts are kept for a day.</p>
+        <Field label='Severity' hint='How bad is it?' aria-describedby='elsewhere'>
+          {(control) => (
+            <select {...control}>
+              <option>low</option>
+            </select>
+          )}
+        </Field>
+      </>,
+    )
+    const texts = describedBy(screen.getByLabelText('Severity')).map((el) => el.textContent)
+    expect(texts).toEqual(['How bad is it?', 'Saved drafts are kept for a day.'])
+  })
 })
