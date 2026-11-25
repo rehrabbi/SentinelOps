@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useRef, useState, type ReactNode } from "react";
 import "./App.css";
-import { getMe, logout, type User } from "./api";
+import { getMe, logout, onSessionExpired, type User } from "./api";
 import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
 import { PublicShell } from "./layout/PublicShell";
@@ -15,14 +15,43 @@ import { UsersPage } from "./pages/Users";
 
 // The auth state is exactly one of these three shapes. 'loading' means we're
 // still asking the server (GET /api/me) whether a session exists.
+// sessionEnded marks an anonymous state reached because the session ended
+// mid-use, so the sign-in screen can say why the person is there.
 type AuthState =
   | { kind: "loading" }
-  | { kind: "anonymous" }
+  | { kind: "anonymous"; sessionEnded?: boolean }
   | { kind: "authenticated"; user: User };
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
   const navigate = useNavigate();
+
+  // The latest auth state, for the expiry handler below, which outlives renders.
+  const authRef = useRef(auth);
+  useEffect(() => {
+    authRef.current = auth;
+  }, [auth]);
+
+  // A 401 from any working request means the session ended under us: sign the
+  // app out and send the person to sign in again, once. Several requests can
+  // fail together (and a late one can land after sign-out), so only the first
+  // 401 while signed in acts; the rest find the state already anonymous.
+  // The router moves to a new location inside a transition. Signing out inside
+  // the same transition means both land in one render; otherwise the page's own
+  // guard (e.g. /admin's "not an admin, go home") would see the signed-out state
+  // first and send the person to "/" instead.
+  useEffect(() => {
+    onSessionExpired(() => {
+      if (authRef.current.kind !== "authenticated") return;
+      const ended: AuthState = { kind: "anonymous", sessionEnded: true };
+      authRef.current = ended;
+      startTransition(() => {
+        setAuth(ended);
+        navigate("/signin", { replace: true });
+      });
+    });
+    return () => onSessionExpired(() => {});
+  }, [navigate]);
 
   // Ask the server who is logged in. Runs on load, and again after anything
   // that may have ended this browser's session from elsewhere.
@@ -91,7 +120,16 @@ function App() {
       <Route
         path="/signin"
         element={
-          user ? <Navigate to="/" replace /> : pub(legacy(<SignIn onLoggedIn={onLoggedIn} />))
+          user ? (
+            <Navigate to="/" replace />
+          ) : (
+            pub(
+              <SignIn
+                onLoggedIn={onLoggedIn}
+                sessionEnded={auth.kind === "anonymous" && auth.sessionEnded === true}
+              />
+            )
+          )
         }
       />
       <Route
