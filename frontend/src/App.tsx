@@ -11,6 +11,7 @@ import { Landing } from "./pages/Landing";
 import { Privacy } from "./pages/Privacy";
 import { ResetPassword } from "./pages/ResetPassword";
 import { SignIn } from "./pages/SignIn";
+import { clearToasts } from "./ui/toast-store";
 
 // The signed-in screens load on demand, as their own files, so the public pages (landing, sign
 // in, invite, reset, privacy) never download them. They come from this site like every other
@@ -65,6 +66,8 @@ function App({ firstSessionCheck }: AppProps) {
         if (authRef.current.kind !== "authenticated") return;
         const ended: AuthState = { kind: "anonymous", sessionEnded: true };
         authRef.current = ended;
+        // A confirmation from the ended session must not greet whoever signs in next.
+        clearToasts();
         startTransition(() => {
           setAuth(ended);
           navigate("/signin", { replace: true });
@@ -103,7 +106,11 @@ function App({ firstSessionCheck }: AppProps) {
   if (auth.kind === "loading") return <LoadingFrame />;
 
   const onLoggedIn = (user: User) => setAuth({ kind: "authenticated", user });
-  const onLoggedOut = () => setAuth({ kind: "anonymous" });
+  const onLoggedOut = () => {
+    // Toasts belong to the session that raised them; the next visitor should not see them.
+    clearToasts();
+    setAuth({ kind: "anonymous" });
+  };
   const user = auth.kind === "authenticated" ? auth.user : null;
 
   // The shell's Log out: end the session on the server, then drop the local

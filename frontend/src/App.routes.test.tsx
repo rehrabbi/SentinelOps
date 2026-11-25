@@ -16,6 +16,7 @@ vi.mock('./api', async (importOriginal) => {
 
 import * as api from './api'
 import App from './App'
+import { clearToasts, getToasts, toast } from './ui/toast-store'
 // The signed-in screens load lazily; importing them here puts their code in the module cache up
 // front, so a test waits for the app, not for the first transform of a module.
 import './pages/Account'
@@ -52,6 +53,7 @@ const getMe = vi.mocked(api.getMe)
 beforeEach(() => {
   vi.clearAllMocks()
   window.history.replaceState(null, '', '/')
+  clearToasts()
 })
 
 describe('routes', () => {
@@ -117,6 +119,36 @@ describe('routes', () => {
     expect(api.logout).toHaveBeenCalled()
     expect(await screen.findByRole('heading', { level: 1, name: /incident tracking/i })).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/')
+  })
+})
+
+describe('toasts and the end of a session', () => {
+  it('drops raised toasts when the person logs out', async () => {
+    getMe.mockResolvedValue(user('analyst'))
+    renderAt('/')
+    const { default: userEvent } = await import('@testing-library/user-event')
+    await userEvent.click(await screen.findByRole('button', { name: /account menu/i }))
+    toast('Incident saved', 'success')
+    expect(getToasts()).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    expect(await screen.findByRole('heading', { level: 1, name: /incident tracking/i })).toBeTruthy()
+    expect(getToasts()).toHaveLength(0)
+  })
+
+  it('drops raised toasts when the session expires', async () => {
+    getMe.mockResolvedValue(user('analyst'))
+    renderAt('/')
+    await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    toast('Incident saved', 'success')
+    // A real request that comes back 401 reaches the app's expiry handler.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })))
+    try {
+      await api.changePassword('current-fixture', 'new-fixture-password').catch(() => {})
+      await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/signin'))
+      expect(getToasts()).toHaveLength(0)
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 
