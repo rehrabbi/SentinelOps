@@ -402,12 +402,12 @@ reset links; `PROXY_SECRET` rotation without refusing anyone, exercised live; a 
 scan and the headers it led to; Node 24 actions, schedules that cannot pause, a Render hours check, and
 a second backup copy in Backblaze B2, locked for 90 days.
 
-**v1.1.0, in progress.** The frontend redesign is built and merged on the `redesign` branch: a new
+**v1.1.0, the frontend redesign.** A new
 brand and logo, a public landing page and privacy notice, every screen redone, an incident overview
 with charts, a light and dark theme, motion that respects reduced-motion settings, an accessibility
 and performance pass, and 292 frontend tests. The API, database and authentication rules are
-unchanged. What remains is a final review of the whole branch, then one pull request from
-`redesign` into `main`, which deploys it. The tag follows that merge.
+unchanged. It reached `main` in one pull request from the `redesign` branch, which deployed it; the
+tag follows the post-launch checks.
 
 Deferred: `dev`, `staging`, and `prod` environments. Every free Render service shares 750
 instance-hours a month and production already uses about 744, so a hosted staging environment would
