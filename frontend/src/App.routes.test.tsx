@@ -66,7 +66,7 @@ describe('routes', () => {
     getMe.mockResolvedValue(null)
     renderAt('/account')
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/signin'))
-    expect(screen.getByRole('heading', { name: 'Log in' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy()
   })
 
   it('sends a reporter from /admin to /', async () => {
