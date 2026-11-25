@@ -35,7 +35,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
       <div className="ui-route-error">
         <h1 className="ui-route-error-title">This page didn&rsquo;t load</h1>
         <p className="ui-route-error-message" role="alert">
-          This page didn&rsquo;t load. The site may have just been updated.
+          The site may have just been updated. Reload to get the latest version.
         </p>
         <Button variant="secondary" onClick={() => window.location.reload()}>
           Reload

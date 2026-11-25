@@ -30,7 +30,7 @@ export const LOCKUP_TEXT_X = 164
 
 /** Colours for files that have no theme around them (icons, standalone logos, social images). */
 export const BRAND_COLORS = {
-  night: { bg: '#0a1020', ink: '#e6edf8', muted: '#9eafcb', signal: '#86d8ff' },
+  night: { bg: '#0a1020', ink: '#e6edf8', muted: '#9eafcb', signal: '#86d8ff', rule: '#223050' },
   day: { bg: '#f4f7fb', ink: '#0b1426', muted: '#46546d', signal: '#0a6ea8' },
   /** Clears 3:1 on both backgrounds: for places where the background is unknown. */
   accent: '#1596d6',

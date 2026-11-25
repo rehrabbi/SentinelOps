@@ -121,7 +121,7 @@ function social(width, height) {
   const urlY = height - height * 0.12;
   const lineY = urlY - urlSize * 0.35;
   const halfUrl = urlSize * 0.6 * URL_TEXT.length * 0.5 + urlSize;
-  const rule = (x1, x2) => `<line x1="${x1}" y1="${lineY}" x2="${x2}" y2="${lineY}" stroke="#223050" stroke-width="1"/>`;
+  const rule = (x1, x2) => `<line x1="${x1}" y1="${lineY}" x2="${x2}" y2="${lineY}" stroke="${night.rule}" stroke-width="1"/>`;
   return (
     `<svg ${SVG_NS} width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
     `<rect width="${width}" height="${height}" fill="${night.bg}"/>` +

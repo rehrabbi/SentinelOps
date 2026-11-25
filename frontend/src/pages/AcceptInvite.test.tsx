@@ -23,9 +23,10 @@ function serve(routes: Record<string, Reply>) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const key = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`
     const reply = routes[key] ?? { status: 404 }
-    return new Response(reply.body === undefined ? null : JSON.stringify(reply.body), {
-      status: reply.status,
-    })
+    // The API sends errors as plain text and successes as JSON.
+    const text =
+      reply.body === undefined ? null : typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body)
+    return new Response(text, { status: reply.status })
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
@@ -57,7 +58,7 @@ async function fill(password: string, confirm: string) {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/invite#tok-123')
+  window.history.replaceState(null, '', '/invite#invite-link-fixture')
 })
 
 afterEach(() => {
@@ -100,7 +101,7 @@ describe('AcceptInvite', () => {
   })
 
   it('creates the account, logs in and goes home', async () => {
-    serve({
+    const fetchMock = serve({
       'POST /api/invites/accept': { status: 200, body: maria },
       'POST /api/sessions': { status: 200, body: maria },
     })
@@ -108,13 +109,36 @@ describe('AcceptInvite', () => {
     await fill('correct-horse-battery-2', 'correct-horse-battery-2')
     await waitFor(() => expect(onLoggedIn).toHaveBeenCalledWith(maria))
     expect(screen.getByTestId('where').textContent).toBe('/')
+
+    // The token is the part after "#", without the "#", and travels with the name and password.
+    const calls = fetchMock.mock.calls
+    const accept = calls.find(([url]) => String(url).endsWith('/api/invites/accept'))
+    expect(JSON.parse(String(accept?.[1]?.body))).toEqual({
+      token: 'invite-link-fixture',
+      fullName: 'Maria Santos',
+      password: 'correct-horse-battery-2',
+    })
+    const signIn = calls.find(([url]) => String(url).endsWith('/api/sessions'))
+    expect(JSON.parse(String(signIn?.[1]?.body))).toEqual({
+      email: maria.email,
+      password: 'correct-horse-battery-2',
+    })
+  })
+
+  it('treats an empty hash as no token and sends nothing', () => {
+    window.history.replaceState(null, '', '/invite#')
+    const fetchMock = serve({})
+    renderInvite()
+    expect(screen.getByText(/needs the full invite link/i)).toBeTruthy()
+    expect(screen.queryByLabelText('Full name')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('shows the server message when the invite is refused', async () => {
-    serve({ 'POST /api/invites/accept': { status: 400, body: { error: 'This invite has expired' } } })
+    serve({ 'POST /api/invites/accept': { status: 400, body: 'This invite has expired' } })
     renderInvite()
     await fill('correct-horse-battery-2', 'correct-horse-battery-2')
-    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect((await screen.findByRole('alert')).textContent).toContain('This invite has expired')
   })
 
   it('under reduced motion has the form on screen from the first render', () => {

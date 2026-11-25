@@ -44,7 +44,7 @@ describe('RouteErrorBoundary', () => {
     )
     expect(screen.getByRole('navigation')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('This page didn’t load')
-    expect(screen.getByRole('alert').textContent).toContain('The site may have just been updated.')
+    expect(screen.getByRole('alert').textContent).toBe('The site may have just been updated. Reload to get the latest version.')
     await userEvent.click(screen.getByRole('button', { name: 'Reload' }))
     expect(reload).toHaveBeenCalledTimes(1)
   })

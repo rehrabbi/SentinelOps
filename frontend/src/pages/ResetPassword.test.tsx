@@ -9,7 +9,11 @@ import { ResetPassword } from './ResetPassword'
 // The real api.ts with fetch stubbed, as in SignIn.test.tsx.
 function serve(status: number, body?: unknown) {
   const fetchMock = vi.fn(
-    async () => new Response(body === undefined ? null : JSON.stringify(body), { status }),
+    async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      // The API sends errors as plain text.
+      const text = body === undefined ? null : typeof body === 'string' ? body : JSON.stringify(body)
+      return new Response(text, { status })
+    },
   )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
@@ -35,7 +39,7 @@ async function fill(password: string, confirm: string) {
 }
 
 beforeEach(() => {
-  window.history.replaceState(null, '', '/reset#tok-123')
+  window.history.replaceState(null, '', '/reset#reset-link-fixture')
 })
 
 afterEach(() => {
@@ -86,14 +90,29 @@ describe('ResetPassword', () => {
     expect(screen.getByRole('link', { name: /sign in/i }).getAttribute('href')).toBe('/signin')
     expect(onSessionChanged).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    // The token is the part after "#", without the "#", and travels with the new password.
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/api\/password-resets\/accept$/)
+    expect(JSON.parse(String(init?.body))).toEqual({
+      token: 'reset-link-fixture',
+      newPassword: 'correct-horse-battery-2',
+    })
+  })
+
+  it('treats an empty hash as no token and sends nothing', () => {
+    window.history.replaceState(null, '', '/reset#')
+    const fetchMock = serve(204)
+    renderReset()
+    expect(screen.getByText(/needs the full reset link/i)).toBeTruthy()
+    expect(screen.queryByLabelText('New password')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('shows the server message when the link is refused', async () => {
-    serve(400, { error: 'This reset link has expired' })
+    serve(400, 'This reset link has expired')
     renderReset()
     await fill('correct-horse-battery-2', 'correct-horse-battery-2')
-    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
-    expect(screen.getByRole('alert').textContent).not.toBe('')
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('This reset link has expired'))
   })
 
   it('under reduced motion shows the form on the first render, and later the confirmation', async () => {

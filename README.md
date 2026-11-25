@@ -405,7 +405,7 @@ a second backup copy in Backblaze B2, locked for 90 days.
 **v1.1.0, in progress.** The frontend redesign is built and merged on the `redesign` branch: a new
 brand and logo, a public landing page and privacy notice, every screen redone, an incident overview
 with charts, a light and dark theme, motion that respects reduced-motion settings, an accessibility
-and performance pass, and 289 frontend tests. The API, database and authentication rules are
+and performance pass, and 292 frontend tests. The API, database and authentication rules are
 unchanged. What remains is a final review of the whole branch, then one pull request from
 `redesign` into `main`, which deploys it. The tag follows that merge.
 

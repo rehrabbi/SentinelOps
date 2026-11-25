@@ -38,8 +38,10 @@ inside the kit and keeps the retired legacy stylesheet out. No CSS framework, no
 
 **Themes.** The page follows the system setting. A System, Dark, Light toggle in the account menu
 overrides it, and the choice is kept in `localStorage` under `sentinelops.theme`. `main.tsx` sets
-`data-theme` before the first render, so there is no inline script and no flash. An OS theme change
-is picked up while the page is open.
+`data-theme` before React's first render. There is no inline script, because the CSP forbids one, so
+the loading frame and the page background paint in the system theme first. A visitor whose saved
+choice is the opposite of their system setting can therefore see a brief flash of the system theme
+before `main.tsx` applies the saved one. An OS theme change is picked up while the page is open.
 
 **Motion.** The `motion` package (14.12.0), with presets in `frontend/src/motion/presets.ts`:
 timings that mirror the CSS tokens, and named variants (`fadeUp`, `scan`, `stagger`). Loud motion is
@@ -64,14 +66,16 @@ images, and SVG assets carry no scripts. Setting styles from JavaScript is allow
 Motion and React work. Vite's production build links its CSS from files, including the CSS of lazy
 chunks. Tokens are plain CSS for the same reason: nothing has to be injected at runtime.
 
-**WCAG 2.2 AA.** The design spec set 2.1 AA as the floor; the audit before launch also applied the
-2.2 criteria that matter here.
+**WCAG 2.1 AA, plus the 2.2 criteria named here.** The design spec set 2.1 AA as the floor; the audit
+before launch also applied the 2.2 criteria listed below. It is not a claim of full 2.2 AA: the footer
+links are 20 px tall, which misses the 24 px target size of 2.5.8.
 
 - Contrast is computed from the token values and checked in both themes (tables in `docs/brand.md`).
   Control edges use `--color-border`, at 3:1 or better. Colour is never the only cue: severity has a
   four-bar meter, status has a glyph, and both carry their word.
 - Focus moves to the new page's heading on every in-app navigation, and each page has its own
   title (`frontend/src/layout/useRouteFocus.ts`).
+- Page transitions were cut: focus moving to the new page's heading already marks the change.
 - The landing page's idle scan plays once and stops. WCAG 2.2.2 wants a way to pause motion that
   lasts more than 5 seconds, and reduced motion is not a pause control. The hero motion ends about
   4.2 seconds after load.
@@ -86,10 +90,10 @@ pages ship less. Measured on the production build:
 
 | | Before lazy routes | After |
 |---|---|---|
-| JS on public pages | 469.03 kB (149.52 kB gzip) | 427.96 kB (139.02 kB gzip) |
-| CSS on public pages | 62.07 kB (10.98 kB gzip) | 42.14 kB (8.61 kB gzip) |
+| JS on public pages | 469.03 kB (149.52 kB gzip) | 428.72 kB (139.27 kB gzip) |
+| CSS on public pages | 62.07 kB (10.98 kB gzip) | 42.44 kB (8.66 kB gzip) |
 
-The Incidents chunk is 37.69 kB (12.95 kB gzip) plus 9.01 kB of CSS, and it is prefetched one second
+The Incidents chunk is 37.69 kB (12.94 kB gzip) plus 9.01 kB of CSS, and it is prefetched one second
 after the sign-in or invite page opens. A route error boundary keeps the shell on screen if a chunk
 fails to load.
 
