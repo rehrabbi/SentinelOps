@@ -403,9 +403,13 @@ criterion has to include the next deployment, not just the moment.
 - **C, built:** the nightly Backup also uploads the same encrypted file to the private Backblaze B2
   bucket `sentinelops-backups-irmqvmze` (10 GB free, no card; owner's account, created 2026-11-25),
   through `infra/b2-upload.py` (standard library only; the key comes from the environment; B2 checks
-  the SHA-1 and so does the script). Bucket: private, Backblaze's own encryption on, Object Lock off,
+  the SHA-1 and so does the script). Bucket: private, Backblaze's own encryption on, **Object Lock on, 90 days, compliance mode** (the website
+  offers only compliance; owner's choice over governance through the API),
   lifecycle hides files after 90 days and deletes them a day later. Key `sentinelops-backup-writer`:
-  write-only, limited to that bucket, cannot list buckets, stored as `B2_KEY_ID` and
+  Backblaze's "Write Only" preset, limited to that bucket. It turned out to include `deleteFiles` and
+  several bucket-settings permissions (but not `writeBucketRetentions` or `bypassGovernance`), which is why
+  Object Lock was switched on: a leaked key still cannot remove a backup before its 90 days. The key's
+  secret went from Backblaze's Copy button through the clipboard into GitHub, unseen; stored as `B2_KEY_ID` and
   `B2_APPLICATION_KEY` in the `backup` environment. A B2 failure fails the run after the GitHub artifact
   is stored.
 

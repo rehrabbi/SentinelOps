@@ -4,9 +4,12 @@ Usage: python3 infra/b2-upload.py <local file> <name in the bucket>
 
 The second, independent copy of the nightly backup (.github/workflows/backup.yml).
 The key comes from B2_KEY_ID and B2_APPLICATION_KEY in the environment, never
-from the command line, and is a write-only key limited to one bucket: it cannot
-read, list or delete anything, so even if it leaked it could not destroy or
-read a backup. The file is already encrypted with age before it gets here.
+from the command line, and is limited to one bucket. It cannot read files, but
+Backblaze's "Write Only" preset also lets it delete files and change some bucket
+settings. What protects the backups is the bucket's Object Lock: every file is
+retained in compliance mode for 90 days, so nobody, not this key and not the
+account owner, can delete or overwrite it before then, and the key cannot change
+that retention. The file is already encrypted with age before it gets here.
 
 Python's standard library only. B2 is told the file's SHA-1 and refuses an
 upload that does not match it; the reply is checked again here.
@@ -49,7 +52,7 @@ def main():
     auth = call(f"{API}/b2_authorize_account", {"Authorization": "Basic " + basic}, method="GET")
     bucket_id = auth.get("allowed", {}).get("bucketId")
     if not bucket_id:
-        sys.exit("the key is not limited to one bucket; use the write-only key made for backups")
+        sys.exit("the key is not limited to one bucket; use the key made for backups")
 
     upload = call(
         auth["apiUrl"] + "/b2api/v2/b2_get_upload_url",

@@ -13,8 +13,9 @@ first hardened production deployment.
 ### Added
 
 - A second, independent copy of every nightly backup in a private Backblaze B2 bucket (free plan, no
-  card), uploaded by `infra/b2-upload.py` with a write-only key limited to that bucket, so a leaked key
-  cannot read or delete backups. The bucket keeps each file 90 days, like the GitHub artifacts.
+  card), uploaded by `infra/b2-upload.py` with a key limited to that bucket. Object Lock keeps every file
+  for 90 days in compliance mode, so neither a leaked key nor anyone else can delete one sooner; the
+  lifecycle rule removes them after that, like the GitHub artifacts.
 - **Render hours** (`render-hours.yml`, Mondays and on demand, and `infra/render-hours.sh` for local
   use): projects the worst case for Render's 750 free hours a month and fails when a second free
   service could exhaust them, which would suspend production, or when the API is suspended.

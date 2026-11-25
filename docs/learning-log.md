@@ -1430,4 +1430,5 @@ monitoring in #60, the runbook in #61; released as v0.6.0.)*
 - ~~`PROXY_SECRET` rotation is written in the runbook but has never run~~ Resolved 2026-11-24: the API
   accepts `PROXY_SECRET_PREVIOUS` during a rotation, which ran live with no refused requests.
 - ~~Backups live 90 days as GitHub artifacts, all under one GitHub account~~ Resolved 2026-11-25: a
-  second copy goes to Backblaze B2 through a write-only key.
+  second copy goes to Backblaze B2, locked for 90 days. Lesson for the stage entry: Backblaze's "Write
+  Only" key preset includes `deleteFiles`; read a key's actual capabilities, not its preset's name.
