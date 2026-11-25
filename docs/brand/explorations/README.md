@@ -18,4 +18,4 @@ The final accent per theme is the brand board's call.
 | D | Visor | An eye cut into three horizontal bands, like a visor slot; the pupil is a lit ice-blue block. | Scan: the bands light top to bottom in turn, then the pupil settles. | Middle band and pupil are crisp; the pointed top and bottom caps soften. Weakness: it is the most "tech", so the scan must stay calm or it tips toward the hacker cliché. |
 | E | Scope | A radar scope seen as an eye: the ring is the iris, the centre the pupil, the ice-blue sector the beam. | Sweep: the beam turns once around the ring and rests at the top. | Boldest at 16 px; fills the square. Weakness: static, it can read as a donut chart or a loading ring, and its eye-ness depends on the centre dot. |
 
-Chosen: (awaiting the owner)
+Chosen: **C, Facet** (the owner, 2026-11-25). The other four stay here as the record of the exploration.
