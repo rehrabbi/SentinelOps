@@ -306,6 +306,7 @@ function UserRow({
       <div className="users-controls">
         <select
           ref={selectRef}
+          name="role"
           className={dirty && !isSelf ? 'users-select users-select-changed' : 'users-select'}
           aria-label={`Role for ${user.fullName}`}
           aria-describedby={describedBy || undefined}

@@ -66,7 +66,7 @@ const GROUPS: Group[] = [
     title: 'Checked from outside',
     facts: [
       {
-        text: 'Strict security headers: scripts, styles and data requests may come only from the site itself, and no other site may frame it.',
+        text: 'Strict security headers: scripts, styles and network requests may come only from the site itself, and no other site may frame it.',
       },
       {
         text: 'Every Monday an automated passive scan checks the live site’s headers, cookies and responses.',
