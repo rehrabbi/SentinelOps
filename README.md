@@ -32,10 +32,11 @@ infrastructure as code, and cloud architecture.
 It is built incrementally, and the git history is meant to read as an engineering story,
 one concern per branch and one concern per pull request.
 
-**Status:** the current release is [v0.6.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v0.6.0),
-which makes the deployment **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)** observable
-and recoverable: encrypted nightly backups with a restore drill, structured request logs, uptime
-alerts, and a runbook. Every release is described in the [changelog](CHANGELOG.md).
+**Status:** the current release is [v1.0.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v1.0.0),
+the first hardened deployment, **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)**:
+account recovery without email, secret rotation without downtime, a weekly passive scan of the live
+site, strict security headers, and backups in two places, both restored before release. Every release
+is described in the [changelog](CHANGELOG.md).
 
 **What works today**
 
@@ -369,15 +370,19 @@ account enumeration, and pruning of expired sessions and spent invites.
 against the audit anchors, one structured log line per request, uptime alerts through the proxy, and
 a runbook with its rotation procedure exercised.
 
-**In progress: the hardening review before 1.0.0.** Password change, "log out everywhere" and
-admin-issued reset links are built; still to come are seamless `PROXY_SECRET` rotation, a scheduled
-passive scan of the live site, and operational hygiene.
+**v1.0.0, released.** Hardening review: password change, "log out everywhere", admin and command-line
+reset links; `PROXY_SECRET` rotation without refusing anyone, exercised live; a weekly OWASP ZAP baseline
+scan and the headers it led to; Node 24 actions, schedules that cannot pause, a Render hours check, and
+a second backup copy in Backblaze B2, locked for 90 days.
 
 Deferred: `dev`, `staging`, and `prod` environments. Every free Render service shares 750
 instance-hours a month and production already uses about 744, so a hosted staging environment would
 put production at risk.
 
-**1.0.0** is the first hardened production deployment.
+**What 1.0.0 promises.** From 1.0.0 on, versions follow semantic versioning: a major version for
+anything that breaks the HTTP API or how the deployment is run (environment variables, manual
+migration or deploy steps, the scripts' usage), a minor version for new features, and a patch for
+fixes. The known gaps above are the honest list of what 1.0.0 does not do.
 
 ## Documentation
 

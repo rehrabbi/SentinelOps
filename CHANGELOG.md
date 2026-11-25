@@ -4,11 +4,21 @@ All notable changes to SentinelOps are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-While the version is `0.y.z` the project is in initial development: each roadmap stage
-ends in a minor release, and fixes between stages are patch releases. `1.0.0` will be the
-first hardened production deployment.
+Up to `0.6.0` the project was in initial development, each roadmap stage ending in a minor
+release. `1.0.0` is the first hardened production deployment, and from it on the version
+number is a promise: a **major** version for anything that breaks the HTTP API or how the
+deployment is run (its environment variables, manual migration or deploy steps, the scripts'
+usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-11-25
+
+Hardening review: the first deployment that can honestly be called hardened. People can change their
+password, log out everywhere and recover a forgotten one, even the only admin; the proxy's secret
+rotates without refusing anyone; the live site is scanned every week and sends a strict set of security
+headers; every backup also lands, locked for 90 days, in a second place; and the scheduled checks keep
+themselves running. Both backup copies were restored before release.
 
 ### Added
 
@@ -339,7 +349,8 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.3.0...v0.4.0
