@@ -11,9 +11,10 @@ describe('SeverityBadge', () => {
     it(`renders the text "${severity}" with class sev-${severity}`, () => {
       render(<SeverityBadge severity={severity} />)
       const word = screen.getByText(severity)
-      const badge = word.closest('.badge')
+      const badge = word.closest('.ui-badge')
       expect(badge).not.toBeNull()
-      expect(badge).toHaveProperty('className', expect.stringContaining(`sev-${severity}`))
+      // The plan's contract: the exact class sev-<level> (not a substring of another class).
+      expect(badge?.classList.contains(`sev-${severity}`)).toBe(true)
     })
   }
 
@@ -23,7 +24,7 @@ describe('SeverityBadge', () => {
       const { container, unmount } = render(<SeverityBadge severity={severity} />)
       const bars = container.querySelectorAll('svg rect')
       expect(bars).toHaveLength(4)
-      expect(container.querySelectorAll('svg rect:not(.off)')).toHaveLength(lit[severity])
+      expect(container.querySelectorAll('svg rect:not(.ui-badge-bar-off)')).toHaveLength(lit[severity])
       expect(container.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
       unmount()
     }
@@ -37,10 +38,12 @@ describe('SeverityBadge', () => {
 
 describe('StatusBadge', () => {
   for (const status of STATUSES) {
-    it(`renders the text "${status}" with class status-${status} and a glyph`, () => {
+    it(`renders the text "${status}" with class ui-status-${status} and a glyph`, () => {
       const { container } = render(<StatusBadge status={status} />)
-      const badge = screen.getByText(status).closest('.badge')
-      expect(badge).toHaveProperty('className', expect.stringContaining(`status-${status}`))
+      const badge = screen.getByText(status).closest('.ui-badge')
+      expect(badge?.classList.contains(`ui-status-${status}`)).toBe(true)
+      // Never the legacy App.css name, which styles a different pill.
+      expect(badge?.classList.contains(`status-${status}`)).toBe(false)
       expect(container.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
       expect(container.textContent).toBe(`Status: ${status}`)
     })

@@ -15,18 +15,18 @@ export interface SpinnerProps {
 export function Spinner({ label, size = 16, className }: SpinnerProps) {
   const svg = (
     <svg
-      className="spinner-ring"
+      className="ui-spinner-ring"
       viewBox="0 0 16 16"
       width={size}
       height={size}
       aria-hidden="true"
       focusable="false"
     >
-      <circle className="spinner-track" cx="8" cy="8" r="6.25" />
-      <path className="spinner-arc" d="M8 1.75a6.25 6.25 0 0 1 6.25 6.25" />
+      <circle className="ui-spinner-track" cx="8" cy="8" r="6.25" />
+      <path className="ui-spinner-arc" d="M8 1.75a6.25 6.25 0 0 1 6.25 6.25" />
     </svg>
   )
-  const classes = className ? `spinner ${className}` : 'spinner'
+  const classes = className ? `ui-spinner ${className}` : 'ui-spinner'
   if (!label) return <span className={classes}>{svg}</span>
   return (
     <span className={classes} role="status">

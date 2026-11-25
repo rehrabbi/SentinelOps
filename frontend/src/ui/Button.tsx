@@ -24,7 +24,7 @@ export function Button({
   children,
   ...rest
 }: ButtonProps) {
-  const classes = ['btn', `btn-${variant}`, className].filter(Boolean).join(' ')
+  const classes = ['ui-btn', `ui-btn-${variant}`, className].filter(Boolean).join(' ')
   return (
     <button
       {...rest}

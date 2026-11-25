@@ -19,7 +19,7 @@ const KIND_LABEL: Record<ToastKind, string> = { info: 'Note:', success: 'Done:',
 
 function KindIcon({ kind }: { kind: ToastKind }) {
   return (
-    <svg className="toast-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    <svg className="ui-toast-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
       {kind === 'success' ? (
         <path
           d="M3 8.4 6.4 11.5 13 4.5"
@@ -78,7 +78,7 @@ function Toast({ item, pageHidden, reduced }: { item: ToastItem; pageHidden: boo
   return (
     <motion.li
       layout={reduced ? false : 'position'}
-      className={`toast toast-${item.kind}`}
+      className={`ui-toast ui-toast-${item.kind}`}
       initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1, transition: transition('enter', reduced) }}
       exit={reduced ? { opacity: 0, transition: transition('exit', true) } : { opacity: 0, scale: 0.98, transition: transition('exit', false) }}
@@ -90,13 +90,13 @@ function Toast({ item, pageHidden, reduced }: { item: ToastItem; pageHidden: boo
       }}
     >
       <KindIcon kind={item.kind} />
-      <p className="toast-message" id={messageId}>
+      <p className="ui-toast-message" id={messageId}>
         <span className="visually-hidden">{KIND_LABEL[item.kind]} </span>
         {item.message}
       </p>
       <button
         type="button"
-        className="toast-dismiss"
+        className="ui-toast-dismiss"
         aria-label="Dismiss"
         aria-describedby={messageId}
         onClick={() => dismissToast(item.id)}
@@ -119,8 +119,16 @@ export function Toaster() {
   const pageHidden = usePageHidden()
 
   return (
-    <div className="toaster" role="status" aria-live="polite" aria-label="Notifications">
-      <ol className="toaster-list">
+    // Announce each new toast on its own: not the whole stack again, and not removals.
+    <div
+      className="ui-toaster"
+      role="status"
+      aria-live="polite"
+      aria-atomic="false"
+      aria-relevant="additions"
+      aria-label="Notifications"
+    >
+      <ol className="ui-toaster-list">
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <Toast key={item.id} item={item} pageHidden={pageHidden} reduced={reduced} />

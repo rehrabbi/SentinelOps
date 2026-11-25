@@ -17,11 +17,11 @@ export interface EmptyStateProps {
 export function EmptyState({ title, body, action, headingLevel = 2 }: EmptyStateProps) {
   const Heading = headingLevel === 3 ? 'h3' : 'h2'
   return (
-    <div className="empty-state">
-      <Logo variant="mark" size={28} className="empty-state-mark" />
-      <Heading className="empty-state-title">{title}</Heading>
-      <div className="empty-state-body">{body}</div>
-      {action ? <div className="empty-state-action">{action}</div> : null}
+    <div className="ui-empty-state">
+      <Logo variant="mark" size={28} className="ui-empty-state-mark" />
+      <Heading className="ui-empty-state-title">{title}</Heading>
+      <div className="ui-empty-state-body">{body}</div>
+      {action ? <div className="ui-empty-state-action">{action}</div> : null}
     </div>
   )
 }

@@ -1,19 +1,19 @@
 /* Form fields, from the brand board (section 06): label above, 40 px control, 4 px corners. */
-.field {
+.ui-field {
   display: grid;
   align-content: start;
   gap: 6px;
   min-width: 0;
 }
 
-.field-label {
+.ui-field-label {
   font: 500 0.875rem/1.25rem var(--font-sans);
   letter-spacing: 0.005em;
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
 
-.field-control {
+.ui-field-control {
   width: 100%;
   min-width: 0;
   min-height: 2.5rem;
@@ -28,19 +28,19 @@
   transition: border-color var(--dur-fast) ease;
 }
 
-.field-control::placeholder {
+.ui-field-control::placeholder {
   color: var(--color-text-muted);
   opacity: 1;
 }
 
-textarea.field-control {
+textarea.ui-field-control {
   min-height: 6.5rem;
   padding: var(--space-2) var(--space-3);
   resize: vertical;
 }
 
 /* A plain chevron drawn with two gradients, so it follows the theme without an image. */
-select.field-control {
+select.ui-field-control {
   appearance: none;
   padding-right: var(--space-6);
   background-image:
@@ -54,34 +54,34 @@ select.field-control {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .field-control:hover:not(:disabled, :focus-visible) {
+  .ui-field-control:hover:not(:disabled, :focus-visible) {
     border-color: var(--color-text-muted);
   }
 }
 
-.field-control:focus-visible {
+.ui-field-control:focus-visible {
   border-color: var(--color-signal);
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-.field-control:disabled {
+.ui-field-control:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-.field-invalid .field-control {
+.ui-field-invalid .ui-field-control {
   border-color: var(--color-danger);
 }
 
-.field-hint {
+.ui-field-hint {
   margin: 0;
   font: 400 0.875rem/1.25rem var(--font-sans);
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
 }
 
-.field-error {
+.ui-field-error {
   display: flex;
   align-items: flex-start;
   gap: 6px;
@@ -91,7 +91,7 @@ select.field-control {
   overflow-wrap: anywhere;
 }
 
-.field-error-icon {
+.ui-field-error-icon {
   flex: none;
   width: 16px;
   height: 16px;

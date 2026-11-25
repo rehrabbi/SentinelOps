@@ -66,7 +66,7 @@ function UserMenu({ user, onLogout }: Pick<AppShellProps, 'user' | 'onLogout'>) 
 
   return (
     <div
-      className="user-menu"
+      className="ui-user-menu"
       ref={wrapperRef}
       onBlur={(event) => {
         // Tabbing out of the menu closes it, so it never hangs open behind the focus.
@@ -76,14 +76,14 @@ function UserMenu({ user, onLogout }: Pick<AppShellProps, 'user' | 'onLogout'>) 
       <button
         ref={triggerRef}
         type="button"
-        className="user-menu-trigger"
+        className="ui-user-menu-trigger"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="user-menu-name">{user.fullName}</span>
+        <span className="ui-user-menu-name">{user.fullName}</span>
         <span className="visually-hidden"> (account menu)</span>
-        <svg className="user-menu-chevron" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+        <svg className="ui-user-menu-chevron" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
           <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
@@ -92,16 +92,16 @@ function UserMenu({ user, onLogout }: Pick<AppShellProps, 'user' | 'onLogout'>) 
           <motion.div
             key="panel"
             id={panelId}
-            className="user-menu-panel"
+            className="ui-user-menu-panel"
             // Focusable so a click on its text keeps focus inside (and the menu open).
             tabIndex={-1}
             initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0, transition: transition('enter', reduced) }}
             exit={{ opacity: 0, transition: transition('exit', reduced) }}
           >
-            <div className="user-menu-who">
-              <p className="user-menu-fullname">{user.fullName}</p>
-              <p className="user-menu-email">
+            <div className="ui-user-menu-who">
+              <p className="ui-user-menu-fullname">{user.fullName}</p>
+              <p className="ui-user-menu-email">
                 {/* If a long address must wrap, prefer the line break before the @. */}
                 {user.email.split('@')[0]}
                 {user.email.includes('@') ? (
@@ -110,16 +110,16 @@ function UserMenu({ user, onLogout }: Pick<AppShellProps, 'user' | 'onLogout'>) 
                   </>
                 ) : null}
               </p>
-              <p className="user-menu-role">{ROLE_LABEL[user.role]}</p>
+              <p className="ui-user-menu-role">{ROLE_LABEL[user.role]}</p>
             </div>
-            <div className="user-menu-section">
-              <p className="user-menu-heading" aria-hidden="true">
+            <div className="ui-user-menu-section">
+              <p className="ui-user-menu-heading" aria-hidden="true">
                 Theme
               </p>
               <ThemeToggle />
             </div>
-            <div className="user-menu-section">
-              <Button variant="secondary" className="user-menu-logout" busy={busy} onClick={handleLogout}>
+            <div className="ui-user-menu-section">
+              <Button variant="secondary" className="ui-user-menu-logout" busy={busy} onClick={handleLogout}>
                 {busy ? 'Logging out…' : 'Log out'}
               </Button>
             </div>
@@ -136,17 +136,17 @@ function UserMenu({ user, onLogout }: Pick<AppShellProps, 'user' | 'onLogout'>) 
  */
 export function AppShell({ user, onLogout, children }: AppShellProps) {
   return (
-    <div className="shell app-shell">
-      <a className="skip-link" href="#main">
+    <div className="ui-shell ui-app-shell">
+      <a className="ui-skip-link" href="#main">
         Skip to content
       </a>
-      <header className="app-header">
-        <div className="app-header-inner">
-          <Link to="/" className="shell-brand app-brand" aria-label="SentinelOps home">
-            <Logo variant="lockup" size={28} className="app-brand-lockup" />
-            <Logo variant="mark" size={28} className="app-brand-mark" />
+      <header className="ui-app-header">
+        <div className="ui-app-header-inner">
+          <Link to="/" className="ui-shell-brand ui-app-brand" aria-label="SentinelOps home">
+            <Logo variant="lockup" size={28} className="ui-app-brand-lockup" />
+            <Logo variant="mark" size={28} className="ui-app-brand-mark" />
           </Link>
-          <nav className="app-nav" aria-label="Main">
+          <nav className="ui-app-nav" aria-label="Main">
             <ul>
               <li>
                 <NavLink to="/" end>
@@ -166,7 +166,7 @@ export function AppShell({ user, onLogout, children }: AppShellProps) {
           <UserMenu user={user} onLogout={onLogout} />
         </div>
       </header>
-      <main id="main" className="shell-main app-main" tabIndex={-1}>
+      <main id="main" className="ui-shell-main ui-app-main" tabIndex={-1}>
         {children}
       </main>
       <Toaster />

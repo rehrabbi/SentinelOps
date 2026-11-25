@@ -10,7 +10,7 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
 /** A raised surface for one thing: an incident, a form, a panel of settings. Never nest cards. */
 export function Card({ as: Tag = 'article', className, children, ...rest }: CardProps) {
   return (
-    <Tag {...rest} className={className ? `card ${className}` : 'card'}>
+    <Tag {...rest} className={className ? `ui-card ${className}` : 'ui-card'}>
       {children}
     </Tag>
   )
@@ -25,7 +25,7 @@ export interface CardTitleProps extends HTMLAttributes<HTMLHeadingElement> {
 /** The card's title. Long titles (and unbroken strings such as URLs) wrap instead of overflowing. */
 export function CardTitle({ as: Tag = 'h3', className, children, ...rest }: CardTitleProps) {
   return (
-    <Tag {...rest} className={className ? `card-title ${className}` : 'card-title'}>
+    <Tag {...rest} className={className ? `ui-card-title ${className}` : 'ui-card-title'}>
       {children}
     </Tag>
   )

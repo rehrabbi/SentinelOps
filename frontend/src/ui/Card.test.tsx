@@ -14,9 +14,9 @@ it('a 200-character title inside Card keeps overflow-wrap: anywhere', () => {
     </Card>,
   )
   const heading = screen.getByRole('heading', { name: title })
-  expect(heading.classList.contains('card-title')).toBe(true)
-  expect(heading.closest('.card')).not.toBeNull()
+  expect(heading.classList.contains('ui-card-title')).toBe(true)
+  expect(heading.closest('.ui-card')).not.toBeNull()
 
   const css = readFileSync(join(import.meta.dirname, 'Card.css'), 'utf8')
-  expect(css).toMatch(/\.card-title\s*\{[^}]*overflow-wrap:\s*anywhere/)
+  expect(css).toMatch(/\.ui-card-title\s*\{[^}]*overflow-wrap:\s*anywhere/)
 })

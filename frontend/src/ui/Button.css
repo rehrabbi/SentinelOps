@@ -1,5 +1,5 @@
 /* Buttons, from the brand board (section 06): 40 px tall, 4 px corners, Small type at 600. */
-.btn {
+.ui-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -25,58 +25,58 @@
 }
 
 /* Press feedback: the button gives a little under the finger. */
-.btn:active:not(:disabled) {
+.ui-btn:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-.btn:focus-visible {
+.ui-btn:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-.btn-primary {
+.ui-btn-primary {
   background: var(--color-signal);
   color: var(--color-on-signal);
 }
 
-.btn-secondary {
+.ui-btn-secondary {
   background: transparent;
   border-color: var(--color-border);
   color: var(--color-text);
 }
 
-.btn-ghost {
+.ui-btn-ghost {
   background: transparent;
   color: var(--color-text);
 }
 
 /* Outlined, not filled: a destructive action should look deliberate, not loud. */
-.btn-danger {
+.ui-btn-danger {
   background: transparent;
   border-color: var(--color-danger);
   color: var(--color-danger);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .btn-primary:hover:not(:disabled) {
+  .ui-btn-primary:hover:not(:disabled) {
     background: var(--color-signal-strong);
   }
-  .btn-secondary:hover:not(:disabled),
-  .btn-ghost:hover:not(:disabled) {
+  .ui-btn-secondary:hover:not(:disabled),
+  .ui-btn-ghost:hover:not(:disabled) {
     background: var(--color-surface-raised);
   }
-  .btn-danger:hover:not(:disabled) {
+  .ui-btn-danger:hover:not(:disabled) {
     background: color-mix(in srgb, var(--color-danger) 12%, transparent);
   }
 }
 
-.btn:disabled {
+.ui-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
 /* Busy is not "unavailable": keep it at full strength so the label and spinner stay readable. */
-.btn[aria-busy='true'] {
+.ui-btn[aria-busy='true'] {
   cursor: progress;
   opacity: 1;
 }

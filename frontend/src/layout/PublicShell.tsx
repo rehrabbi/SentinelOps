@@ -23,25 +23,25 @@ export interface PublicShellProps {
  */
 export function PublicShell({ children, headerAction }: PublicShellProps) {
   return (
-    <div className="shell public-shell">
-      <a className="skip-link" href="#main">
+    <div className="ui-shell ui-public-shell">
+      <a className="ui-skip-link" href="#main">
         Skip to content
       </a>
-      <header className="public-header">
-        <Link to="/" className="shell-brand" aria-label="SentinelOps home">
+      <header className="ui-public-header">
+        <Link to="/" className="ui-shell-brand" aria-label="SentinelOps home">
           <Logo variant="lockup" size={28} />
         </Link>
-        {headerAction ? <div className="public-header-action">{headerAction}</div> : null}
+        {headerAction ? <div className="ui-public-header-action">{headerAction}</div> : null}
       </header>
-      <main id="main" className="shell-main public-main" tabIndex={-1}>
+      <main id="main" className="ui-shell-main ui-public-main" tabIndex={-1}>
         {children}
       </main>
-      <footer className="public-footer">
-        <p className="public-credit">
+      <footer className="ui-public-footer">
+        <p className="ui-public-credit">
           Built and operated by <a href="https://github.com/rehrabbi">rehrabbi</a> as an open-source
           project.
         </p>
-        <nav className="public-footer-links" aria-label="Footer">
+        <nav className="ui-public-footer-links" aria-label="Footer">
           <ul>
             <li>
               <a href={REPO}>Source on GitHub</a>

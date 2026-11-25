@@ -1,5 +1,5 @@
 /* The signed-out frame: a quiet header, the page, a footer that says who runs this. */
-.public-header {
+.ui-public-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -11,13 +11,13 @@
   padding: var(--space-2) var(--space-4);
 }
 
-.public-header-action {
+.ui-public-header-action {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.public-main {
+.ui-public-main {
   flex: 1;
   width: 100%;
   max-width: 72rem;
@@ -25,7 +25,7 @@
   padding: var(--space-5) var(--space-4) var(--space-7);
 }
 
-.public-footer {
+.ui-public-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -39,13 +39,13 @@
   color: var(--color-text-muted);
 }
 
-.public-credit {
+.ui-public-credit {
   flex: 1 1 18rem;
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.public-footer-links ul {
+.ui-public-footer-links ul {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-4);
@@ -54,7 +54,7 @@
   list-style: none;
 }
 
-.public-footer a {
+.ui-public-footer a {
   border-radius: 2px;
   color: var(--color-text);
   text-decoration: underline;
@@ -64,20 +64,20 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .public-footer a:hover {
+  .ui-public-footer a:hover {
     text-decoration-color: currentColor;
   }
 }
 
-.public-footer a:focus-visible {
+.ui-public-footer a:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 @media (min-width: 768px) {
-  .public-header,
-  .public-main,
-  .public-footer {
+  .ui-public-header,
+  .ui-public-main,
+  .ui-public-footer {
     padding-inline: var(--space-5);
   }
 }

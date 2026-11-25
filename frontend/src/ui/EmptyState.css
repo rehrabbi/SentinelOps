@@ -1,5 +1,5 @@
 /* An empty list's stand-in. Left-aligned like the content it replaces, quiet, one way forward. */
-.empty-state {
+.ui-empty-state {
   display: grid;
   justify-items: start;
   gap: var(--space-2);
@@ -11,13 +11,13 @@
   overflow-wrap: anywhere;
 }
 
-.empty-state-mark {
+.ui-empty-state-mark {
   color: var(--color-text-muted);
   margin-bottom: var(--space-2);
 }
 
 /* H3 on the type scale, whatever the heading level. */
-.empty-state-title {
+.ui-empty-state-title {
   margin: 0;
   font: 600 1.125rem/1.625rem var(--font-sans);
   letter-spacing: -0.005em;
@@ -25,22 +25,22 @@
   text-wrap: balance;
 }
 
-.empty-state-body {
+.ui-empty-state-body {
   max-width: 60ch;
   font: 400 1rem/1.5rem var(--font-sans);
   text-wrap: pretty;
 }
 
-.empty-state-body p {
+.ui-empty-state-body p {
   margin: 0;
 }
 
-.empty-state-action {
+.ui-empty-state-action {
   margin-top: var(--space-3);
 }
 
 @media (max-width: 480px) {
-  .empty-state {
+  .ui-empty-state {
     padding: var(--space-5) var(--space-4);
   }
 }

@@ -1,5 +1,5 @@
 /* Cards, from the brand board (section 06): surface, a decorative hairline, 8 px corners. */
-.card {
+.ui-card {
   display: grid;
   gap: 10px;
   min-width: 0;
@@ -14,7 +14,7 @@
 }
 
 /* H3 on the type scale. */
-.card-title {
+.ui-card-title {
   margin: 0;
   font: 600 1.125rem/1.625rem var(--font-sans);
   letter-spacing: -0.005em;

@@ -19,6 +19,9 @@ describe('toast', () => {
     const regions = screen.getAllByRole('status')
     expect(regions).toHaveLength(1)
     expect(regions[0].getAttribute('aria-live')).toBe('polite')
+    // New toasts are read on their own; older ones and removals are not re-read.
+    expect(regions[0].getAttribute('aria-atomic')).toBe('false')
+    expect(regions[0].getAttribute('aria-relevant')).toBe('additions')
     expect(within(regions[0]).getByText('Incident INC-0142 saved')).toBeTruthy()
     expect(within(regions[0]).getByText('Could not reach the server. Try again.')).toBeTruthy()
   })
@@ -28,13 +31,13 @@ describe('toast', () => {
     act(() => toast('Could not reach the server.', 'error'))
     const item = screen.getByText('Could not reach the server.').closest('li')
     expect(item?.textContent).toContain('Error:')
-    expect(item?.classList.contains('toast-error')).toBe(true)
+    expect(item?.classList.contains('ui-toast-error')).toBe(true)
   })
 
   it('defaults to info', () => {
     render(<Toaster />)
     act(() => toast('Signed out'))
-    expect(screen.getByText('Signed out').closest('li')?.classList.contains('toast-info')).toBe(true)
+    expect(screen.getByText('Signed out').closest('li')?.classList.contains('ui-toast-info')).toBe(true)
   })
 
   it('can be dismissed', async () => {

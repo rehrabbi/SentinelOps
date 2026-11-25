@@ -9,7 +9,7 @@ describe('Button', () => {
     render(<Button onClick={onClick}>Save changes</Button>)
     const button = screen.getByRole('button', { name: 'Save changes' })
     expect(button.getAttribute('type')).toBe('button')
-    expect(button.classList.contains('btn-primary')).toBe(true)
+    expect(button.classList.contains('ui-btn-primary')).toBe(true)
     await userEvent.click(button)
     expect(onClick).toHaveBeenCalledOnce()
   })
@@ -17,7 +17,7 @@ describe('Button', () => {
   it('takes each variant as a class', () => {
     for (const variant of ['primary', 'secondary', 'ghost', 'danger'] as const) {
       const { unmount } = render(<Button variant={variant}>Go</Button>)
-      expect(screen.getByRole('button').classList.contains(`btn-${variant}`)).toBe(true)
+      expect(screen.getByRole('button').classList.contains(`ui-btn-${variant}`)).toBe(true)
       unmount()
     }
   })

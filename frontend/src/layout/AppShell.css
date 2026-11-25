@@ -2,7 +2,7 @@
  * The signed-in frame. Phones: logo and user menu on one row, the nav as a row of tabs below.
  * From 768 px: one 64 px row, logo, nav, then the user menu at the far end.
  */
-.app-header {
+.ui-app-header {
   position: sticky;
   top: 0;
   z-index: var(--z-header);
@@ -10,7 +10,7 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.app-header-inner {
+.ui-app-header-inner {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
@@ -23,31 +23,31 @@
   padding: var(--space-2) var(--space-4) 0;
 }
 
-.app-brand {
+.ui-app-brand {
   grid-area: brand;
   justify-self: start;
 }
 
 /* The lockup needs room (120 px at least); on narrow phones the mark stands alone. */
-.app-brand-lockup {
+.ui-app-brand-lockup {
   display: none;
 }
 
 @media (min-width: 480px) {
-  .app-brand-lockup {
+  .ui-app-brand-lockup {
     display: inline-block;
   }
-  .app-brand-mark {
+  .ui-app-brand-mark {
     display: none;
   }
 }
 
-.app-nav {
+.ui-app-nav {
   grid-area: nav;
   min-width: 0;
 }
 
-.app-nav ul {
+.ui-app-nav ul {
   display: flex;
   gap: var(--space-1);
   margin: 0 calc(-1 * var(--space-3));
@@ -55,7 +55,7 @@
   list-style: none;
 }
 
-.app-nav a {
+.ui-app-nav a {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -70,22 +70,22 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .app-nav a:hover {
+  .ui-app-nav a:hover {
     color: var(--color-text);
   }
 }
 
-.app-nav a:focus-visible {
+.ui-app-nav a:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: -2px;
 }
 
 /* Current page: full-strength text and a signal rule on the header's bottom edge. */
-.app-nav a[aria-current='page'] {
+.ui-app-nav a[aria-current='page'] {
   color: var(--color-text);
 }
 
-.app-nav a[aria-current='page']::after {
+.ui-app-nav a[aria-current='page']::after {
   content: '';
   position: absolute;
   right: var(--space-3);
@@ -96,12 +96,12 @@
   background: var(--color-signal);
 }
 
-.user-menu {
+.ui-user-menu {
   grid-area: user;
   position: relative;
 }
 
-.user-menu-trigger {
+.ui-user-menu-trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -120,34 +120,34 @@
     transform 160ms var(--ease-out);
 }
 
-.user-menu-trigger:active {
+.ui-user-menu-trigger:active {
   transform: scale(0.97);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .user-menu-trigger:hover {
+  .ui-user-menu-trigger:hover {
     background: var(--color-surface-raised);
   }
 }
 
-.user-menu-trigger[aria-expanded='true'] {
+.ui-user-menu-trigger[aria-expanded='true'] {
   background: var(--color-surface-raised);
 }
 
-.user-menu-trigger:focus-visible {
+.ui-user-menu-trigger:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 /* The full name is in the panel; the button may shorten it. */
-.user-menu-name {
+.ui-user-menu-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.user-menu-chevron {
+.ui-user-menu-chevron {
   flex: none;
   width: 12px;
   height: 12px;
@@ -155,11 +155,11 @@
   transition: transform var(--dur-base) var(--ease-out);
 }
 
-.user-menu-trigger[aria-expanded='true'] .user-menu-chevron {
+.ui-user-menu-trigger[aria-expanded='true'] .ui-user-menu-chevron {
   transform: rotate(180deg);
 }
 
-.user-menu-panel {
+.ui-user-menu-panel {
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
@@ -176,44 +176,44 @@
   overflow-wrap: anywhere;
 }
 
-.user-menu-panel:focus {
+.ui-user-menu-panel:focus {
   outline: none;
 }
 
-.user-menu-who,
-.user-menu-section {
+.ui-user-menu-who,
+.ui-user-menu-section {
   display: grid;
   gap: 2px;
   padding: var(--space-3) 0;
 }
 
-.user-menu-section {
+.ui-user-menu-section {
   gap: var(--space-2);
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.user-menu-who p,
-.user-menu-heading {
+.ui-user-menu-who p,
+.ui-user-menu-heading {
   margin: 0;
 }
 
-.user-menu-fullname {
+.ui-user-menu-fullname {
   font: 600 0.875rem/1.25rem var(--font-sans);
   color: var(--color-text);
 }
 
-.user-menu-email,
-.user-menu-role,
-.user-menu-heading {
+.ui-user-menu-email,
+.ui-user-menu-role,
+.ui-user-menu-heading {
   font: 400 0.875rem/1.25rem var(--font-sans);
   color: var(--color-text-muted);
 }
 
-.user-menu-logout {
+.ui-user-menu-logout {
   width: 100%;
 }
 
-.app-main {
+.ui-app-main {
   flex: 1;
   width: 100%;
   max-width: 72rem;
@@ -222,7 +222,7 @@
 }
 
 @media (min-width: 768px) {
-  .app-header-inner {
+  .ui-app-header-inner {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: 'brand nav user';
     column-gap: var(--space-6);
@@ -230,24 +230,24 @@
     padding: 0 var(--space-5);
   }
 
-  .app-nav {
+  .ui-app-nav {
     align-self: stretch;
     display: flex;
   }
 
-  .app-nav ul {
+  .ui-app-nav ul {
     margin: 0;
   }
 
-  .app-nav li {
+  .ui-app-nav li {
     display: flex;
   }
 
-  .app-nav a {
+  .ui-app-nav a {
     min-height: 0;
   }
 
-  .app-main {
+  .ui-app-main {
     padding: var(--space-6) var(--space-5) var(--space-8);
   }
 }

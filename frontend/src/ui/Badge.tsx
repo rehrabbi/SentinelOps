@@ -18,8 +18,8 @@ const BARS = [
 export function SeverityBadge({ severity, className }: { severity: IncidentSeverity; className?: string }) {
   const lit = LIT[severity]
   return (
-    <span className={['badge', 'badge-sev', `sev-${severity}`, className].filter(Boolean).join(' ')}>
-      <svg className="badge-bars" viewBox="0 0 14 12" aria-hidden="true" focusable="false">
+    <span className={['ui-badge', 'ui-badge-sev', `sev-${severity}`, className].filter(Boolean).join(' ')}>
+      <svg className="ui-badge-bars" viewBox="0 0 14 12" aria-hidden="true" focusable="false">
         {BARS.map((bar, i) => (
           <rect
             key={bar.x}
@@ -28,12 +28,12 @@ export function SeverityBadge({ severity, className }: { severity: IncidentSever
             width="2.4"
             height={bar.h}
             rx="0.6"
-            className={i < lit ? undefined : 'off'}
+            className={i < lit ? undefined : 'ui-badge-bar-off'}
           />
         ))}
       </svg>
       <span className="visually-hidden">Severity: </span>
-      <span className="badge-word">{severity}</span>
+      <span className="ui-badge-word">{severity}</span>
     </span>
   )
 }
@@ -68,12 +68,12 @@ function StatusGlyph({ status }: { status: IncidentStatus }) {
 
 export function StatusBadge({ status, className }: { status: IncidentStatus; className?: string }) {
   return (
-    <span className={['badge', 'badge-status', `status-${status}`, className].filter(Boolean).join(' ')}>
-      <svg className="badge-glyph" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+    <span className={['ui-badge', 'ui-badge-status', `ui-status-${status}`, className].filter(Boolean).join(' ')}>
+      <svg className="ui-badge-glyph" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
         <StatusGlyph status={status} />
       </svg>
       <span className="visually-hidden">Status: </span>
-      <span className="badge-word">{status}</span>
+      <span className="ui-badge-word">{status}</span>
     </span>
   )
 }
