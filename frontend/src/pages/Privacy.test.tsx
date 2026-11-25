@@ -101,7 +101,8 @@ describe('privacy notice', () => {
       /any signed-in GitHub user can download/i,
       /about 90 days/,
       /rolling 6 hour history/i,
-      /administrators cannot do it in the app/i,
+      /Administrators can see each account’s email, name and role/i,
+      /not correct or delete anything/i,
       /Deleting an account is not currently supported/i,
       /do not put your email address or anything about your account/i,
     ]) {
