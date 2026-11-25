@@ -295,6 +295,55 @@ describe('Users page', () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Password reset link' })))
   })
 
+  it('a failed re-issue says the link shown before still works, and puts focus back on Reset', async () => {
+    const u = setup()
+    createPasswordReset
+      .mockResolvedValueOnce({ email: BOB.email, expiresAt: '2026-11-25T10:00:00Z', token: 'first-link-fixture' })
+      .mockRejectedValueOnce(new api.ApiError(500, 'Could not create the reset link'))
+    renderPage()
+    await screen.findByText('Bob Reporter')
+    const reset = () => screen.getByRole('button', { name: 'Reset password for Bob Reporter' })
+    await u.click(reset())
+    await screen.findByRole('textbox', { name: 'Password reset link' })
+
+    await u.click(reset())
+    const alert = await screen.findByRole('alert')
+    // The server rolled the new link back, so the old one was never replaced: say so plainly.
+    expect(alert.textContent).toBe(
+      'Could not create the reset link. The link shown before was not replaced: it still works until it expires.',
+    )
+    expect(screen.queryByRole('textbox', { name: 'Password reset link' })).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(reset()))
+    expect(reset().getAttribute('aria-describedby')).toBe(alert.id)
+  })
+
+  it('a re-issue that never reaches the server does not promise the old link still works', async () => {
+    const u = setup()
+    createPasswordReset
+      .mockResolvedValueOnce({ email: BOB.email, expiresAt: '2026-11-25T10:00:00Z', token: 'first-link-fixture' })
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    renderPage()
+    await screen.findByText('Bob Reporter')
+    await u.click(screen.getByRole('button', { name: 'Reset password for Bob Reporter' }))
+    await screen.findByRole('textbox', { name: 'Password reset link' })
+    await u.click(screen.getByRole('button', { name: 'Reset password for Bob Reporter' }))
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toMatch(/may have stopped working/)
+    expect(alert.textContent).not.toMatch(/still works/)
+  })
+
+  it('a failed first reset puts focus back on Reset', async () => {
+    const u = setup()
+    createPasswordReset.mockRejectedValueOnce(new api.ApiError(404, 'user not found'))
+    renderPage()
+    await screen.findByText('Bob Reporter')
+    await u.click(screen.getByRole('button', { name: 'Reset password for Bob Reporter' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('user not found')
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Reset password for Bob Reporter' })),
+    )
+  })
+
   it('shows a cue while the chosen role differs from the saved one', async () => {
     const u = setup()
     renderPage()
