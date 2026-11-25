@@ -2,7 +2,7 @@ import type { Transition, Variants } from 'motion/react'
 
 // Numbers mirror the CSS tokens (--ease-out, --ease-in-out, --dur-fast/base/slow) so CSS and
 // JS motion feel like one system. Motion takes seconds; the tokens are milliseconds.
-const EASE_OUT = [0.22, 1, 0.36, 1] as const
+export const EASE_OUT = [0.22, 1, 0.36, 1] as const
 const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const
 
 // Under reduced motion every preset becomes a short fade: no travel, no scale, nothing hidden.

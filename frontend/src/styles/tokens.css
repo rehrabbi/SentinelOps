@@ -1,13 +1,15 @@
 /*
- * Design tokens. Placeholder palette: final values come from the brand board.
+ * Design tokens, from the approved brand board (docs/brand/board/, docs/brand.md).
  * Names are stable; change values here only.
  *
  * Theme selection (no inline script, so no flash under the CSP):
  *   - <html> without data-theme  -> follows prefers-color-scheme (dark by default)
  *   - data-theme="dark"|"light"  -> explicit choice, set by main.tsx before first render
  *
- * Contrast (computed): text >= 4.5:1 and UI parts >= 3:1 on --color-bg,
+ * Contrast (computed, tables in docs/brand.md): text >= 4.5:1 and UI parts >= 3:1 on --color-bg,
  * --color-surface and --color-surface-raised in both themes.
+ * --color-border-subtle is the exception on purpose: decorative hairlines (card edges, dividers)
+ * only, never the only visible edge of a control. Control edges use --color-border (>= 3:1).
  */
 
 /* Theme-independent tokens. */
@@ -40,23 +42,24 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --color-bg: #0a1020;
-  --color-surface: #111a2e;
-  --color-surface-raised: #18243d;
-  --color-border: #5f74a0;
-  --color-text: #e8eef9;
-  --color-text-muted: #a3b3cf;
-  --color-signal: #7dd3fc;
-  --color-signal-strong: #38bdf8;
+  --color-surface: #0f1729;
+  --color-surface-raised: #162139;
+  --color-border: #5f75a0;
+  --color-border-subtle: #223050;
+  --color-text: #e6edf8;
+  --color-text-muted: #9eafcb;
+  --color-signal: #86d8ff;
+  --color-signal-strong: #c4ecff;
   --color-on-signal: #04121f;
-  --color-danger: #ff8a8a;
-  --color-sev-critical: #ff6b6b;
-  --color-sev-high: #ff9f43;
-  --color-sev-medium: #f5c542;
-  --color-sev-low: #8fd19e;
-  --color-status-open: #7dd3fc;
-  --color-status-investigating: #f5c542;
-  --color-status-resolved: #6ee7a0;
-  --color-status-closed: #9aa8c0;
+  --color-danger: #ff8f8f;
+  --color-sev-critical: #ff7070;
+  --color-sev-high: #ffa24d;
+  --color-sev-medium: #f2c94c;
+  --color-sev-low: #a7b6cf;
+  --color-status-open: #86d8ff;
+  --color-status-investigating: #c3b1ff;
+  --color-status-resolved: #6fe3a2;
+  --color-status-closed: #8d9bb4;
   --color-focus: var(--color-signal-strong);
   --shadow-raised: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -2px rgb(0 0 0 / 0.3);
 }
@@ -65,24 +68,25 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --color-bg: #f6f8fc;
+    --color-bg: #f4f7fb;
     --color-surface: #ffffff;
     --color-surface-raised: #ffffff;
-    --color-border: #7a8aa6;
+    --color-border: #7486a4;
+    --color-border-subtle: #d9e1ec;
     --color-text: #0b1426;
-    --color-text-muted: #4a5973;
-    --color-signal: #0369a1;
-    --color-signal-strong: #075985;
+    --color-text-muted: #46546d;
+    --color-signal: #0a6ea8;
+    --color-signal-strong: #06547f;
     --color-on-signal: #ffffff;
     --color-danger: #b42318;
-    --color-sev-critical: #c62828;
-    --color-sev-high: #b4540a;
-    --color-sev-medium: #8a6100;
-    --color-sev-low: #2f6f3e;
-    --color-status-open: #0369a1;
-    --color-status-investigating: #8a6100;
-    --color-status-resolved: #1e7a45;
-    --color-status-closed: #55657f;
+    --color-sev-critical: #b82525;
+    --color-sev-high: #a34a0b;
+    --color-sev-medium: #7d5800;
+    --color-sev-low: #52607a;
+    --color-status-open: #0a6ea8;
+    --color-status-investigating: #6a48c9;
+    --color-status-resolved: #17703f;
+    --color-status-closed: #5d6a80;
     --shadow-raised: 0 10px 15px -3px rgb(11 20 38 / 0.1), 0 4px 6px -2px rgb(11 20 38 / 0.05);
   }
 }
@@ -90,24 +94,25 @@
 /* Light, explicit choice. Same values as the block above. */
 :root[data-theme='light'] {
   color-scheme: light;
-  --color-bg: #f6f8fc;
+  --color-bg: #f4f7fb;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
-  --color-border: #7a8aa6;
+  --color-border: #7486a4;
+  --color-border-subtle: #d9e1ec;
   --color-text: #0b1426;
-  --color-text-muted: #4a5973;
-  --color-signal: #0369a1;
-  --color-signal-strong: #075985;
+  --color-text-muted: #46546d;
+  --color-signal: #0a6ea8;
+  --color-signal-strong: #06547f;
   --color-on-signal: #ffffff;
   --color-danger: #b42318;
-  --color-sev-critical: #c62828;
-  --color-sev-high: #b4540a;
-  --color-sev-medium: #8a6100;
-  --color-sev-low: #2f6f3e;
-  --color-status-open: #0369a1;
-  --color-status-investigating: #8a6100;
-  --color-status-resolved: #1e7a45;
-  --color-status-closed: #55657f;
+  --color-sev-critical: #b82525;
+  --color-sev-high: #a34a0b;
+  --color-sev-medium: #7d5800;
+  --color-sev-low: #52607a;
+  --color-status-open: #0a6ea8;
+  --color-status-investigating: #6a48c9;
+  --color-status-resolved: #17703f;
+  --color-status-closed: #5d6a80;
   --shadow-raised: 0 10px 15px -3px rgb(11 20 38 / 0.1), 0 4px 6px -2px rgb(11 20 38 / 0.05);
 }
 
