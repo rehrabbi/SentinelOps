@@ -1,9 +1,10 @@
 name: Backup
 
 # Every night: dump the production database and keep it, encrypted, as a
-# workflow artifact for 90 days. The dump is encrypted inside the runner with
-# the public key in infra/backup-recipient.txt before anything is stored, so
-# GitHub only ever holds ciphertext. Artifacts of a public repository can be
+# workflow artifact for 90 days, with a second copy in Backblaze B2. The dump
+# is encrypted inside the runner with the public key in
+# infra/backup-recipient.txt before anything is stored, so GitHub and Backblaze
+# only ever hold ciphertext. Artifacts of a public repository can be
 # downloaded by anyone who can read it; without the private key, which never
 # leaves the owner, they are useless. infra/restore-drill.sh proves a backup
 # restores, and that it holds the audit history GitHub has been anchoring.
@@ -30,7 +31,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: infra/backup-recipient.txt
+          sparse-checkout: |
+            infra/backup-recipient.txt
+            infra/b2-upload.py
           sparse-checkout-cone-mode: false
 
       # age from Ubuntu's own archive, verified by apt's signatures.
@@ -71,3 +74,15 @@ jobs:
           if-no-files-found: error
           # Already compressed by pg_dump and encrypted by age.
           compression-level: 0
+
+      # The second, independent copy: the same ciphertext in a private
+      # Backblaze B2 bucket, outside GitHub, kept 90 days by the bucket's
+      # lifecycle rule. The key is limited to that bucket and cannot read it;
+      # the bucket's Object Lock keeps every file for 90 days in compliance
+      # mode, so neither a leaked key nor anyone else can delete one sooner.
+      # Runs after the artifact upload, so a B2 failure still leaves that copy.
+      - name: Copy to Backblaze B2
+        env:
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: python3 -I infra/b2-upload.py sentinelops.dump.age "$BACKUP_NAME.dump.age"

@@ -18,7 +18,7 @@ Write down what you did as you go: a GitHub issue labelled `priority: high` is t
 | Uptime alerts | UptimeRobot (owner's account): the site and `/api/healthz` through the proxy, every 5 minutes, by email |
 | Scheduled checks | GitHub Actions: **Audit verify** (every 6 hours), **Backup** (02:47 UTC daily), **ZAP baseline** (04:17 UTC Mondays), **Render hours** (05:07 UTC Mondays), **Keep schedules alive** (05:41 UTC on the 1st, re-enables the others so GitHub's 60-day inactivity rule never pauses them); a failed scheduled run emails the owner |
 | Audit anchors | branch `audit-anchors`, file `anchors.log` (protected: no force-push, no deletion) |
-| Backups | GitHub Actions artifacts `sentinelops-db-<UTC time>`, 90 days, encrypted with `age` |
+| Backups | GitHub Actions artifacts `sentinelops-db-<UTC time>`, 90 days, encrypted with `age`; the same files as `sentinelops-db-<UTC time>.dump.age` in the Backblaze B2 bucket `sentinelops-backups-irmqvmze` (owner's Backblaze account; Object Lock keeps each file 90 days in compliance mode, so none can be deleted sooner, by anyone; the lifecycle rule removes them after) |
 | Backup private key | owner's password manager, and `~/.sentinelops/backup-key.txt` on the machine that restores |
 
 ---
@@ -77,6 +77,7 @@ verify → Run workflow) and check it passes with `anchor … still holds`.
 | `password authentication failed for user "backup_reader"` | The password was rotated without updating the secret: `infra/rotate-readonly-role.sh backup_reader`. |
 | `the encrypted dump is only N bytes` | The dump came out (nearly) empty: check the log above it for a `pg_dump` error. |
 | A connection error or timeout | Neon is down or waking slowly: check [Neon's status page](https://neonstatus.com) and re-run. |
+| `B2 refused …` in **Copy to Backblaze B2** | The GitHub copy was stored; only the second copy failed. `bad_auth_token` or `unauthorized`: the key was deleted or replaced, so create a new key for the bucket (Application Keys → Add, that bucket only, Write Only) and set `B2_KEY_ID` and `B2_APPLICATION_KEY` in the `backup` environment again; its secret can go from Backblaze's Copy button straight into `Get-Clipboard | gh secret set B2_APPLICATION_KEY --env backup --repo rehrabbi/SentinelOps`. Anything else: check [Backblaze's status](https://status.backblaze.com) and re-run. |
 
 **Confirm:** run **Backup** by hand, then `infra/restore-drill.sh`, which must end in
 `RESTORE DRILL PASSED`. A backup that has not been restored is not yet a backup.
@@ -98,7 +99,9 @@ Nothing else changes: same connection string, same roles.
 
 ### B. Older than 6 hours, or Neon's own history is gone
 
-1. Pick the backup: the newest one from before the damage. Prove it first:
+1. Pick the backup: the newest one from before the damage, from the run's artifact or, if GitHub
+   is unavailable, from Backblaze (log in → **Browse Files** → `sentinelops-backups-irmqvmze` →
+   the file → **Download**). Prove it first:
    `infra/restore-drill.sh --file <downloaded sentinelops.dump.age>` must pass.
 2. Create a new, empty database in the Neon project (console → Databases → New database, owner
    `sentinelops`), for example `sentinelops_restored`, and copy its direct (non-pooled) connection

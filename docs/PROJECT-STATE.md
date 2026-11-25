@@ -400,11 +400,20 @@ criterion has to include the next deployment, not just the moment.
   Tested against the workspace (720 of 750 for November) and against made-up service lists. Environment
   `render` created 2026-11-24 (owner-approved), limited to `main`, holding `RENDER_API_KEY` (piped from
   `.env`, never printed).
-- **C, waiting on the owner's Backblaze account:** the nightly Backup also uploads the same encrypted
-  file to a private Backblaze B2 bucket (10 GB free, no card), with a key that can only write files.
+- **C, built:** the nightly Backup also uploads the same encrypted file to the private Backblaze B2
+  bucket `sentinelops-backups-irmqvmze` (10 GB free, no card; owner's account, created 2026-11-25),
+  through `infra/b2-upload.py` (standard library only; the key comes from the environment; B2 checks
+  the SHA-1 and so does the script). Bucket: private, Backblaze's own encryption on, **Object Lock on, 90 days, compliance mode** (the website
+  offers only compliance; owner's choice over governance through the API),
+  lifecycle hides files after 90 days and deletes them a day later. Key `sentinelops-backup-writer`:
+  Backblaze's "Write Only" preset, limited to that bucket. It turned out to include `deleteFiles` and
+  several bucket-settings permissions (but not `writeBucketRetentions` or `bypassGovernance`), which is why
+  Object Lock was switched on: a leaked key still cannot remove a backup before its 90 days. The key's
+  secret went from Backblaze's Copy button through the clipboard into GitHub, unseen; stored as `B2_KEY_ID` and
+  `B2_APPLICATION_KEY` in the `backup` environment. A B2 failure fails the run after the GitHub artifact
+  is stored.
 
-**⏭️ Next:** the owner creates the Backblaze account, a private bucket with a 90-day lifecycle, and a
-write-only key limited to it (C); then the Backup job uploads there too.
+**⏭️ Next:** brief step 5, the 1.0.0 review: every open question in the learning log, then the release.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly; follow `docs/RUNBOOK.md` for any
 alert.
