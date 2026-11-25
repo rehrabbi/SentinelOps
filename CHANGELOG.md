@@ -12,6 +12,9 @@ first hardened production deployment.
 
 ### Added
 
+- `reset-password`, a command-line subcommand (`go run . reset-password --email …`) that issues a
+  one-time reset link with database access instead of an admin session, so even the only admin can
+  get back in. Audited as `command-line`; the link behaves like any other reset link.
 - A second, independent copy of every nightly backup in a private Backblaze B2 bucket (free plan, no
   card), uploaded by `infra/b2-upload.py` with a key limited to that bucket. Every upload carries its own
   90-day compliance lock, which nobody can shorten, so neither a leaked key nor anyone else can delete a
