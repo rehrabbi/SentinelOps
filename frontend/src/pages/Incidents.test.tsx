@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Incident, IncidentSeverity, IncidentStatus } from '../api'
@@ -45,6 +45,16 @@ function incident(
   }
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 /** The first headline count, e.g. "3 open or investigating". */
 function openCount(container: HTMLElement): string {
   return container.querySelector('.overview-stat')?.textContent ?? ''
@@ -56,6 +66,16 @@ function rowTitles(): string[] {
     return t ? [t.textContent ?? ''] : []
   })
 }
+
+function rowOf(title: string): HTMLElement {
+  return screen.getByText(title, { selector: '.incidents-title' }).closest('li') as HTMLElement
+}
+
+function statusSelect(title: string): HTMLSelectElement {
+  return screen.getByRole('combobox', { name: `Status for ${title}` }) as HTMLSelectElement
+}
+
+const toggle = () => screen.getByRole('button', { name: 'Report an incident' })
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -73,11 +93,12 @@ describe('Incidents page states', () => {
     expect(container.querySelector('.overview')).toBeNull()
   })
 
-  it('shows the server message in an alert when loading fails, and no overview', async () => {
+  it('shows the server message in an alert when loading fails, with Retry and no overview', async () => {
     getIncidents.mockRejectedValue(new api.ApiError(500, 'The incident service is down'))
     const { container } = render(<Incidents />)
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe('The incident service is down')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
     expect(container.querySelector('.overview')).toBeNull()
   })
 
@@ -87,14 +108,17 @@ describe('Incidents page states', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Failed to load incidents')
   })
 
-  it('shows the empty state when there are no incidents', async () => {
+  it('shows the empty state, with the report form open, when there are no incidents', async () => {
     getIncidents.mockResolvedValue([])
     render(<Incidents />)
     expect(await screen.findByRole('heading', { name: 'No incidents yet' })).toBeTruthy()
-    expect(screen.queryByRole('list', { name: '' })).toBeNull()
+    expect(toggle().getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByLabelText('Title')).toBeTruthy()
+    // Opening by default does not take focus from where it was.
+    expect(document.activeElement).toBe(document.body)
   })
 
-  it('lists incidents with severity, status and times, newest first as the server sent them', async () => {
+  it('names the list for every role, and lists incidents with severity, status and times', async () => {
     getIncidents.mockResolvedValue([
       incident('2', 'Disk almost full', 'investigating', 'high', {
         description: 'The /var volume is at 94%.',
@@ -104,14 +128,31 @@ describe('Incidents page states', () => {
     ])
     render(<Incidents />)
     await screen.findByText('Disk almost full')
+    expect(screen.getByRole('heading', { level: 2, name: 'Incidents you can see' })).toBeTruthy()
     expect(rowTitles()).toEqual(['Disk almost full', 'Login page slow'])
     expect(screen.getByText('The /var volume is at 94%.')).toBeTruthy()
     expect(screen.getAllByText('Reported 20 Nov 2026, 09:00 UTC', { selector: 'time' })).toHaveLength(2)
     expect(screen.getByText('Updated 21 Nov 2026, 10:30 UTC', { selector: 'time' })).toBeTruthy()
-    // The row for an untouched incident has no "Updated" time.
     expect(screen.getAllByText(/^Updated /)).toHaveLength(1)
-    const select = screen.getByRole('combobox', { name: 'Status for Disk almost full' }) as HTMLSelectElement
-    expect(select.value).toBe('investigating')
+    expect(statusSelect('Disk almost full').value).toBe('investigating')
+    // Severity is a badge; status is shown once, in the select (no second status badge).
+    expect(within(rowOf('Disk almost full')).getByText('high', { selector: '.ui-badge-word' })).toBeTruthy()
+    expect(document.querySelector('.incidents-list .ui-badge-status')).toBeNull()
+    // The form is closed when there is a list to read.
+    expect(toggle().getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByLabelText('Title')).toBeNull()
+  })
+
+  it('leaves out "Updated" when the two times only differ by seconds', async () => {
+    getIncidents.mockResolvedValue([
+      incident('1', 'Login page slow', 'open', 'low', {
+        createdAt: '2026-11-20T09:00:05Z',
+        updatedAt: '2026-11-20T09:00:41Z',
+      }),
+    ])
+    render(<Incidents />)
+    await screen.findByText('Login page slow')
+    expect(screen.queryByText(/^Updated /)).toBeNull()
   })
 
   it('renders a 200-character title inside its row, set to wrap', async () => {
@@ -126,8 +167,55 @@ describe('Incidents page states', () => {
   })
 })
 
+describe('A failed load', () => {
+  it('keeps the error and shows no overview after a create, then Retry brings in the server list', async () => {
+    const user = userEvent.setup()
+    getIncidents.mockRejectedValueOnce(new api.ApiError(503, 'The incident service is down'))
+    createIncident.mockResolvedValue(incident('9', 'Payments failing'))
+    const { container } = render(
+      <>
+        <Incidents />
+        <Toaster />
+      </>,
+    )
+    await screen.findByText('The incident service is down')
+
+    await user.click(toggle())
+    await user.type(screen.getByLabelText('Title'), 'Payments failing')
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
+
+    // The create worked and says so, but there is still no list, so no overview and no faked rows.
+    expect(await screen.findByText('Incident reported')).toBeTruthy()
+    expect(screen.getByText('The incident service is down')).toBeTruthy()
+    expect(container.querySelector('.overview')).toBeNull()
+    expect(document.querySelector('.incidents-list')).toBeNull()
+
+    getIncidents.mockResolvedValueOnce([
+      incident('9', 'Payments failing'),
+      incident('1', 'Login page slow', 'closed', 'low'),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByText('Payments failing', { selector: '.incidents-title' })
+    expect(screen.queryByText('The incident service is down')).toBeNull()
+    expect(screen.getByText('Counts cover the 2 incidents you can see.')).toBeTruthy()
+    expect(openCount(container)).toBe('1 open or investigating')
+    expect(getIncidents).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the error again if Retry fails', async () => {
+    const user = userEvent.setup()
+    getIncidents
+      .mockRejectedValueOnce(new api.ApiError(503, 'The incident service is down'))
+      .mockRejectedValueOnce(new api.ApiError(503, 'Still down'))
+    render(<Incidents />)
+    await screen.findByText('The incident service is down')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Still down')
+  })
+})
+
 describe('Reporting an incident', () => {
-  it('sends title, description and severity, adds the incident at the top as open, and updates the overview', async () => {
+  it('opens in place with focus on Title, sends the payload, then closes, returns focus and updates the overview', async () => {
     const user = userEvent.setup()
     getIncidents.mockResolvedValue([incident('1', 'Login page slow', 'open', 'low')])
     createIncident.mockResolvedValue(
@@ -142,10 +230,18 @@ describe('Reporting an incident', () => {
     await screen.findByText('Login page slow')
     expect(openCount(container)).toBe('1 open or investigating')
 
+    await user.click(toggle())
+    expect(toggle().getAttribute('aria-expanded')).toBe('true')
+    const controls = toggle().getAttribute('aria-controls')
+    expect(controls && document.getElementById(controls)).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByLabelText('Title'))
+
     await user.type(screen.getByLabelText('Title'), 'Payments failing')
     await user.type(screen.getByLabelText('Description'), 'Card checkout returns 500.')
+    // Option text is capitalised like the badges; the value sent stays lowercase.
+    expect(within(screen.getByLabelText('Severity')).getByRole('option', { name: 'Critical' })).toBeTruthy()
     await user.selectOptions(screen.getByLabelText('Severity'), 'critical')
-    await user.click(screen.getByRole('button', { name: 'Report incident' }))
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
 
     await waitFor(() => expect(rowTitles()).toEqual(['Payments failing', 'Login page slow']))
     expect(createIncident).toHaveBeenCalledWith({
@@ -153,47 +249,84 @@ describe('Reporting an incident', () => {
       description: 'Card checkout returns 500.',
       severity: 'critical',
     })
-    const row = screen.getByText('Payments failing').closest('li') as HTMLElement
-    expect(within(row).getByText('open', { selector: '.ui-badge-status .ui-badge-word' })).toBeTruthy()
+    const row = rowOf('Payments failing')
+    expect(statusSelect('Payments failing').value).toBe('open')
+    expect(row.querySelector('.incidents-status-open')).toBeTruthy()
     await waitFor(() => expect(openCount(container)).toBe('2 open or investigating'))
-    // The form is cleared, ready for the next one, and a toast confirms.
-    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('')
-    expect((screen.getByLabelText('Severity') as HTMLSelectElement).value).toBe('medium')
+    // The form closes, focus returns to the button that opened it, and a toast confirms.
+    expect(screen.queryByLabelText('Title')).toBeNull()
+    expect(toggle().getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(toggle())
     expect(await screen.findByText('Incident reported')).toBeTruthy()
   })
 
-  it('sends the default severity when none is chosen', async () => {
+  it('Cancel closes the form and returns focus to the button', async () => {
+    const user = userEvent.setup()
+    getIncidents.mockResolvedValue([incident('1', 'Login page slow')])
+    render(<Incidents />)
+    await screen.findByText('Login page slow')
+    await user.click(toggle())
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByLabelText('Title')).toBeNull()
+    expect(document.activeElement).toBe(toggle())
+    expect(createIncident).not.toHaveBeenCalled()
+  })
+
+  it('sends the default severity when none is chosen, and the empty state gives way to the list', async () => {
     const user = userEvent.setup()
     getIncidents.mockResolvedValue([])
     createIncident.mockResolvedValue(incident('1', 'Printer offline'))
     render(<Incidents />)
     await screen.findByRole('heading', { name: 'No incidents yet' })
     await user.type(screen.getByLabelText('Title'), 'Printer offline')
-    await user.click(screen.getByRole('button', { name: 'Report incident' }))
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
     await waitFor(() =>
       expect(createIncident).toHaveBeenCalledWith({ title: 'Printer offline', description: '', severity: 'medium' }),
     )
-    // The empty state gives way to the list.
     await screen.findByText('Printer offline', { selector: '.incidents-title' })
     expect(screen.queryByRole('heading', { name: 'No incidents yet' })).toBeNull()
+    expect(toggle().getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('keeps what was typed and shows the server message when creating fails', async () => {
+  it('disables the submit button while sending, and does not send twice', async () => {
+    const user = userEvent.setup()
+    const pending = deferred<Incident>()
+    getIncidents.mockResolvedValue([])
+    createIncident.mockReturnValue(pending.promise)
+    render(<Incidents />)
+    await screen.findByRole('heading', { name: 'No incidents yet' })
+    await user.type(screen.getByLabelText('Title'), 'Printer offline')
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
+
+    const sending = screen.getByRole('button', { name: 'Creating…' }) as HTMLButtonElement
+    expect(sending.disabled).toBe(true)
+    expect(sending.getAttribute('aria-busy')).toBe('true')
+    await user.click(sending)
+    expect(createIncident).toHaveBeenCalledTimes(1)
+
+    await act(async () => pending.resolve(incident('1', 'Printer offline')))
+    await screen.findByText('Printer offline', { selector: '.incidents-title' })
+  })
+
+  it('keeps what was typed, shows the server message and puts focus on the button when creating fails', async () => {
     const user = userEvent.setup()
     getIncidents.mockResolvedValue([])
     createIncident.mockRejectedValue(new api.ApiError(400, 'title is required'))
     render(<Incidents />)
     await screen.findByRole('heading', { name: 'No incidents yet' })
     await user.type(screen.getByLabelText('Title'), 'Something')
-    await user.click(screen.getByRole('button', { name: 'Report incident' }))
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe('title is required')
     expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Something')
+    const submit = screen.getByRole('button', { name: 'Create incident' })
+    expect((submit as HTMLButtonElement).disabled).toBe(false)
+    expect(document.activeElement).toBe(submit)
   })
 })
 
 describe('Changing a status', () => {
-  it('calls updateIncident, shows the new badge and moves the overview count', async () => {
+  it('calls updateIncident, shows the new status once, moves the overview count and keeps focus', async () => {
     const user = userEvent.setup()
     getIncidents.mockResolvedValue([incident('1', 'Login page slow', 'open', 'high')])
     updateIncident.mockResolvedValue(incident('1', 'Login page slow', 'resolved', 'high'))
@@ -201,18 +334,38 @@ describe('Changing a status', () => {
     await screen.findByText('Login page slow')
     expect(openCount(container)).toBe('1 open or investigating')
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Status for Login page slow' }), 'resolved')
+    await user.selectOptions(statusSelect('Login page slow'), 'resolved')
 
     expect(updateIncident).toHaveBeenCalledWith('1', { status: 'resolved' })
-    const row = screen.getByText('Login page slow').closest('li') as HTMLElement
-    await waitFor(() =>
-      expect(within(row).getByText('resolved', { selector: '.ui-badge-status .ui-badge-word' })).toBeTruthy(),
-    )
-    expect((within(row).getByRole('combobox') as HTMLSelectElement).value).toBe('resolved')
+    const row = rowOf('Login page slow')
+    await waitFor(() => expect(row.querySelector('.incidents-status-resolved')).toBeTruthy())
+    expect(statusSelect('Login page slow').value).toBe('resolved')
+    expect(within(row).getByRole('option', { name: 'Resolved', selected: true })).toBeTruthy()
     await waitFor(() => expect(openCount(container)).toBe('0 open or investigating'))
+    expect(document.activeElement).toBe(statusSelect('Login page slow'))
   })
 
-  it('restores the previous status and shows the server message on that row when the update fails', async () => {
+  it('marks the row busy and says "Saving…" to screen readers while the update is in flight', async () => {
+    const user = userEvent.setup()
+    const pending = deferred<Incident>()
+    getIncidents.mockResolvedValue([incident('1', 'Login page slow')])
+    updateIncident.mockReturnValue(pending.promise)
+    render(<Incidents />)
+    await screen.findByText('Login page slow')
+    const row = rowOf('Login page slow')
+    expect(row.getAttribute('aria-busy')).toBeNull()
+
+    await user.selectOptions(statusSelect('Login page slow'), 'closed')
+    expect(row.getAttribute('aria-busy')).toBe('true')
+    expect(within(row).getByRole('status').textContent).toBe('Saving…')
+    expect(statusSelect('Login page slow').disabled).toBe(true)
+
+    await act(async () => pending.resolve(incident('1', 'Login page slow', 'closed')))
+    await waitFor(() => expect(row.getAttribute('aria-busy')).toBeNull())
+    expect(within(row).getByRole('status').textContent).toBe('')
+  })
+
+  it('restores the previous status and shows the server message, tied to the select, when the update fails', async () => {
     const user = userEvent.setup()
     getIncidents.mockResolvedValue([
       incident('1', 'Login page slow', 'investigating'),
@@ -222,18 +375,22 @@ describe('Changing a status', () => {
     render(<Incidents />)
     await screen.findByText('Login page slow')
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Status for Login page slow' }), 'closed')
+    await user.selectOptions(statusSelect('Login page slow'), 'closed')
 
-    const row = screen.getByText('Login page slow').closest('li') as HTMLElement
+    const row = rowOf('Login page slow')
     const alert = await within(row).findByRole('alert')
     expect(alert.textContent).toBe('incident not found')
-    const select = within(row).getByRole('combobox') as HTMLSelectElement
+    const select = statusSelect('Login page slow')
     expect(select.value).toBe('investigating')
     expect(select.disabled).toBe(false)
-    expect(within(row).getByText('investigating', { selector: '.ui-badge-status .ui-badge-word' })).toBeTruthy()
+    expect(row.querySelector('.incidents-status-investigating')).toBeTruthy()
+    expect(select.getAttribute('aria-describedby')).toBe(alert.id)
+    expect(alert.id).not.toBe('')
+    expect(document.activeElement).toBe(select)
     // The other row is untouched and shows no error.
-    const other = screen.getByText('Disk almost full').closest('li') as HTMLElement
+    const other = rowOf('Disk almost full')
     expect(within(other).queryByRole('alert')).toBeNull()
+    expect(statusSelect('Disk almost full').getAttribute('aria-describedby')).toBeNull()
   })
 
   it('clears an earlier row error when the next change goes through', async () => {
@@ -244,26 +401,58 @@ describe('Changing a status', () => {
       .mockResolvedValueOnce(incident('1', 'Login page slow', 'closed'))
     render(<Incidents />)
     await screen.findByText('Login page slow')
-    const select = screen.getByRole('combobox', { name: 'Status for Login page slow' })
-    await user.selectOptions(select, 'closed')
+    await user.selectOptions(statusSelect('Login page slow'), 'closed')
     await screen.findByRole('alert')
-    await user.selectOptions(select, 'closed')
+    await user.selectOptions(statusSelect('Login page slow'), 'closed')
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(statusSelect('Login page slow').getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('handles two rows updating at once: each ends with its own server result', async () => {
+    const user = userEvent.setup()
+    const first = deferred<Incident>()
+    const second = deferred<Incident>()
+    getIncidents.mockResolvedValue([
+      incident('1', 'Login page slow', 'open'),
+      incident('2', 'Disk almost full', 'investigating'),
+    ])
+    updateIncident.mockImplementation((id) => (id === '1' ? first.promise : second.promise))
+    const { container } = render(<Incidents />)
+    await screen.findByText('Login page slow')
+    expect(openCount(container)).toBe('2 open or investigating')
+
+    await user.selectOptions(statusSelect('Login page slow'), 'resolved')
+    await user.selectOptions(statusSelect('Disk almost full'), 'closed')
+    expect(statusSelect('Login page slow').disabled).toBe(true)
+    expect(statusSelect('Disk almost full').disabled).toBe(true)
+
+    // They come back in the opposite order.
+    await act(async () => second.resolve(incident('2', 'Disk almost full', 'closed')))
+    await act(async () => first.resolve(incident('1', 'Login page slow', 'resolved')))
+
+    await waitFor(() => expect(statusSelect('Login page slow').value).toBe('resolved'))
+    expect(statusSelect('Disk almost full').value).toBe('closed')
+    expect(statusSelect('Login page slow').disabled).toBe(false)
+    expect(statusSelect('Disk almost full').disabled).toBe(false)
+    expect(rowTitles()).toEqual(['Login page slow', 'Disk almost full'])
+    await waitFor(() => expect(openCount(container)).toBe('0 open or investigating'))
   })
 })
 
 describe('Incidents motion', () => {
-  it('shows a new incident at once under reduced motion', async () => {
+  it('shows the form and a new incident at once under reduced motion', async () => {
     const user = userEvent.setup()
     setMatchMedia(REDUCE, true)
     getIncidents.mockResolvedValue([incident('1', 'Login page slow')])
     createIncident.mockResolvedValue(incident('2', 'Payments failing'))
     render(<Incidents />)
     await screen.findByText('Login page slow')
-    await user.type(screen.getByLabelText('Title'), 'Payments failing')
-    await user.click(screen.getByRole('button', { name: 'Report incident' }))
-    const added = await screen.findByText('Payments failing', { selector: '.incidents-title' })
+    await user.click(toggle())
     // On the first frame: no inline opacity 0, no transform, nothing hidden.
+    expectShownAtOnce(screen.getByLabelText('Title').closest('section') as HTMLElement)
+    await user.type(screen.getByLabelText('Title'), 'Payments failing')
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
+    const added = await screen.findByText('Payments failing', { selector: '.incidents-title' })
     expectShownAtOnce(added.closest('li') as HTMLElement)
   })
 

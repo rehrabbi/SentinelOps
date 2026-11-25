@@ -39,7 +39,7 @@ export function SeverityBadge({ severity, className }: { severity: IncidentSever
 }
 
 // Ring for open (waiting for eyes), half ring for investigating, tick for resolved, dot for closed.
-function StatusGlyph({ status }: { status: IncidentStatus }) {
+export function StatusGlyph({ status }: { status: IncidentStatus }) {
   switch (status) {
     case 'open':
       return <circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" strokeWidth="1.6" />
