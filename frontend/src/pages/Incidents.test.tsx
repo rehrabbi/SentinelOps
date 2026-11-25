@@ -212,6 +212,27 @@ describe('A failed load', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect((await screen.findByRole('alert')).textContent).toBe('Still down')
   })
+
+  it('shows a new incident once when Retry already brought it in before the create answered', async () => {
+    const user = userEvent.setup()
+    const created = deferred<Incident>()
+    getIncidents.mockRejectedValueOnce(new api.ApiError(503, 'The incident service is down'))
+    createIncident.mockReturnValue(created.promise)
+    render(<Incidents />)
+    await screen.findByText('The incident service is down')
+
+    await user.click(toggle())
+    await user.type(screen.getByLabelText('Title'), 'Payments failing')
+    await user.click(screen.getByRole('button', { name: 'Create incident' }))
+
+    // The reload lands first and already holds the new incident; then the create answers.
+    getIncidents.mockResolvedValueOnce([incident('9', 'Payments failing')])
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByText('Payments failing', { selector: '.incidents-title' })
+    await act(async () => created.resolve(incident('9', 'Payments failing')))
+
+    expect(rowTitles()).toEqual(['Payments failing'])
+  })
 })
 
 describe('Reporting an incident', () => {

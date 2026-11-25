@@ -100,10 +100,16 @@ export function Incidents() {
   }
 
   // Prepend a newly created incident (newest first). If the list never loaded there is no list to
-  // add it to; the toast confirms it, and Retry brings in the server's list.
+  // add it to; the toast confirms it, and Retry brings in the server's list. A reload that
+  // finished first may already hold it, so it is never added twice.
   function handleCreated(incident: Incident) {
     setList((prev) =>
-      prev.kind === 'ready' ? { kind: 'ready', incidents: [incident, ...prev.incidents] } : prev,
+      prev.kind === 'ready'
+        ? {
+            kind: 'ready',
+            incidents: [incident, ...prev.incidents.filter((i) => i.id !== incident.id)],
+          }
+        : prev,
     )
     toast('Incident reported', 'success')
     closeForm()
