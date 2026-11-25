@@ -1,0 +1,77 @@
+/*
+ * The account screen (Account.tsx): change password, log out everywhere. Steady and quiet.
+ * Classes are prefixed account- (the kit owns ui-, App.css owns the plain names).
+ */
+.account-page {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 40rem;
+  min-width: 0;
+  text-align: start;
+}
+
+.account-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.account-h1 {
+  margin: 0;
+  font: 600 2rem/1.2 var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.account-lede {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: 400 1rem/1.5rem var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+.account-mono {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.account-card-title {
+  margin: 0;
+  font: 600 1.125rem/1.625rem var(--font-sans);
+  letter-spacing: -0.005em;
+  color: var(--color-text);
+}
+
+.account-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.account-text {
+  margin: 0;
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.account-error {
+  margin: 0;
+  color: var(--color-danger);
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+.account-success {
+  margin: 0;
+  color: var(--color-status-resolved);
+  font: 500 0.9375rem/1.4rem var(--font-sans);
+}
+
+.account-success:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

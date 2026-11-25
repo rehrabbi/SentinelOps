@@ -1,5 +1,5 @@
-import { Link } from "react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { motion } from 'motion/react'
 import {
   createInvite,
   createPasswordReset,
@@ -10,284 +10,416 @@ import {
   type IssuedReset,
   type Role,
   type User,
-} from "../api";
+} from '../api'
+import { transition } from '../motion/presets'
+import { useReducedMotion } from '../motion/useReducedMotion'
+import { Button } from '../ui/Button'
+import { Card } from '../ui/Card'
+import { EmptyState } from '../ui/EmptyState'
+import { Field } from '../ui/Field'
+import { Spinner } from '../ui/Spinner'
+import { toast } from '../ui/toast-store'
+import { OneTimeLink } from './OneTimeLink'
+import './Users.css'
 
-// The load state for the user list — exactly one of these three, the same
-// discriminated-union shape the incident dashboard uses.
+// The load state for the user list: exactly one of these three.
 type ListState =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ready"; users: User[] };
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; users: User[] }
 
-const ROLES: Role[] = ["reporter", "analyst", "admin"];
+const ROLES: Role[] = ['reporter', 'analyst', 'admin']
 
-// UsersPage lists every account and lets an admin change someone else's role.
-// Reaching this screen already requires the admin role, but that is routing
-// convenience: the API is the actual control, and it answers 403 to anyone else.
+// What each role can really do, from the API: reporters see and change only their own incidents;
+// analysts see and change every incident; only admins reach the user, invite and reset endpoints.
+const ROLE_DESCRIPTION: Record<Role, string> = {
+  reporter: 'Reports incidents and sees only their own.',
+  analyst: 'Sees and updates every incident.',
+  admin: 'Does what an analyst does, and manages users, invites and password resets.',
+}
+
+function cap(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1)
+}
+
+function RoleOptions() {
+  return (
+    <>
+      {ROLES.map((r) => (
+        <option key={r} value={r}>
+          {cap(r)}
+        </option>
+      ))}
+    </>
+  )
+}
+
+// A reset link that is on screen: whose row it belongs to, and the server's answer.
+type ShownReset = { userId: string; reset: IssuedReset }
+
+/**
+ * The admin screen: invite someone, then see everyone and change roles or issue a reset link.
+ * Reaching it already requires the admin role, but that is routing convenience: the API is the
+ * actual control, and it answers 403 to anyone else.
+ */
 export function UsersPage({ currentUserId }: { currentUserId: string }) {
-  const [list, setList] = useState<ListState>({ kind: "loading" });
+  const reduced = useReducedMotion()
+  const [list, setList] = useState<ListState>({ kind: 'loading' })
+  // At most one reset link is on screen: issuing another, or hiding it, drops the old one.
+  const [shownReset, setShownReset] = useState<ShownReset | null>(null)
+
+  const load = useCallback(() => {
+    setList({ kind: 'loading' })
+    getUsers()
+      .then((users) => setList({ kind: 'ready', users }))
+      .catch((err) => {
+        const message = err instanceof ApiError ? err.message : 'Failed to load users'
+        setList({ kind: 'error', message })
+      })
+  }, [])
 
   useEffect(() => {
-    getUsers()
-      .then((users) => setList({ kind: "ready", users }))
-      .catch((err) => {
-        const message =
-          err instanceof ApiError ? err.message : "Failed to load users";
-        setList({ kind: "error", message });
-      });
-  }, []);
+    load()
+  }, [load])
 
   // Replace one user in place after a role change, so we never refetch.
   function handleUpdated(updated: User) {
     setList((prev) =>
-      prev.kind === "ready"
-        ? {
-            kind: "ready",
-            users: prev.users.map((u) => (u.id === updated.id ? updated : u)),
-          }
-        : prev
-    );
+      prev.kind === 'ready'
+        ? { kind: 'ready', users: prev.users.map((u) => (u.id === updated.id ? updated : u)) }
+        : prev,
+    )
   }
 
-  if (list.kind === "loading") {
-    return <p className="status loading">Loading users…</p>;
-  }
-  if (list.kind === "error") {
-    return <p className="status error">{list.message}</p>;
+  // A reset link lets whoever holds it choose this person's password, so it is shown once, in the
+  // row, and handed over by the admin like an invite. Throws on failure; the row shows why.
+  async function issueReset(userId: string) {
+    const reset = await createPasswordReset(userId)
+    setShownReset({ userId, reset })
   }
 
   return (
-    <section className="admin">
-      <h2>Users</h2>
-            <p className="admin-link">
-        <Link to="/">Back to incidents</Link>
-      </p>
+    <div className="users-page">
+      <div className="users-head">
+        <h1 className="users-h1">Users</h1>
+        <p className="users-lede">
+          Accounts exist only by invitation. There is no sign-up, and no email is sent.
+        </p>
+      </div>
+
       <InviteForm />
-      <ul className="user-list">
-        {list.users.map((u) => (
-          <UserRow
-            key={u.id}
-            user={u}
-            isSelf={u.id === currentUserId}
-            onUpdated={handleUpdated}
+
+      <section className="users-section" aria-labelledby="users-list-title">
+        <h2 id="users-list-title" className="users-h2">
+          Everyone with an account
+        </h2>
+        {list.kind === 'loading' && (
+          <p className="users-loading">
+            <Spinner label="Loading users" />
+            <span aria-hidden="true">Loading users…</span>
+          </p>
+        )}
+        {list.kind === 'error' && (
+          <div className="users-load-error">
+            <p className="users-error" role="alert">
+              {list.message}
+            </p>
+            <Button variant="secondary" onClick={load}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {list.kind === 'ready' && list.users.length === 0 && (
+          <EmptyState
+            headingLevel={3}
+            title="No users yet"
+            body="Invite someone above and their account shows up here once they accept."
           />
-        ))}
-      </ul>
-    </section>
-  );
+        )}
+        {list.kind === 'ready' && list.users.length > 0 && (
+          <motion.ul
+            className="users-list"
+            initial={reduced ? false : { opacity: 0 }}
+            animate={{ opacity: 1, transition: transition('enter', reduced) }}
+          >
+            {list.users.map((u) => (
+              <UserRow
+                key={u.id}
+                user={u}
+                isSelf={u.id === currentUserId}
+                onUpdated={handleUpdated}
+                onIssueReset={issueReset}
+                shownReset={shownReset?.userId === u.id ? shownReset.reset : null}
+                onHideReset={() => setShownReset(null)}
+              />
+            ))}
+          </motion.ul>
+        )}
+      </section>
+    </div>
+  )
 }
 
-// One row. The select holds a draft choice; Save commits it. Granting admin is
-// privileged enough to deserve a deliberate second action rather than firing on
-// change like the incident status dropdown does.
+// One row. The select holds a draft choice; Save commits it. Granting admin is privileged enough
+// to deserve a deliberate second action rather than firing on change like the incident status.
 function UserRow({
   user,
   isSelf,
   onUpdated,
+  onIssueReset,
+  shownReset,
+  onHideReset,
 }: {
-  user: User;
-  isSelf: boolean;
-  onUpdated: (user: User) => void;
+  user: User
+  isSelf: boolean
+  onUpdated: (user: User) => void
+  onIssueReset: (userId: string) => Promise<void>
+  shownReset: IssuedReset | null
+  onHideReset: () => void
 }) {
-  const [choice, setChoice] = useState<Role>(user.role);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reset, setReset] = useState<
-    | { kind: "idle" }
-    | { kind: "issuing" }
-    | { kind: "issued"; reset: IssuedReset; copied: boolean }
-  >({ kind: "idle" });
+  const errorId = useId()
+  const selfNoteId = useId()
+  const selectRef = useRef<HTMLSelectElement>(null)
+  const resetButtonRef = useRef<HTMLDivElement>(null)
+  const linkRef = useRef<HTMLTextAreaElement>(null)
+  const wasSaving = useRef(false)
+  const [choice, setChoice] = useState<Role>(user.role)
+  const [saving, setSaving] = useState(false)
+  const [issuing, setIssuing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // A reset link lets whoever holds it choose this person's password, so it is
-  // shown once, here, and handed over by the admin like an invite.
-  async function issueReset() {
-    setReset({ kind: "issuing" });
-    setError(null);
-    try {
-      const issued = await createPasswordReset(user.id);
-      setReset({ kind: "issued", reset: issued, copied: false });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the reset link");
-      setReset({ kind: "idle" });
+  // A disabled select (and the Save button that just ran) drops focus to the page. Once saving is
+  // over, give focus to the select, unless the person has already moved on to something else.
+  useEffect(() => {
+    if (wasSaving.current && !saving) {
+      const active = document.activeElement
+      // The Save button that was just pressed is disabled again (nothing left to save); a browser
+      // drops focus from it, jsdom leaves it there. Either way it is not a place to stay.
+      const stranded = !active || active === document.body || (active as HTMLButtonElement).disabled
+      if (stranded) selectRef.current?.focus()
     }
-  }
+    wasSaving.current = saving
+  }, [saving])
 
-  const resetLink =
-    reset.kind === "issued"
-      ? `${window.location.origin}/reset#${reset.reset.token}`
-      : "";
-
-  async function copyResetLink() {
-    if (reset.kind !== "issued") return;
-    try {
-      await navigator.clipboard.writeText(resetLink);
-      setReset({ ...reset, copied: true });
-    } catch {
-      // Clipboard access can be refused; the link stays visible to copy by hand.
-    }
-  }
+  // When this row's link appears, put the cursor on it so it is read out and ready to copy.
+  const hasLink = shownReset !== null
+  useEffect(() => {
+    if (hasLink) linkRef.current?.focus()
+  }, [hasLink])
 
   // Nothing to save until the draft differs from what the server told us.
-  const dirty = choice !== user.role;
+  const dirty = choice !== user.role
 
   async function save() {
-    setSaving(true);
-    setError(null);
+    setSaving(true)
+    setError(null)
     try {
-      const updated = await updateUserRole(user.id, choice);
-      onUpdated(updated);
+      const updated = await updateUserRole(user.id, choice)
+      onUpdated(updated)
+      toast(`${user.fullName} is now ${updated.role}`, 'success')
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Update failed");
-      // Snap the control back to the truth we know, so the screen never shows
-      // a role the server refused.
-      setChoice(user.role);
+      setError(err instanceof ApiError ? err.message : 'Update failed')
+      // Snap the control back to the truth we know, so the screen never shows a role the server
+      // refused.
+      setChoice(user.role)
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
+  async function issueReset() {
+    setIssuing(true)
+    setError(null)
+    try {
+      await onIssueReset(user.id)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not create the reset link')
+    } finally {
+      setIssuing(false)
+    }
+  }
+
+  function hideLink() {
+    onHideReset()
+    resetButtonRef.current?.querySelector('button')?.focus()
+  }
+
+  const describedBy = [error ? errorId : null, isSelf ? selfNoteId : null].filter(Boolean).join(' ')
+
   return (
-    <li className="user-row">
-      <div className="user-main">
-        <span className="user-name">
+    <li className="users-row" aria-busy={saving || issuing || undefined}>
+      <div className="users-main">
+        <p className="users-name">
           {user.fullName}
-          {isSelf && <span className="user-self"> (you)</span>}
-        </span>
-        <span className="user-email">{user.email}</span>
-        {error && <span className="status error">{error}</span>}
+          {isSelf && <span className="users-self"> (you)</span>}
+        </p>
+        <p className="users-email">{user.email}</p>
+        {isSelf && (
+          <p id={selfNoteId} className="users-note">
+            You can't change your own role, so there is always one admin left.
+          </p>
+        )}
+        {error && (
+          <p id={errorId} className="users-error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
-      <div className="user-controls">
-        <span className={`badge role-${user.role}`}>{user.role}</span>
+      <div className="users-controls">
         <select
+          ref={selectRef}
+          className="users-select"
+          aria-label={`Role for ${user.fullName}`}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={error ? true : undefined}
           value={choice}
           disabled={isSelf || saving}
           onChange={(e) => setChoice(e.target.value as Role)}
         >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
+          <RoleOptions />
         </select>
-        <button onClick={save} disabled={isSelf || !dirty || saving}>
-          {saving ? "Saving…" : "Save"}
-        </button>
+        <Button
+          variant="secondary"
+          onClick={save}
+          disabled={isSelf || !dirty}
+          busy={saving}
+          aria-label={`Save role for ${user.fullName}`}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
         {!isSelf && (
-          <button onClick={issueReset} disabled={reset.kind === "issuing"}>
-            {reset.kind === "issuing" ? "Creating…" : "Reset password"}
-          </button>
+          <div ref={resetButtonRef}>
+            <Button
+              variant="ghost"
+              onClick={issueReset}
+              busy={issuing}
+              aria-label={`Reset password for ${user.fullName}`}
+            >
+              {issuing ? 'Creating…' : 'Reset password'}
+            </Button>
+          </div>
         )}
       </div>
-      {reset.kind === "issued" && (
-        <div className="invite-issued user-reset">
-          <p>
-            Password reset link for <strong>{reset.reset.email}</strong>, valid
-            until {new Date(reset.reset.expiresAt).toLocaleString()}. Send it only
-            to them; it is shown once, works once, and replaces any earlier link.
-            Using it logs them out everywhere.
-          </p>
-          <div className="invite-link">
-            <input type="text" readOnly value={resetLink} aria-label="Password reset link" />
-            <button type="button" onClick={copyResetLink}>
-              {reset.copied ? "Copied" : "Copy"}
-            </button>
-          </div>
+      {shownReset && (
+        <div className="users-row-link">
+          <OneTimeLink
+            ref={linkRef}
+            label="Password reset link"
+            link={`${window.location.origin}/reset#${shownReset.token}`}
+            expiresAt={shownReset.expiresAt}
+            summary={
+              <>
+                Reset link for <strong className="users-mono">{shownReset.email}</strong>. Whoever
+                opens it can choose a new password for this account, and doing so logs them out
+                everywhere. A new link replaces any earlier one. It lasts 1 hour.
+              </>
+            }
+            onHide={hideLink}
+          />
         </div>
       )}
+      {/* Always in the page so a screen reader hears the text appear. */}
+      <span role="status" className="visually-hidden">
+        {saving ? 'Saving…' : ''}
+      </span>
     </li>
-  );
+  )
 }
-// InviteForm issues a one-time invite and shows its link, once. Accounts exist
-// only through invites: there is no open sign-up, so nobody can learn which
-// emails have accounts by trying to register them.
+
+// InviteForm issues a one-time invite and shows its link, once. Accounts exist only through
+// invites: there is no open sign-up, so nobody can learn which emails have accounts by trying to
+// register them.
 function InviteForm() {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("reporter");
+  const formRef = useRef<HTMLFormElement>(null)
+  const linkRef = useRef<HTMLTextAreaElement>(null)
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<Role>('reporter')
   const [status, setStatus] = useState<
-    | { kind: "idle" }
-    | { kind: "submitting" }
-    | { kind: "error"; message: string }
-    | { kind: "issued"; invite: IssuedInvite; copied: boolean }
-  >({ kind: "idle" });
+    | { kind: 'idle' }
+    | { kind: 'submitting' }
+    | { kind: 'error'; message: string }
+    | { kind: 'issued'; invite: IssuedInvite }
+  >({ kind: 'idle' })
+
+  // A new link: put the cursor on it. A failed send: the button was disabled for a moment, which
+  // drops focus, so put it back on the button to fix the text and try again.
+  const kind = status.kind
+  useEffect(() => {
+    if (kind === 'issued') linkRef.current?.focus()
+    if (kind === 'error') formRef.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus()
+  }, [kind])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setStatus({ kind: "submitting" });
+    e.preventDefault()
+    // Starting another invite drops the last link from the screen.
+    setStatus({ kind: 'submitting' })
     try {
-      const invite = await createInvite(email, role);
-      setStatus({ kind: "issued", invite, copied: false });
-      setEmail("");
+      const invite = await createInvite(email, role)
+      setStatus({ kind: 'issued', invite })
+      setEmail('')
     } catch (err) {
-      const message =
-        err instanceof ApiError ? err.message : "Could not create the invite";
-      setStatus({ kind: "error", message });
+      const message = err instanceof ApiError ? err.message : 'Could not create the invite'
+      setStatus({ kind: 'error', message })
     }
   }
 
-  // The token goes after "#": browsers never send that part to any server, so
-  // the credential stays out of request logs and Referer headers.
-  const link =
-    status.kind === "issued"
-      ? `${window.location.origin}/invite#${status.invite.token}`
-      : "";
-
-  async function copyLink() {
-    if (status.kind !== "issued") return;
-    try {
-      await navigator.clipboard.writeText(link);
-      setStatus({ ...status, copied: true });
-    } catch {
-      // Clipboard access can be refused; the link stays visible to copy by hand.
-    }
+  function hideLink() {
+    setStatus({ kind: 'idle' })
+    formRef.current?.querySelector('input')?.focus()
   }
+
+  // The token goes after "#": browsers never send that part to any server, so the credential
+  // stays out of request logs and Referer headers.
+  const link = status.kind === 'issued' ? `${window.location.origin}/invite#${status.invite.token}` : ''
+  const submitting = status.kind === 'submitting'
 
   return (
-    <form className="incident-form invite-form" onSubmit={handleSubmit}>
-      <h3>Invite someone</h3>
-      <div className="invite-fields">
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="off"
-          />
-        </label>
-        <label>
-          Role
-          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" disabled={status.kind === "submitting"}>
-          {status.kind === "submitting" ? "Creating…" : "Create invite"}
-        </button>
-      </div>
-      {status.kind === "error" && (
-        <p className="status error">{status.message}</p>
-      )}
-      {status.kind === "issued" && (
-        <div className="invite-issued">
-          <p>
-            Invite for <strong>{status.invite.email}</strong> as{" "}
-            {status.invite.role}, valid until{" "}
-            {new Date(status.invite.expiresAt).toLocaleString()}. Send this link
-            only to them; it is shown once and works once.
-          </p>
-          <div className="invite-link">
-            <input type="text" readOnly value={link} aria-label="Invite link" />
-            <button type="button" onClick={copyLink}>
-              {status.copied ? "Copied" : "Copy"}
-            </button>
-          </div>
+    <Card as="section" className="users-invite" aria-labelledby="users-invite-title">
+      <h2 id="users-invite-title" className="users-card-title">
+        Invite someone
+      </h2>
+      <form ref={formRef} className="users-invite-form" onSubmit={handleSubmit}>
+        <Field
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          autoComplete="off"
+        />
+        <Field label="Role" hint={ROLE_DESCRIPTION[role]}>
+          {(control) => (
+            <select {...control} value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              <RoleOptions />
+            </select>
+          )}
+        </Field>
+        <div className="users-invite-actions">
+          <Button type="submit" busy={submitting}>
+            {submitting ? 'Creating…' : 'Create invite'}
+          </Button>
         </div>
+      </form>
+      {status.kind === 'error' && (
+        <p className="users-error" role="alert">
+          {status.message}
+        </p>
       )}
-    </form>
-  );
+      {status.kind === 'issued' && (
+        <OneTimeLink
+          ref={linkRef}
+          label="Invite link"
+          link={link}
+          expiresAt={status.invite.expiresAt}
+          summary={
+            <>
+              Invite for <strong className="users-mono">{status.invite.email}</strong> as{' '}
+              {status.invite.role}. It lasts 24 hours.
+            </>
+          }
+          onHide={hideLink}
+        />
+      )}
+    </Card>
+  )
 }
