@@ -91,3 +91,23 @@
   outline: 2px solid var(--color-focus);
   outline-offset: 4px;
 }
+
+/* A screen that failed to load, inside its shell (RouteErrorBoundary). */
+.ui-route-error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding-block: var(--space-8);
+}
+
+.ui-route-error-title {
+  margin: 0;
+  color: var(--color-text);
+  font: 600 1.5rem/2rem var(--font-sans);
+}
+
+.ui-route-error-message {
+  margin: 0;
+  color: var(--color-danger);
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+}

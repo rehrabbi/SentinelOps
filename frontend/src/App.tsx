@@ -3,6 +3,7 @@ import { getMe, logout, onSessionExpired, type User } from "./api";
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
 import { LoadingFrame, PageLoading } from "./layout/LoadingFrame";
+import { RouteErrorBoundary } from "./layout/RouteErrorBoundary";
 import { PublicShell } from "./layout/PublicShell";
 import { useRouteFocus } from "./layout/useRouteFocus";
 import { AcceptInvite } from "./pages/AcceptInvite";
@@ -93,6 +94,8 @@ function App({ firstSessionCheck }: AppProps) {
   const aboutToSignIn = auth.kind === "anonymous" && (pathname === "/signin" || pathname === "/invite");
   useEffect(() => {
     if (!aboutToSignIn) return;
+    // A failed prefetch is ignored: the page itself loads on arrival, and RouteErrorBoundary
+    // handles that failure if it is real.
     const timer = setTimeout(() => void loadIncidents().catch(() => {}), 1000);
     return () => clearTimeout(timer);
   }, [aboutToSignIn]);
@@ -119,7 +122,9 @@ function App({ firstSessionCheck }: AppProps) {
   const signedIn = (page: ReactNode) =>
     user ? (
       <AppShell user={user} onLogout={handleLogout}>
-        <Suspense fallback={<PageLoading />}>{page}</Suspense>
+        <RouteErrorBoundary key={pathname}>
+          <Suspense fallback={<PageLoading />}>{page}</Suspense>
+        </RouteErrorBoundary>
       </AppShell>
     ) : null;
   const pub = (page: ReactNode, headerAction?: ReactNode) => (
