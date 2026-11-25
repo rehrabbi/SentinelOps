@@ -12,7 +12,9 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
 
-Frontend redesign: a new look and identity for every screen, built on the `redesign` branch. The API,
+## [1.1.0] - 2026-11-25
+
+Frontend redesign: a new look and identity for every screen. The API,
 the database and the authentication rules are unchanged, and the invite and reset links already issued
 keep working at the same paths.
 
@@ -406,7 +408,8 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/rehrabbi/SentinelOps/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...v0.5.0
