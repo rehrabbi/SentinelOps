@@ -55,10 +55,13 @@ export function SignIn({ onLoggedIn, sessionEnded = false }: SignInProps) {
   return (
     <section className="signin" aria-labelledby={titleId}>
       <div className="signin-scene" aria-hidden="true">
-        <svg className="signin-range" viewBox="-700 -700 1400 1400" focusable="false">
+        <svg className="signin-field signin-range" viewBox="-700 -700 1400 1400" focusable="false">
           {RINGS.map((r) => (
             <path key={r} d={diamond(r)} />
           ))}
+        </svg>
+        {/* Its own layer, so the rings' quiet zone behind the heading never hides the ping. */}
+        <svg className="signin-field" viewBox="-700 -700 1400 1400" focusable="false">
           <path className="signin-ping" d={diamond(30)} />
         </svg>
         <span className="signin-beam" />
