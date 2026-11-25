@@ -98,6 +98,28 @@ describe('perDay', () => {
     expect(days.reduce((sum, d) => sum + d.count, 0)).toBe(0)
   })
 
+  it('includes the first instant of the first day and excludes the last instant before it', () => {
+    const items = [
+      incident('open', 'low', '2026-10-27T00:00:00.000Z'), // first day of the window, first instant
+      incident('open', 'low', '2026-10-26T23:59:59.999Z'), // the day before, last instant
+      incident('open', 'low', '2026-11-25T23:59:59.999Z'), // today, last instant
+    ]
+    const days = perDay(items, 30, now)
+    expect(days[0]).toEqual({ date: '2026-10-27', count: 1 })
+    expect(days[29]).toEqual({ date: '2026-11-25', count: 1 })
+    expect(days.reduce((sum, d) => sum + d.count, 0)).toBe(2)
+  })
+
+  it('gives no days for days = 0, and only today for days = 1', () => {
+    const items = [incident('open', 'low', '2026-11-25T08:00:00Z'), incident('open', 'low', '2026-11-24T08:00:00Z')]
+    expect(perDay(items, 0, now)).toEqual([])
+    expect(perDay(items, 1, now)).toEqual([{ date: '2026-11-25', count: 1 }])
+  })
+
+  it('gives no days, rather than throwing, when `now` is not a valid date', () => {
+    expect(perDay([incident('open', 'low')], 30, new Date('not a date'))).toEqual([])
+  })
+
   it('crosses month and year boundaries in UTC', () => {
     const days = perDay([], 3, new Date('2027-01-01T00:10:00Z'))
     expect(days.map((d) => d.date)).toEqual(['2026-12-30', '2026-12-31', '2027-01-01'])

@@ -1,7 +1,7 @@
 import { useState, type PointerEvent } from 'react'
 import { dayDomain } from '../stats'
 import { formatCount, incidents, longDate, shortDate } from '../format'
-import { columnPath, useWidth } from './geometry'
+import { capLabel, columnPath, MONO_CHAR, useWidth } from './geometry'
 import { Grow } from './motion'
 
 // Incidents reported per UTC day: one column per day, one colour (a single series needs no
@@ -31,8 +31,8 @@ export function DailyColumns({ days, reduced }: DailyColumnsProps) {
   const domain = dayDomain(max)
   const ticks = [0, domain / 2, domain]
 
-  // Left gutter fits the widest tick label (JetBrains Mono 12 px is about 7.2 px a character).
-  const left = Math.ceil(formatCount(domain).length * 7.2) + 10
+  // Left gutter fits the widest tick label.
+  const left = Math.ceil(formatCount(domain).length * MONO_CHAR) + 10
   const plotWidth = Math.max(0, width - left)
   const slot = days.length > 0 ? plotWidth / days.length : 0
   const column = Math.max(1, Math.min(MAX_COLUMN, slot - GAP))
@@ -41,6 +41,7 @@ export function DailyColumns({ days, reduced }: DailyColumnsProps) {
 
   // The busiest day gets its number on its cap; the latest one if several tie.
   const peak = max > 0 ? counts.lastIndexOf(max) : -1
+  const cap = capLabel(left + peak * slot + slot / 2, formatCount(max), left, width)
   const first = days[0]
   const last = days[days.length - 1]
   const middle = days[Math.floor((days.length - 1) / 2)]
@@ -111,7 +112,7 @@ export function DailyColumns({ days, reduced }: DailyColumnsProps) {
           })}
 
           {peak >= 0 ? (
-            <text className="overview-cap" x={left + peak * slot + slot / 2} y={y(max) - 6} textAnchor="middle">
+            <text className="overview-cap" x={cap.x} y={y(max) - 6} textAnchor={cap.anchor}>
               {formatCount(max)}
             </text>
           ) : (

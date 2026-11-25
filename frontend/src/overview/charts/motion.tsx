@@ -43,7 +43,11 @@ function AnimatedCount({ value, delay }: { value: number; delay: number }) {
     return () => controls.stop()
   }, [current, value, delay, first])
 
-  return <motion.span>{text}</motion.span>
+  // Reserve the final value's width from the first frame, so neighbours (the label beside a
+  // headline count, the bar beside a meter count) don't slide as digits are added. Counts are
+  // in JetBrains Mono, where every digit and the comma are 1ch wide.
+  const reserve = { display: 'inline-block', minWidth: `${formatCount(value).length}ch` }
+  return <motion.span style={reserve}>{text}</motion.span>
 }
 
 export interface GrowProps {

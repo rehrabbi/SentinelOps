@@ -61,8 +61,8 @@ export function Overview({ incidents, now }: OverviewProps) {
   }
 
   const headline = [
-    { key: 'open', value: stats.openTotal, label: 'open' },
-    { key: 'critical', value: stats.open.critical, label: 'critical and open' },
+    { key: 'open', value: stats.openTotal, label: 'open or investigating' },
+    { key: 'critical', value: stats.open.critical, label: 'critical, still open or investigating' },
     { key: 'recent', value: stats.recent, label: `reported in the last ${DAYS} days` },
   ]
 
@@ -89,8 +89,8 @@ export function Overview({ incidents, now }: OverviewProps) {
       <div className="overview-charts">
         <Card as="section" className="overview-card" aria-labelledby={sevId}>
           <div className="overview-card-head">
-            <CardTitle id={sevId}>Open by severity</CardTitle>
-            <p className="overview-card-note">Open and investigating</p>
+            <CardTitle id={sevId}>By severity</CardTitle>
+            <p className="overview-card-note">Open or investigating</p>
           </div>
           <MeterList
             labelledBy={sevId}

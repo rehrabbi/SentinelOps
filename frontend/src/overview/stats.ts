@@ -43,9 +43,10 @@ function utcDate(ms: number): string {
 /**
  * Incidents created on each of the last `days` UTC days, oldest first, ending with today (the UTC
  * date of `now`). Days without incidents are 0. Incidents outside the window, or with a date that
- * can't be read, are left out.
+ * can't be read, are left out. An unreadable `now` gives no days at all.
  */
 export function perDay(items: Incident[], days: number, now: Date): { date: string; count: number }[] {
+  if (Number.isNaN(now.getTime())) return []
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
   const result = Array.from({ length: Math.max(0, days) }, (_, i) => ({
     date: utcDate(today - (days - 1 - i) * DAY_MS),

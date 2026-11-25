@@ -4,6 +4,9 @@ import { useLayoutEffect, useRef, useState } from 'react'
 // viewBox matches its measured width), so the 4 px rounded data end stays 4 px at any width
 // instead of being stretched by a scaled viewBox.
 
+/** Advance of one JetBrains Mono character at 12 px (0.6 em), for sizing axis and cap labels. */
+export const MONO_CHAR = 7.2
+
 /** Rounded data end, at most this many pixels. */
 const END_RADIUS = 4
 
@@ -37,6 +40,18 @@ export function columnPath(x: number, width: number, baseline: number, height: n
     `V${baseline}`,
     'Z',
   ].join(' ')
+}
+
+/**
+ * Where the busiest day's label goes: centred over its column, unless that would run past the
+ * plot's edge, in which case it is pinned to the edge and aligned to it (a "1,234" over the last
+ * column ends at the right edge instead of being cut off).
+ */
+export function capLabel(centre: number, text: string, left: number, right: number) {
+  const half = (text.length * MONO_CHAR) / 2
+  if (centre + half > right) return { x: right, anchor: 'end' as const }
+  if (centre - half < left) return { x: left, anchor: 'start' as const }
+  return { x: centre, anchor: 'middle' as const }
 }
 
 /**

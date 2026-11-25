@@ -150,10 +150,13 @@
   list-style: none;
 }
 
+/* Without subgrid, each row keeps the same three columns on its own: a label column wide enough
+   for the longest badge ("Investigating"), so the bars still line up. */
 .overview-meter {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: subgrid;
+  grid-template-columns: 9rem minmax(3rem, 1fr) max-content;
+  column-gap: var(--space-3);
   align-items: center;
   min-height: 1.75rem;
 }
@@ -191,9 +194,21 @@
     grid-template-columns: max-content minmax(0, 1fr);
   }
 
+  .overview-meter {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
   .overview-meter-track {
     grid-column: 1 / -1;
     grid-row: 2;
+  }
+}
+
+/* With subgrid (after the rules above, so it wins at every width), the rows share the list's
+   columns and every bar starts on the same line whatever its label's width. */
+@supports (grid-template-columns: subgrid) {
+  .overview-meter {
+    grid-template-columns: subgrid;
   }
 }
 
