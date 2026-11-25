@@ -1,0 +1,30 @@
+.ui-spinner {
+  display: inline-flex;
+  flex: none;
+  vertical-align: middle;
+}
+
+.ui-spinner-ring {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  /* Quick turn: a faster spinner reads as a faster wait. Linear, because it never settles. */
+  animation: ui-spinner-turn 700ms linear infinite;
+}
+
+.ui-spinner-track {
+  opacity: 0.25;
+}
+
+.ui-spinner-arc {
+  stroke-linecap: round;
+}
+
+@keyframes ui-spinner-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* base.css already stops the turn for reduced motion; a still arc stays as the cue. */

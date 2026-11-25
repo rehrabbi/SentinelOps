@@ -35,6 +35,11 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 360ms;
+
+  /* Stacking order, lowest to highest. Use these, never a bare number. */
+  --z-header: 10;
+  --z-menu: 20;
+  --z-toast: 30;
 }
 
 /* Dark: the default, and what an explicit dark choice gives. */
@@ -62,6 +67,9 @@
   --color-status-closed: #8d9bb4;
   --color-focus: var(--color-signal-strong);
   --shadow-raised: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -2px rgb(0 0 0 / 0.3);
+  /* How much of a severity or status colour tints its badge over the surface. */
+  --tint-badge: 16%;
+  --shadow-card: 0 1px 0 color-mix(in srgb, var(--color-text) 4%, transparent), 0 12px 24px -12px rgb(0 0 0 / 0.35);
 }
 
 /* Light, when the system asks for it and no explicit choice is set. */
@@ -88,6 +96,8 @@
     --color-status-resolved: #17703f;
     --color-status-closed: #5d6a80;
     --shadow-raised: 0 10px 15px -3px rgb(11 20 38 / 0.1), 0 4px 6px -2px rgb(11 20 38 / 0.05);
+    --tint-badge: 10%;
+    --shadow-card: 0 1px 2px rgb(11 20 38 / 0.06), 0 12px 24px -12px rgb(11 20 38 / 0.18);
   }
 }
 
@@ -114,6 +124,8 @@
   --color-status-resolved: #17703f;
   --color-status-closed: #5d6a80;
   --shadow-raised: 0 10px 15px -3px rgb(11 20 38 / 0.1), 0 4px 6px -2px rgb(11 20 38 / 0.05);
+  --tint-badge: 10%;
+  --shadow-card: 0 1px 2px rgb(11 20 38 / 0.06), 0 12px 24px -12px rgb(11 20 38 / 0.18);
 }
 
 /* Legacy aliases: removed when screens are redesigned. App.css still uses these names. */

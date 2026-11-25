@@ -1,0 +1,83 @@
+/* The signed-out frame: a quiet header, the page, a footer that says who runs this. */
+.ui-public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 72rem;
+  min-height: 4rem;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-4);
+}
+
+.ui-public-header-action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ui-public-main {
+  flex: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.ui-public-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text-muted);
+}
+
+.ui-public-credit {
+  flex: 1 1 18rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-public-footer-links ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-public-footer a {
+  border-radius: 2px;
+  color: var(--color-text);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-public-footer a:hover {
+    text-decoration-color: currentColor;
+  }
+}
+
+.ui-public-footer a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .ui-public-header,
+  .ui-public-main,
+  .ui-public-footer {
+    padding-inline: var(--space-5);
+  }
+}

@@ -1,0 +1,82 @@
+/* Buttons, from the brand board (section 06): 40 px tall, 4 px corners, Small type at 600. */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  max-width: 100%;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: 600 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+/* Press feedback: the button gives a little under the finger. */
+.ui-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.ui-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.ui-btn-primary {
+  background: var(--color-signal);
+  color: var(--color-on-signal);
+}
+
+.ui-btn-secondary {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.ui-btn-ghost {
+  background: transparent;
+  color: var(--color-text);
+}
+
+/* Outlined, not filled: a destructive action should look deliberate, not loud. */
+.ui-btn-danger {
+  background: transparent;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-btn-primary:hover:not(:disabled) {
+    background: var(--color-signal-strong);
+  }
+  .ui-btn-secondary:hover:not(:disabled),
+  .ui-btn-ghost:hover:not(:disabled) {
+    background: var(--color-surface-raised);
+  }
+  .ui-btn-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  }
+}
+
+.ui-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Busy is not "unavailable": keep it at full strength so the label and spinner stay readable. */
+.ui-btn[aria-busy='true'] {
+  cursor: progress;
+  opacity: 1;
+}
