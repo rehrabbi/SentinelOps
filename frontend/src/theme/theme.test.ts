@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { applyTheme, readChoice, resolveTheme, saveChoice } from './theme'
+import { setMatchMedia } from '../test/setup'
+import { applyTheme, initTheme, readChoice, resolveTheme, saveChoice } from './theme'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -48,5 +49,25 @@ describe('applyTheme', () => {
   it('sets data-theme on the root element', () => {
     applyTheme('light')
     expect(document.documentElement.dataset.theme).toBe('light')
+  })
+})
+
+describe('initTheme', () => {
+  const DARK = '(prefers-color-scheme: dark)'
+
+  it('applies the system theme, and follows the system when it changes, with no toggle mounted', () => {
+    setMatchMedia(DARK, true)
+    initTheme()
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    setMatchMedia(DARK, false)
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
+  it('leaves an explicit choice alone when the system changes', () => {
+    saveChoice('dark')
+    setMatchMedia(DARK, true)
+    initTheme()
+    setMatchMedia(DARK, false)
+    expect(document.documentElement.dataset.theme).toBe('dark')
   })
 })
