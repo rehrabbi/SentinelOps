@@ -1,13 +1,45 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  type NavigateFunction,
+  type NavigateOptions,
+  type To,
+} from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../api'
+import { getIncidents, type User } from '../api'
 import App from '../App'
 import { SignIn } from './SignIn'
 
 // These tests use the real api.ts with fetch stubbed, so the messages on screen are the ones the
 // API client really produces for each response.
+
+// Every navigate() call made through useNavigate, in order. The router batches location updates
+// inside a transition, so two navigations in a row can render as one; counting the calls themselves
+// is what shows whether the app signed out once or twice. The wrapper passes every call through.
+const navigations = vi.hoisted(() => [] as string[])
+vi.mock('react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router')>()
+  const wrapped = new WeakMap<NavigateFunction, NavigateFunction>()
+  return {
+    ...actual,
+    useNavigate: () => {
+      const navigate = actual.useNavigate()
+      let recorded = wrapped.get(navigate)
+      if (!recorded) {
+        recorded = ((to: To | number, options?: NavigateOptions) => {
+          navigations.push(String(to))
+          return typeof to === 'number' ? navigate(to) : navigate(to, options)
+        }) as NavigateFunction
+        wrapped.set(navigate, recorded)
+      }
+      return recorded
+    },
+  }
+})
 
 const maria: User = {
   id: 'u1',
@@ -58,6 +90,7 @@ async function signIn(email: string, password: string) {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/')
+  navigations.length = 0
 })
 
 afterEach(() => {
@@ -128,6 +161,33 @@ describe('a session that ends mid-use', () => {
     renderApp('/admin')
     expect(await screen.findByText('Your session ended. Sign in again.')).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/signin')
+  })
+
+  it('signs out once when two requests fail together, and ignores a 401 that lands later', async () => {
+    serve({
+      'GET /api/me': { status: 200, body: maria },
+      'GET /api/incidents': { status: 200, body: [] },
+    })
+    renderApp('/')
+    await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+
+    // The session ends; two requests in flight both come back 401.
+    serve({ 'GET /api/incidents': { status: 401 } })
+    await act(async () => {
+      await Promise.allSettled([getIncidents(), getIncidents()])
+    })
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/signin'))
+    const signOuts = () => navigations.filter((to) => to === '/signin')
+    expect(signOuts()).toHaveLength(1)
+
+    // Signed out, the person goes to the landing page; a straggling 401 must not pull them back.
+    await userEvent.setup().click(screen.getByRole('link', { name: 'SentinelOps home' }))
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/'))
+    await act(async () => {
+      await getIncidents().catch(() => {})
+    })
+    expect(screen.getByTestId('where').textContent).toBe('/')
+    expect(signOuts()).toHaveLength(1)
   })
 
   it('does not call a log out with an already-ended session an expiry', async () => {

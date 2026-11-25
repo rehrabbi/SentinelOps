@@ -48,6 +48,13 @@ describe('onSessionExpired', () => {
     expect(expired).not.toHaveBeenCalled()
   })
 
+  // The client reports every 401; making several into one sign-out is App's job (SignIn.test.tsx).
+  it('runs once per 401 when two requests fail together', async () => {
+    respond(401)
+    await Promise.allSettled([getIncidents(), getIncidents()])
+    expect(expired).toHaveBeenCalledTimes(2)
+  })
+
   it('does not run on other failures, such as a 403', async () => {
     respond(403)
     await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
