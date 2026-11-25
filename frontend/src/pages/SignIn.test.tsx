@@ -150,6 +150,24 @@ describe('a session that ends mid-use', () => {
     expect(await screen.findByText('Your session ended. Sign in again.')).toBeTruthy()
     expect(screen.getByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/signin')
+    // The person is told where they are: focus moves to the page heading, and the notice is read.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: 'Sign in' })),
+    )
+  })
+
+  it('after signing in, lands on the incidents screen with focus on its heading', async () => {
+    serve({
+      'GET /api/me': { status: 401 },
+      'POST /api/sessions': { status: 200, body: maria },
+      'GET /api/incidents': { status: 200, body: [] },
+    })
+    renderApp('/signin')
+    await screen.findByRole('heading', { level: 1, name: 'Sign in' })
+    await signIn('m.santos@example.com', 'correct-horse-battery')
+    const incidents = await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    await waitFor(() => expect(document.activeElement).toBe(incidents))
+    await waitFor(() => expect(document.title).toBe('Incidents · SentinelOps'))
   })
 
   // /admin sends anyone who is not an admin to "/"; the expiry must still end on the sign-in screen.

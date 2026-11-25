@@ -100,7 +100,7 @@ describe('routes', () => {
     renderAt('/invite')
     // With a token the form shows; without one the page asks for the full link.
     expect(await screen.findByLabelText('Full name')).toBeTruthy()
-    expect(window.location.hash).toBe('')
+    await waitFor(() => expect(window.location.hash).toBe(''))
   })
 
   it('logs out through the API, then lands on the landing page', async () => {
@@ -112,5 +112,79 @@ describe('routes', () => {
     expect(api.logout).toHaveBeenCalled()
     expect(await screen.findByRole('heading', { level: 1, name: /incident tracking/i })).toBeTruthy()
     expect(screen.getByTestId('where').textContent).toBe('/')
+  })
+})
+
+describe('route changes', () => {
+  beforeEach(() => {
+    document.title = ''
+  })
+
+  const heading = (name: string | RegExp) => screen.findByRole('heading', { level: 1, name })
+
+  it('names every page in the document title', async () => {
+    getMe.mockResolvedValue(null)
+    renderAt('/privacy')
+    await heading('Privacy')
+    await waitFor(() => expect(document.title).toBe('Privacy · SentinelOps'))
+  })
+
+  it('names the signed-in home "Incidents"', async () => {
+    getMe.mockResolvedValue(user('admin'))
+    renderAt('/')
+    await heading('Incidents')
+    await waitFor(() => expect(document.title).toBe('Incidents · SentinelOps'))
+  })
+
+  it('leaves focus alone on the first page after a load', async () => {
+    getMe.mockResolvedValue(null)
+    renderAt('/privacy')
+    await heading('Privacy')
+    // Give a pending focus move every chance to happen.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('does not count a redirect on load as a navigation', async () => {
+    getMe.mockResolvedValue(null)
+    renderAt('/account')
+    await heading('Sign in')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it('moves focus to the new page heading after following a nav link, and titles it', async () => {
+    getMe.mockResolvedValue(user('admin'))
+    renderAt('/')
+    await heading('Incidents')
+    const { default: userEvent } = await import('@testing-library/user-event')
+    await userEvent.click(screen.getByRole('link', { name: 'Users' }))
+    const users = await heading('Users')
+    await waitFor(() => expect(document.activeElement).toBe(users))
+    await waitFor(() => expect(document.title).toBe('Users · SentinelOps'))
+    // Focusable only for this: once focus leaves, the heading is plain again.
+    users.blur()
+    expect(users.hasAttribute('tabindex')).toBe(false)
+  })
+
+  it('moves focus to the landing heading after logging out from "/" (same address, new page)', async () => {
+    getMe.mockResolvedValue(user('analyst'))
+    renderAt('/')
+    const { default: userEvent } = await import('@testing-library/user-event')
+    await userEvent.click(await screen.findByRole('button', { name: /account menu/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    const landing = await heading(/incident tracking/i)
+    await waitFor(() => expect(document.activeElement).toBe(landing))
+    await waitFor(() => expect(document.title).toBe('SentinelOps · Incident tracking, watched closely'))
+  })
+
+  it('moves focus on a public page too (a footer link)', async () => {
+    getMe.mockResolvedValue(null)
+    renderAt('/')
+    await heading(/incident tracking/i)
+    const { default: userEvent } = await import('@testing-library/user-event')
+    await userEvent.click(screen.getAllByRole('link', { name: 'Privacy' })[0])
+    const privacy = await heading('Privacy')
+    await waitFor(() => expect(document.activeElement).toBe(privacy))
   })
 })

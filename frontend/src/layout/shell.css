@@ -31,8 +31,10 @@
   outline-offset: 2px;
 }
 
-/* Main takes focus from the skip link; it needs no ring of its own. */
-.ui-shell-main:focus {
+/* Main takes focus from the skip link; it needs no ring of its own. Nor does a page's heading,
+   which takes focus after a navigation (useRouteFocus) only so the new page is announced. */
+.ui-shell-main:focus,
+[data-route-focus]:focus {
   outline: none;
 }
 

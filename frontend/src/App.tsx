@@ -3,6 +3,7 @@ import { getMe, logout, onSessionExpired, type User } from "./api";
 import { Routes, Route, Navigate, Link, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
 import { PublicShell } from "./layout/PublicShell";
+import { useRouteFocus } from "./layout/useRouteFocus";
 import { AcceptInvite } from "./pages/AcceptInvite";
 import { AccountPage } from "./pages/Account";
 import { Incidents } from "./pages/Incidents";
@@ -24,6 +25,9 @@ type AuthState =
 function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
   const navigate = useNavigate();
+
+  // Titles every page and, after an in-app navigation, moves focus to the new page's heading.
+  useRouteFocus(auth.kind === "loading" ? null : auth.kind === "authenticated");
 
   // The latest auth state, for the expiry handler below, which outlives renders.
   const authRef = useRef(auth);
