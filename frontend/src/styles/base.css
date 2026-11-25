@@ -56,18 +56,8 @@ body {
   }
 }
 
-/* Current screens: layout and typography from the old index.css, kept until each screen is redesigned. */
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--color-border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-}
-
+/* Current screens: type and spacing from the old index.css, kept until each screen is redesigned.
+   The page frame (width, centring, borders) now belongs to the shells. */
 h1,
 h2 {
   font-family: var(--font-sans);

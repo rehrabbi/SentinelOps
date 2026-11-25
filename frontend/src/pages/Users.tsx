@@ -10,7 +10,7 @@ import {
   type IssuedReset,
   type Role,
   type User,
-} from "./api";
+} from "../api";
 
 // The load state for the user list — exactly one of these three, the same
 // discriminated-union shape the incident dashboard uses.
@@ -21,10 +21,10 @@ type ListState =
 
 const ROLES: Role[] = ["reporter", "analyst", "admin"];
 
-// AdminPage lists every account and lets an admin change someone else's role.
+// UsersPage lists every account and lets an admin change someone else's role.
 // Reaching this screen already requires the admin role, but that is routing
 // convenience: the API is the actual control, and it answers 403 to anyone else.
-export function AdminPage({ currentUserId }: { currentUserId: string }) {
+export function UsersPage({ currentUserId }: { currentUserId: string }) {
   const [list, setList] = useState<ListState>({ kind: "loading" });
 
   useEffect(() => {
