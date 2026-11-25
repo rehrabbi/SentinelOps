@@ -28,6 +28,9 @@ import (
 // admin to pass it on, short enough that a link left in a chat goes stale.
 const ResetLifetime = time.Hour
 
+// cliActor names the command line in the audit trail, where there is no user.
+const cliActor = "command-line"
+
 var (
 	// ErrWrongPassword: the current password given with a change is not the
 	// account's password.
@@ -166,13 +169,23 @@ type Reset struct {
 }
 
 // IssueReset creates a one-time reset for the account userID, on behalf of
-// the admin by, and records it in the same transaction. Any earlier reset of
-// that account that is still pending stops working, so only the newest link
-// is ever live. It returns the raw token, which is stored only as its SHA-256
-// hash and cannot be recovered later.
-func (s *Service) IssueReset(ctx context.Context, by authctx.Principal, userID string, ip *string) (string, Reset, error) {
-	if userID == by.ID {
+// the admin by, or of the command line when by is nil, and records it in the
+// same transaction. Any earlier reset of that account that is still pending
+// stops working, so only the newest link is ever live. It returns the raw
+// token, which is stored only as its SHA-256 hash and cannot be recovered.
+//
+// An admin may not reset their own account: a stolen session must not be
+// enough to take it over. The command line may reset any account, the only
+// admin's included, because using it already takes the database login.
+func (s *Service) IssueReset(ctx context.Context, by *authctx.Principal, userID string, ip *string) (string, Reset, error) {
+	if by != nil && userID == by.ID {
 		return "", Reset{}, ErrOwnAccount
+	}
+	var createdBy *string
+	actorEmail := cliActor
+	if by != nil {
+		createdBy = &by.ID
+		actorEmail = by.Email
 	}
 	raw, hash, err := session.GenerateToken()
 	if err != nil {
@@ -201,7 +214,7 @@ func (s *Service) IssueReset(ctx context.Context, by authctx.Principal, userID s
 		INSERT INTO password_resets (token_hash, user_id, created_by, expires_at)
 		VALUES ($1, $2, $3, now() + $4::interval)
 		RETURNING expires_at`,
-		hash, userID, by.ID, fmt.Sprintf("%d seconds", int(ResetLifetime.Seconds())),
+		hash, userID, createdBy, fmt.Sprintf("%d seconds", int(ResetLifetime.Seconds())),
 	).Scan(&rs.ExpiresAt)
 	if err != nil {
 		return "", Reset{}, fmt.Errorf("issue reset: insert: %w", err)
@@ -209,8 +222,8 @@ func (s *Service) IssueReset(ctx context.Context, by authctx.Principal, userID s
 
 	targetType := "user"
 	if err := s.audit.RecordTx(ctx, tx, audit.Entry{
-		ActorID:    &by.ID,
-		ActorEmail: by.Email,
+		ActorID:    createdBy,
+		ActorEmail: actorEmail,
 		Action:     audit.ActionPasswordResetIssued,
 		TargetType: &targetType,
 		TargetID:   &userID,

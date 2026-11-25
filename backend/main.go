@@ -149,6 +149,16 @@ func main() {
 		return
 	}
 
+	// Subcommand: "reset-password" issues a one-time reset link from the
+	// command line (see cli.go): the way back in when the only admin has
+	// forgotten their password.
+	if len(os.Args) > 1 && os.Args[1] == "reset-password" {
+		if err := runResetPassword(context.Background(), db, os.Args[2:], os.Stdout); err != nil {
+			log.Fatalf("reset-password failed: %v", err)
+		}
+		return
+	}
+
 	// From here on the process is the server, so everything it logs, including
 	// the existing log.Printf calls, is one JSON object per line on stderr,
 	// which Render collects. The subcommands above keep plain, readable text.

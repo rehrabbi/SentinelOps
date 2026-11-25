@@ -4,7 +4,11 @@ package main
 // everywhere, and admin-issued password resets (internal/account).
 
 import (
+	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"regexp"
 	"slices"
@@ -13,6 +17,7 @@ import (
 
 	"sentinelops/internal/audit"
 	"sentinelops/internal/session"
+	"sentinelops/internal/user"
 )
 
 const newTestPassword = "staple-battery-horse-correct" // local-only test value
@@ -245,4 +250,47 @@ func TestPasswordResetAcceptRateLimit(t *testing.T) {
 		c.expect(http.StatusNotFound, "POST", "/api/password-resets/accept", guess)
 	}
 	c.expect(http.StatusTooManyRequests, "POST", "/api/password-resets/accept", guess)
+}
+
+// The only admin forgot their password: nobody can issue them a link in the
+// app, so the command line, which needs the database login, can.
+func TestResetPasswordCommand(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	admin, adminUser := signUp(t, srv, "forgetful-admin", "admin")
+	ctx := context.Background()
+
+	var out bytes.Buffer
+	if err := runResetPassword(ctx, testDB, []string{"--email", strings.ToUpper(adminUser.Email), "--site", "https://example.test/"}, &out); err != nil {
+		t.Fatalf("reset-password command: %v", err)
+	}
+	link := regexp.MustCompile(`https://example\.test/reset#([0-9a-f]{64})`).FindStringSubmatch(out.String())
+	if link == nil {
+		t.Fatalf("no reset link in output: %q", out.String())
+	}
+
+	// Recorded as the command line's doing, with no admin behind it.
+	var actor string
+	var createdBy sql.NullString
+	if err := testDB.QueryRow(`SELECT actor_email FROM audit_log WHERE action = $1 AND target_id = $2 ORDER BY id DESC LIMIT 1`,
+		audit.ActionPasswordResetIssued, adminUser.ID).Scan(&actor); err != nil || actor != "command-line" {
+		t.Errorf("command-line reset audited as %q (%v)", actor, err)
+	}
+	if err := testDB.QueryRow(`SELECT created_by FROM password_resets WHERE token_hash = $1`,
+		session.HashToken(link[1])).Scan(&createdBy); err != nil || createdBy.Valid {
+		t.Errorf("command-line reset created_by = %v (%v), want NULL", createdBy, err)
+	}
+
+	// The link works like any other: new password in, every session out.
+	newClient(t, srv).expect(http.StatusNoContent, "POST", "/api/password-resets/accept",
+		map[string]string{"token": link[1], "newPassword": newTestPassword})
+	admin.expect(http.StatusUnauthorized, "GET", "/api/me", nil)
+	login(t, newClient(t, srv), adminUser.Email, newTestPassword)
+
+	out.Reset()
+	if err := runResetPassword(ctx, testDB, []string{}, &out); err == nil || !strings.Contains(err.Error(), "--email") {
+		t.Errorf("reset-password without --email: %v, want an error naming --email", err)
+	}
+	if err := runResetPassword(ctx, testDB, []string{"--email", uniqueEmail("nobody")}, &out); !errors.Is(err, user.ErrUserNotFound) {
+		t.Errorf("reset-password for an unknown address: %v, want user not found", err)
+	}
 }

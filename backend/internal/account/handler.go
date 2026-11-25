@@ -115,7 +115,7 @@ func (h *Handler) IssueReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, rs, err := h.svc.IssueReset(r.Context(), caller, id, audit.ClientIP(r))
+	token, rs, err := h.svc.IssueReset(r.Context(), &caller, id, audit.ClientIP(r))
 	switch {
 	case errors.Is(err, ErrOwnAccount):
 		http.Error(w, ErrOwnAccount.Error(), http.StatusForbidden)
