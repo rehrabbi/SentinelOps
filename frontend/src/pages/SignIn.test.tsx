@@ -68,11 +68,11 @@ function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>
 }
 
-function renderSignIn(onLoggedIn = vi.fn()) {
+function renderSignIn(onLoggedIn = vi.fn(), sessionEnded = false) {
   render(
     <MemoryRouter initialEntries={['/signin']}>
       <Routes>
-        <Route path="/signin" element={<SignIn onLoggedIn={onLoggedIn} />} />
+        <Route path="/signin" element={<SignIn onLoggedIn={onLoggedIn} sessionEnded={sessionEnded} />} />
         <Route path="/" element={<p>Home</p>} />
       </Routes>
       <Where />
@@ -111,6 +111,42 @@ describe('SignIn', () => {
     renderSignIn()
     await signIn('m.santos@example.com', 'not-the-password')
     expect((await screen.findByRole('alert')).textContent).toContain('Invalid email or password')
+  })
+
+  it('ties wrong credentials to both fields and puts the cursor back in the password', async () => {
+    serve({ 'POST /api/sessions': { status: 401 } })
+    renderSignIn()
+    await signIn('m.santos@example.com', 'not-the-password')
+    const alert = await screen.findByRole('alert')
+    const email = screen.getByLabelText('Email')
+    const password = screen.getByLabelText('Password') as HTMLInputElement
+    for (const field of [email, password]) {
+      expect(field.getAttribute('aria-invalid')).toBe('true')
+      expect(field.getAttribute('aria-describedby')?.split(' ')).toContain(alert.id)
+    }
+    await waitFor(() => expect(document.activeElement).toBe(password))
+    expect(password.selectionStart).toBe(0)
+    expect(password.selectionEnd).toBe(password.value.length)
+  })
+
+  it('leaves the fields valid when the error is not about them, and returns focus to the button', async () => {
+    serve({ 'POST /api/sessions': { status: 429, headers: { 'Retry-After': '60' } } })
+    renderSignIn()
+    await signIn('m.santos@example.com', 'not-the-password')
+    await screen.findByRole('alert')
+    expect(screen.getByLabelText('Email').hasAttribute('aria-invalid')).toBe(false)
+    expect(screen.getByLabelText('Password').hasAttribute('aria-invalid')).toBe(false)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Sign in' })))
+  })
+
+  it('never shows the session-ended notice beside a sign-in error', async () => {
+    serve({ 'POST /api/sessions': { status: 401 } })
+    renderSignIn(vi.fn(), true)
+    expect(screen.getByRole('alert').textContent).toContain('Your session ended')
+    await signIn('m.santos@example.com', 'not-the-password')
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Invalid email or password'))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(screen.queryByText('Your session ended. Sign in again.')).toBeNull()
   })
 
   it('shows the wait after too many attempts', async () => {
