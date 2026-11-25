@@ -49,8 +49,12 @@ keep working at the same paths.
   glyph for status.
 - One-time invite and reset links on the users screen are stricter: shown once with Copy and Hide,
   only one reset link on screen at a time, and a new link replaces the old one.
-- The signed-in screens (incidents, users, account) load on demand. Public pages ship 427.96 kB of
-  JavaScript (139.02 kB gzip), down from 469.03 kB (149.52 kB gzip).
+- The signed-in screens (incidents, users, account) load on demand. Public pages ship 428.72 kB of
+  JavaScript (139.27 kB gzip), down from 469.03 kB (149.52 kB gzip).
+- A signed-out visitor at `/` now gets the landing page.
+- Sign-in moved to `/signin`.
+- Logging out lands on the landing page.
+- The accept-invite form asks for the password twice.
 - The landing page's idle scan plays once instead of looping.
 - Error toasts stay until dismissed; success and info toasts go after 5 seconds.
 
