@@ -219,6 +219,79 @@
   min-width: 0;
 }
 
+/* The readout and the chart/table switch share one line. */
+.overview-daily-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+/* A quiet text button: the chart is the default view, the table is there for anyone who cannot
+   hover a day (keyboard, touch). */
+.overview-daily-toggle {
+  min-height: 1.75rem;
+  margin: 0;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-signal);
+  font: 500 0.8125rem/1.25rem var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.overview-daily-toggle:hover {
+  color: var(--color-signal-strong);
+}
+
+@media (pointer: coarse) {
+  .overview-daily-toggle {
+    min-height: 2.75rem;
+  }
+}
+
+.overview-daily-summary {
+  margin: 0 0 var(--space-2);
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text-muted);
+}
+
+.overview-daily-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text);
+}
+
+.overview-daily-table th,
+.overview-daily-table td {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-align: start;
+}
+
+.overview-daily-table thead th {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.overview-daily-table tbody th {
+  font-weight: 400;
+}
+
+.overview-daily-table td {
+  font-family: var(--font-mono);
+  text-align: end;
+}
+
+.overview-daily-table thead th:last-child {
+  text-align: end;
+}
+
 /* Reserves its line, so hovering never shifts the chart. */
 .overview-readout {
   margin: 0;
