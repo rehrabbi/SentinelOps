@@ -6,7 +6,7 @@ import { useReducedMotion } from './useReducedMotion'
 
 const QUERY = '(prefers-reduced-motion: reduce)'
 const VARIANT_KINDS = ['fadeUp', 'scan', 'stagger'] as const
-const TRANSITION_KINDS = ['enter', 'exit', 'emphasis', 'page'] as const
+const TRANSITION_KINDS = ['enter', 'exit', 'emphasis'] as const
 const TRANSFORMS = ['x', 'y', 'scale'] as const
 const IDENTITY: Record<string, number> = { x: 0, y: 0, scale: 1 }
 
@@ -29,10 +29,6 @@ describe('variants under reduced motion', () => {
 })
 
 describe('transition', () => {
-  it('keeps the page transition short under reduced motion', () => {
-    expect(transition('page', true).duration).toBeLessThanOrEqual(0.15)
-  })
-
   it('keeps every kind short under reduced motion', () => {
     for (const kind of TRANSITION_KINDS) {
       expect(transition(kind, true).duration).toBeLessThanOrEqual(0.15)

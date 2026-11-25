@@ -8,10 +8,10 @@ const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const
 // Under reduced motion every preset becomes a short fade: no travel, no scale, nothing hidden.
 const REDUCED: Transition = { duration: 0.12, ease: 'linear' }
 
-export type TransitionKind = 'enter' | 'exit' | 'emphasis' | 'page'
+export type TransitionKind = 'enter' | 'exit' | 'emphasis'
 export type VariantKind = 'fadeUp' | 'scan' | 'stagger'
 
-/** Timing for a preset: enter/exit for working UI, emphasis to draw the eye, page for route changes. */
+/** Timing for a preset: enter/exit for working UI, emphasis to draw the eye. */
 export function transition(kind: TransitionKind, reduced: boolean): Transition {
   if (reduced) return REDUCED
   switch (kind) {
@@ -24,9 +24,6 @@ export function transition(kind: TransitionKind, reduced: boolean): Transition {
     // A brief pulse or glow to draw attention; symmetric curve so it settles back.
     case 'emphasis':
       return { duration: 0.36, ease: EASE_IN_OUT }
-    // Route changes: a little longer than enter (--dur-slow).
-    case 'page':
-      return { duration: 0.36, ease: EASE_OUT }
   }
 }
 
