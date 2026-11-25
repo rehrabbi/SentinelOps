@@ -1,0 +1,17 @@
+/* The logo takes its ink from the surrounding text colour and its pupil from the signal token,
+   so it follows the theme. The fallback is the universal accent, for a page without tokens. */
+.logo {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.logo-lid,
+.logo-letters {
+  fill: currentColor;
+}
+
+.logo-pupil,
+.logo-tittle {
+  fill: var(--color-signal, #1596d6);
+}
