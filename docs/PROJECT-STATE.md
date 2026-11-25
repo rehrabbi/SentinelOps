@@ -409,7 +409,7 @@ criterion has to include the next deployment, not just the moment.
   Backblaze's "Write Only" preset, limited to that bucket. It turned out to include `deleteFiles` and
   bucket-settings permissions, and once Object Lock was on, `writeBucketRetentions` too, so a leaked key
   could lower the bucket's default lock. Hence every upload sets its own compliance lock for 90 days
-  (`infra/b2-upload.py`), which nobody can shorten. The first key (`…0001`) failed to authorize in CI
+  (`infra/b2-upload.py`), which nobody can shorten. The first key (`…0001`, deleted 2026-11-25 at the owner's request) failed to authorize in CI
   (`bad_auth_token`, most likely a newline or wrong value from the first clipboard transfer); the second
   (`…0002`, `sentinelops-backup-writer-2`) was checked against Backblaze from the owner's machine before
   being stored, as exact bytes, never displayed; stored as `B2_KEY_ID` and
