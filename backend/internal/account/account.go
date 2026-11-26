@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"time"
 
@@ -81,6 +82,11 @@ func (s *Service) ChangePassword(ctx context.Context, caller authctx.Principal, 
 	// Authenticate before anything else: without the current password, the
 	// request learns nothing, not even whether the new password would pass.
 	if bcrypt.CompareHashAndPassword([]byte(stored), []byte(current)) != nil {
+		// Best effort, like a failed sign-in: nothing changed, so there is
+		// nothing to roll back, and the change limiter counts only 403s. A lost
+		// entry turned into a 500 would stop it counting guesses exactly while
+		// the audit log is broken. A successful change still commits with its
+		// entry or not at all (below).
 		if err := s.audit.Record(ctx, audit.Entry{
 			ActorID:    &caller.ID,
 			ActorEmail: caller.Email,
@@ -89,7 +95,7 @@ func (s *Service) ChangePassword(ctx context.Context, caller authctx.Principal, 
 			Detail:     map[string]any{"reason": "bad_password"},
 			IP:         ip,
 		}); err != nil {
-			return fmt.Errorf("change password: audit failure: %w", err)
+			log.Printf("change password: audit failure: %v", err)
 		}
 		return ErrWrongPassword
 	}
