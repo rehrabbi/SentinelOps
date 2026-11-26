@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { changePassword, logoutEverywhere, type User } from '../api'
+import { ApiError, changePassword, logoutEverywhere, type User } from '../api'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Field } from '../ui/Field'
@@ -33,6 +33,9 @@ function ChangePasswordForm({ email }: { email: string }) {
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
   const [mismatch, setMismatch] = useState(false)
+  // The server refused the current password (403). Only then is that field the invalid one; a
+  // weak new password or too many attempts is not its fault.
+  const [currentWrong, setCurrentWrong] = useState(false)
   const [status, setStatus] = useState<FormStatus>({ kind: 'idle' })
 
   // The submit button is disabled while the request runs, which drops focus to the page. When the
@@ -56,6 +59,7 @@ function ChangePasswordForm({ email }: { email: string }) {
       return
     }
     setMismatch(false)
+    setCurrentWrong(false)
     setStatus({ kind: 'submitting' })
     try {
       await changePassword(current, next)
@@ -64,6 +68,7 @@ function ChangePasswordForm({ email }: { email: string }) {
       setConfirm('')
       setStatus({ kind: 'done' })
     } catch (err) {
+      setCurrentWrong(err instanceof ApiError && err.status === 403)
       setStatus({ kind: 'error', message: errorMessage(err, 'Something went wrong') })
     }
   }
@@ -86,7 +91,7 @@ function ChangePasswordForm({ email }: { email: string }) {
           required
           autoComplete="current-password"
           aria-describedby={status.kind === 'error' && !mismatch ? errorId : undefined}
-          aria-invalid={status.kind === 'error' && !mismatch ? true : undefined}
+          aria-invalid={status.kind === 'error' && currentWrong ? true : undefined}
         />
         <Field
           label="New password"
