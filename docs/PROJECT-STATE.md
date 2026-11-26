@@ -4,10 +4,10 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-26 · **Current release:** ✅ **v1.1.0, the frontend redesign**, merged to `main`
-> and deployed to https://sentinelops.pages.dev, with all nine checks required (v1.0.0 was the first
-> hardened deployment). Next: the post-launch checks, then the v1.1.0 tag on the owner's word. Full
-> detail in §6.
+> **Last updated:** 2026-11-26 · **Current release:** ✅ **v1.1.0, the frontend redesign**, tagged and live at
+> https://sentinelops.pages.dev, with all nine checks required (v1.0.0 was the first hardened
+> deployment). Next: the owner's signed-in pass on the live site, then pick the next stage from the
+> candidates in §6.
 
 ---
 
@@ -283,26 +283,24 @@ real credentials.
 
 ---
 
-## 6. ⏭️ THE EXACT NEXT STEP — post-launch checks, then the v1.1.0 tag
+## 6. ⏭️ THE EXACT NEXT STEP — pick the next stage
 
-### ⏭️ NEXT STEP: check the deployed redesign, then tag v1.1.0
+### ⏭️ NEXT STEP: the owner's signed-in pass, then choose from the candidates below
 
 The frontend redesign stage (issue #79, milestone #7) is in `main`. Every task was a pull request into
 the long-lived `redesign` branch (cut from `main` at c6aa1cd), merged on green CI and archived as
 `merged/rd-task-<n>`. A final review of the whole branch ran before launch, its findings were fixed in
-pull request #97, and one launch pull request carried `redesign` into `main`, which deployed it.
+pull request #97, and launch pull request #99 carried `redesign` into `main` on 2026-11-26, which
+deployed it.
 
-In order:
-1. **Post-launch checks:** the deploy workflow's health check, the OWASP ZAP baseline scan against the
-   live site, and a pass through sign-in, invites, resets, roles and incidents on
-   https://sentinelops.pages.dev.
-2. **Release v1.1.0**, tag and release notes from the CHANGELOG's 1.1.0 entry. The tag happens only on
-   the owner's word.
-3. **Archive `redesign`** as `merged/redesign`.
+Done after launch: the deploy workflow's health check, CI, Security and an OWASP ZAP baseline scan of
+the live site all passed; the public pages (landing, sign-in, privacy) were checked live, with the
+security headers unchanged and the `/api/me` preload served; `v1.1.0` is tagged on 55e1776 and
+published as a GitHub release from the CHANGELOG entry; `redesign` is archived as `merged/redesign`;
+and `docs/images/social-card.png` is the repository's social preview.
 
 Owner to-dos still open:
-- Upload `docs/images/social-card.png` as the GitHub social preview (repository settings, which only the
-  owner can change).
+- Sign in on the live site and go through incidents, users, invites, resets and account security.
 - Turn on 2FA for Backblaze.
 
 **Locked decisions for this stage** (reasons in `docs/adr/0001-frontend-design-system.md`; values in
