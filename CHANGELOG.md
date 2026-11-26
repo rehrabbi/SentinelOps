@@ -12,6 +12,11 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
 
+### Added
+
+- Browser-level end-to-end tests of accepting an invite, signing in and out, and resetting a password,
+  run with Playwright in Chromium against the real API and database, as a CI job (`npm run e2e` locally).
+
 ## [1.1.0] - 2026-11-26
 
 Frontend redesign: a new look and identity for every screen. The API,

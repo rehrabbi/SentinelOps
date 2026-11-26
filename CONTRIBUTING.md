@@ -106,6 +106,27 @@ cd backend && go test ./...
 
 The tests refuse any host other than `localhost`, so they cannot reach the production database.
 
+### End-to-end tests
+
+`npm run e2e` (in `frontend/`) drives sign-in, invites and password resets in a real Chromium
+with Playwright: the production build served with `/api` on the same origin, the API built from
+this checkout, and a database of its own. CI runs it as the `End-to-end (Playwright)` job.
+
+```bash
+docker compose up -d                       # the local database
+npx playwright install chromium            # once, from frontend/
+export E2E_DATABASE_URL="postgres://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/sentinelops_e2e?sslmode=disable"
+cd frontend && npm run e2e
+```
+
+- Every run **drops and recreates** the database `E2E_DATABASE_URL` names, so it must end in `_e2e`
+  and be on `localhost`; the run refuses anything else. Your development database is untouched.
+- The API always listens on port 8080, so stop anything already there first (`go run .`, or
+  `docker compose --profile app stop api`). The run refuses to start if 8080 answers.
+- The reset uses `psql` if it is installed, otherwise the one inside the `sentinelops-db` container.
+- The report, traces and the API's log land in `frontend/e2e-output/` (git-ignored);
+  `npx playwright show-report e2e-output/report` opens the report.
+
 The two dependency scans from the security workflow also run locally, and catch most of
 what it would fail on. The image, CodeQL, and history scans run only in CI.
 
