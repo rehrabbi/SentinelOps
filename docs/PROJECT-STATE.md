@@ -6,8 +6,8 @@
 >
 > **Last updated:** 2026-11-26 · **Current release:** ✅ **v1.1.0, the frontend redesign**, tagged and live at
 > https://sentinelops.pages.dev, with all nine checks required (v1.0.0 was the first hardened
-> deployment). Next: the owner's signed-in pass on the live site, then pick the next stage from the
-> candidates in §6.
+> deployment). Since v1.1.0, `main` also has browser-level tests, transactional sign-in audit and the
+> launch follow-ups; the API part waits for the owner's deploy. Next: §6.
 
 ---
 
@@ -285,7 +285,7 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick the next stage
 
-### ⏭️ NEXT STEP: the owner's signed-in pass, then choose from the candidates below
+### ⏭️ NEXT STEP: deploy the pinned API image, then the owner's signed-in pass
 
 The frontend redesign stage (issue #79, milestone #7) is in `main`. Every task was a pull request into
 the long-lived `redesign` branch (cut from `main` at c6aa1cd), merged on green CI and archived as
@@ -300,6 +300,10 @@ published as a GitHub release from the CHANGELOG entry; `redesign` is archived a
 and `docs/images/social-card.png` is the repository's social preview.
 
 Owner to-dos still open:
+- Deploy the API image pinned in `infra/api-image-tag.txt` (built from 3f4eac2: sign-in and sign-out
+  commit with their audit entries, and `golang.org/x/crypto` 0.59.0). There is no new migration. In
+  order: `infra/migrate.sh`, `infra/deploy-api.sh`, then `infra/terraform.sh apply -refresh-only`, after
+  which `infra/terraform.sh plan` must say "No changes". The frontend parts are already live.
 - Sign in on the live site and go through incidents, users, invites, resets and account security.
 - Turn on 2FA for Backblaze.
 
@@ -328,7 +332,7 @@ Owner to-dos still open:
 - Known smaller item, deferred: with two status saves in flight, focus goes to whichever row finishes
   first.
 
-### After v1.1.0: candidates
+### After v1.1.0: candidates (1, 2 and 5 done; 3 and 4 blocked)
 
 1. ✅ **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
    component tests exist now). Done 2026-11-26 on `feat/e2e-playwright`: `frontend/e2e/`, `npm run e2e`,
