@@ -1583,7 +1583,6 @@ launch pull request.)*
 
 ---
 
-<<<<<<< HEAD
 ## 2026-11-26: Transactional audit for sign-in and sign-out
 
 **Decision:** a successful sign-in and a sign-out now commit their session change and its audit entry in
@@ -1651,8 +1650,8 @@ was expected) and pass now; the full backend suite, `go vet` and `govulncheck` a
   this way: it stays put and says why.
 - A test proves wrong passwords still reach the limiter's 429 while their audit entries fail.
 
-*(Committed on `feat/transactional-auth-audit`.)*
-=======
+*(Merged in PR #103.)*
+
 ## 2026-11-26 — Browser-level end-to-end tests (Playwright)
 
 **Decision:** add a small Playwright suite (`frontend/e2e/`) that drives accepting an invite, signing
@@ -1693,7 +1692,6 @@ origin. No production default changed.
   anything already answers there, rather than quietly testing the wrong API.
 - **Serial tests that build on each other cannot be retried one by one**, so retries are off and the
   suite is kept short.
->>>>>>> origin/main
 
 ---
 
