@@ -152,6 +152,25 @@ func TestFailedLoginAuditStaysBestEffort(t *testing.T) {
 	}
 }
 
+// The reason failed sign-ins stay best effort: with their entries failing,
+// wrong passwords still answer 401, so the limiter still counts them and
+// still locks the guesser out.
+func TestFailedLoginsReachLimitWithoutAudit(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	u := createAccount(t, "failed-login-limit-fault", "")
+	c := newClient(t, srv)
+	wrong := map[string]string{"email": u.Email, "password": "wrong-password-123"}
+
+	failAudit(t, audit.ActionLoginFailed, u.Email)
+	for i := 0; i < 10; i++ {
+		c.expect(http.StatusUnauthorized, "POST", "/api/sessions", wrong)
+	}
+	c.expect(http.StatusTooManyRequests, "POST", "/api/sessions", wrong)
+	if n := countAudit(t, audit.ActionLoginFailed, u.Email); n != 0 {
+		t.Errorf("%d failed sign-in entries written through the fault, want 0", n)
+	}
+}
+
 // A sign-out whose audit entry is lost keeps the session alive.
 func TestLogoutRollsBackWithoutAudit(t *testing.T) {
 	srv := newServer(t, serverConfig{})
