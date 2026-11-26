@@ -362,8 +362,8 @@ Work follows GitHub Flow, run the way a team would run it.
   conventional commit types used in its commit messages.
 - **Protected `main`.** It changes only through a pull request, and ten required checks,
   covering build, lint, tests, browser end-to-end tests, Terraform, dependency, code, image, and secret
-  scanning, must pass on a
-  branch that is up to date with `main` before anything merges, administrators included.
+  scanning, must pass on a branch that is up to date with `main` before anything merges,
+  administrators included.
 - **Merge commits only.** Every commit keeps its hash on `main`, and each merge commit
   carries the pull request's full write-up, so the reasoning behind a change is in
   `git log` itself.
