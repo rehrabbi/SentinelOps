@@ -68,8 +68,9 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// Record writes an entry on its own connection. Use it for events with no
-// surrounding transaction, such as a login or a logout.
+// Record writes an entry on its own connection, for an event that changed
+// nothing and so has no transaction to join: a failed sign-in or a wrong
+// current password. Anything that changes state uses RecordTx.
 func (r *Repository) Record(ctx context.Context, e Entry) error {
 	return write(ctx, r.db, e)
 }

@@ -78,9 +78,10 @@ func newHandler(db *sql.DB, cfg serverConfig) http.Handler {
 
 	// Auth feature: login reads a user AND writes a session, so it takes both
 	// repositories. This is why auth is its own package rather than living
-	// inside user or session.
+	// inside user or session. It also takes the pool, because a sign-in and a
+	// sign-out commit their session change together with its audit entry.
 	sessionRepo := session.NewRepository(db)
-	authHandler := auth.NewHandler(userRepo, sessionRepo, auditRepo, cfg.SecureCookies)
+	authHandler := auth.NewHandler(db, userRepo, sessionRepo, auditRepo, cfg.SecureCookies)
 	// Login is limited per visitor: after 10 failed logins in 15 minutes every
 	// further attempt gets 429 before any password is checked. Only failures
 	// count, so a correct password never uses up the limit, and a success does

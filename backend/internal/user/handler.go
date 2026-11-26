@@ -112,9 +112,9 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request) {
 
 	// A privileged change and its audit entry share ONE transaction. If the
 	// entry cannot be written, the change is rolled back: an action nobody can
-	// account for must not happen. This is deliberately stricter than the
-	// best-effort policy used for login and logout, which have no transaction
-	// to join.
+	// account for must not happen. Sign-in, sign-out and the account and
+	// invite changes follow the same rule; only failed sign-ins, which change
+	// nothing, stay best effort (see auth.recordFailedLogin).
 	tx, err := h.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		log.Printf("update user role: begin: %v", err)
