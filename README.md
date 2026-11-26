@@ -32,11 +32,13 @@ infrastructure as code, and cloud architecture.
 It is built incrementally, and the git history is meant to read as an engineering story,
 one concern per branch and one concern per pull request.
 
-**Status:** the current release is [v1.0.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v1.0.0),
-the first hardened deployment, **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)**:
-account recovery without email, secret rotation without downtime, a weekly passive scan of the live
-site, strict security headers, and backups in two places, both restored before release. Every release
-is described in the [changelog](CHANGELOG.md).
+**Status:** the current release is [v1.1.0](https://github.com/rehrabbi/SentinelOps/releases/tag/v1.1.0),
+the frontend redesign, **live at [sentinelops.pages.dev](https://sentinelops.pages.dev)**: its own brand
+and logo, a public landing page and privacy notice, every screen redone with an incident overview, light
+and dark themes, and an accessibility and performance pass. It builds on v1.0.0, the first hardened
+deployment: account recovery without email, secret rotation without downtime, a weekly passive scan of
+the live site, strict security headers, and backups in two places. Every release is described in the
+[changelog](CHANGELOG.md).
 
 **What works today**
 
