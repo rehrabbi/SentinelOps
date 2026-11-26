@@ -1,0 +1,24 @@
+/* Kit typography shared by the signed-in screens: the page title, the small uppercase label over a
+   section, and the red text of an inline error. A screen adds its own spacing in its own stylesheet. */
+
+.ui-page-title {
+  margin: 0;
+  font: 600 2rem/1.2 var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.ui-section-label {
+  margin: 0 0 var(--space-3);
+  font: 500 0.75rem/1rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ui-error-text {
+  margin: 0;
+  color: var(--color-danger);
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+  overflow-wrap: anywhere;
+}

@@ -19,6 +19,7 @@ import { EmptyState } from '../ui/EmptyState'
 import { Field } from '../ui/Field'
 import { Spinner } from '../ui/Spinner'
 import { toast } from '../ui/toast-store'
+import '../ui/Text.css'
 import './Incidents.css'
 
 // The load state for the incident list: exactly one of these three. Only a successful load
@@ -127,7 +128,7 @@ export function Incidents() {
   return (
     <div className="incidents-page">
       <div className="incidents-head">
-        <h1 className="incidents-h1">Incidents</h1>
+        <h1 className="ui-page-title">Incidents</h1>
         <div ref={toggleRef}>
           <Button
             variant={open ? 'secondary' : 'primary'}
@@ -155,7 +156,7 @@ export function Incidents() {
       {list.kind === 'ready' && <Overview incidents={list.incidents} />}
 
       <section className="incidents-section" aria-labelledby="incidents-list-title">
-        <h2 id="incidents-list-title" className="incidents-h2">
+        <h2 id="incidents-list-title" className="ui-section-label">
           Incidents you can see
         </h2>
         {list.kind === 'loading' && (
@@ -166,7 +167,7 @@ export function Incidents() {
         )}
         {list.kind === 'error' && (
           <div className="incidents-load-error">
-            <p className="incidents-error" role="alert">
+            <p className="ui-error-text" role="alert">
               {list.message}
             </p>
             <Button variant="secondary" onClick={load}>
@@ -273,7 +274,7 @@ function IncidentRow({
           )}
         </p>
         {error && (
-          <p id={errorId} className="incidents-error incidents-row-error" role="alert">
+          <p id={errorId} className="ui-error-text incidents-row-error" role="alert">
             {error}
           </p>
         )}
@@ -395,7 +396,7 @@ function ReportForm({
           )}
         </Field>
         {state.kind === 'error' && (
-          <p className="incidents-error" role="alert">
+          <p className="ui-error-text" role="alert">
             {state.message}
           </p>
         )}

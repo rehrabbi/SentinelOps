@@ -5,6 +5,7 @@ import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Field } from '../ui/Field'
 import { errorMessage, type FormStatus } from './formStatus'
+import '../ui/Text.css'
 import './Account.css'
 
 // AccountPage is where people keep control of their own account: change the password, or end
@@ -13,7 +14,7 @@ export function AccountPage({ user, onLoggedOut }: { user: User; onLoggedOut: ()
   return (
     <div className="account-page">
       <div className="account-head">
-        <h1 className="account-h1">Account</h1>
+        <h1 className="ui-page-title">Account</h1>
         <p className="account-lede">
           Signed in as <span className="account-mono">{user.email}</span>
         </p>
@@ -109,7 +110,7 @@ function ChangePasswordForm({ email }: { email: string }) {
           error={mismatch && status.kind === 'error' ? status.message : undefined}
         />
         {status.kind === 'error' && !mismatch && (
-          <p id={errorId} className="account-error" role="alert">
+          <p id={errorId} className="ui-error-text" role="alert">
             {status.message}
           </p>
         )}
@@ -161,7 +162,7 @@ function LogoutEverywhere({ onLoggedOut }: { onLoggedOut: () => void }) {
         lost or someone else may have your password.
       </p>
       {status.kind === 'error' && (
-        <p className="account-error" role="alert">
+        <p className="ui-error-text" role="alert">
           {status.message}
         </p>
       )}

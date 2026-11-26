@@ -15,13 +15,6 @@
   gap: var(--space-2);
 }
 
-.account-h1 {
-  margin: 0;
-  font: 600 2rem/1.2 var(--font-sans);
-  letter-spacing: -0.02em;
-  color: var(--color-text);
-}
-
 .account-lede {
   margin: 0;
   color: var(--color-text-muted);
@@ -56,13 +49,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-
-.account-error {
-  margin: 0;
-  color: var(--color-danger);
-  font: 400 0.9375rem/1.4rem var(--font-sans);
-  overflow-wrap: anywhere;
 }
 
 .account-success {
