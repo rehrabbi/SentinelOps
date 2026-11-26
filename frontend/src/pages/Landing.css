@@ -1,0 +1,522 @@
+/*
+ * The public landing page (Landing.tsx and pages/landing/). It sits inside PublicShell's main
+ * column (max 72rem, 16 px gutters on phones, 24 px from 768 px).
+ *
+ * Motion, from the first frame:
+ *   0 ms      the hero copy settles in, one line after another (Motion presets: stagger, fadeUp)
+ *   0 ms      the range rings open out behind the eye (CSS, 900 ms)
+ *   200 ms    the eye wakes: lids part, then the pupil turns in (Motion, the Logo's wake)
+ *   1000 ms   the idle scan plays once, as the wake settles: the pupil glides 4 units left, right
+ *             and back (3.2 s), and one diamond ping passes under the lids (1.8 s). Landing hero
+ *             only (docs/brand.md). It does not loop: every movement on the page ends by about
+ *             4.2 s, inside the 5 s after which WCAG 2.2.2 wants a way to pause it, and a loop
+ *             would keep pulling the eye from the words beside it.
+ *   on scroll the steps and the safeguards settle in as they come into view (Motion presets)
+ * The rings, glide and ping are decorative CSS keyframes, transform and opacity only, declared
+ * only under prefers-reduced-motion: no-preference. With reduced motion nothing loops or travels,
+ * and Motion's presets turn into plain fades with the content shown from the first frame.
+ */
+
+.landing {
+  display: grid;
+}
+
+/* ---------- Hero ---------- */
+
+.landing-hero {
+  --landing-eye: 112px;
+  /* How far the rings reach above and below the eye before they have faded out. */
+  --landing-rings-ry: 104px;
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-6);
+  /* Bleed to the edges of main's gutters so the rings can run wide; clipped there, so they never
+     cause sideways scrolling. */
+  margin-inline: calc(-1 * var(--space-4));
+  padding: var(--space-5) var(--space-4) var(--space-8);
+  overflow: hidden;
+}
+
+/* Positioned, like the copy after it: both stay at z-index auto and paint in source order, so the
+   rings, which spread behind the copy, always sit under it. */
+.landing-hero-eye {
+  position: relative;
+  justify-self: center;
+  width: var(--landing-eye);
+  height: var(--landing-eye);
+  margin-top: var(--space-4);
+  color: var(--color-text);
+}
+
+/* The rings scale with the eye: 1520 units across, the eye is 200 of them. */
+.landing-hero-rings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--landing-eye) * 7.6);
+  height: calc(var(--landing-eye) * 7.6);
+  transform: translate(-50%, -50%);
+  overflow: visible;
+  pointer-events: none;
+  /* An ellipse, wide and shallow, so the rings fade out before the hero's top and bottom edges
+     rather than being cut by them. */
+  -webkit-mask-image: radial-gradient(
+    ellipse calc(var(--landing-eye) * 3.4) var(--landing-rings-ry) at 50% 50%,
+    #000 30%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse calc(var(--landing-eye) * 3.4) var(--landing-rings-ry) at 50% 50%,
+    #000 30%,
+    transparent 100%
+  );
+}
+
+.landing-hero-rings path {
+  fill: none;
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.landing-hero-rings path:first-child {
+  stroke: color-mix(in srgb, var(--color-signal) 32%, var(--color-border-subtle));
+}
+
+.landing-eye {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.landing-eye-lid {
+  fill: currentColor;
+}
+
+.landing-eye-pupil {
+  fill: var(--color-signal);
+}
+
+/* Hidden until the idle scan plays it, so with no animation nothing is left over. */
+.landing-eye-ping {
+  fill: none;
+  stroke: var(--color-signal);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.landing-hero-copy {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  max-width: 38rem;
+}
+
+/* Display on the type scale (brand.md). */
+.landing-title {
+  margin: 0;
+  font: 600 2.5rem/2.75rem var(--font-sans);
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+.landing-lede {
+  max-width: 32rem;
+  margin: var(--space-4) 0 0;
+  font: 400 1.125rem/1.75rem var(--font-sans);
+  color: var(--color-text-muted);
+  text-wrap: pretty;
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+/* The page's calls to action: a little larger than working buttons, 44 px for the thumb. */
+.landing-cta {
+  min-height: 2.75rem;
+  padding-inline: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.landing-invite {
+  max-width: 32rem;
+  margin-top: var(--space-5);
+  padding: var(--space-1) 0 var(--space-1) var(--space-4);
+  border-left: 2px solid var(--color-signal);
+}
+
+.landing-invite p {
+  margin: 0;
+  font: 400 1rem/1.5rem var(--font-sans);
+  color: var(--color-text);
+  text-wrap: pretty;
+}
+
+.landing-invite p + p {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+/* ---------- Sections ---------- */
+
+.landing-section {
+  padding-block: var(--space-7);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.landing-h2 {
+  margin: 0;
+  font: 600 1.625rem/2.125rem var(--font-sans);
+  letter-spacing: -0.015em;
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+.landing-h3 {
+  margin: 0;
+  font: 600 1.125rem/1.625rem var(--font-sans);
+  letter-spacing: -0.005em;
+  color: var(--color-text);
+}
+
+.landing-body {
+  margin: 0;
+  font: 400 1rem/1.5rem var(--font-sans);
+  color: var(--color-text-muted);
+  text-wrap: pretty;
+}
+
+/* What it does: an incident's path, down a rail of pupils. */
+.landing-flow {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.landing-flow-intro {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 30rem;
+}
+
+.landing-flow-steps {
+  position: relative;
+  display: grid;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The rail, from the first pupil to the last. */
+.landing-flow-steps::before {
+  content: '';
+  position: absolute;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  left: 5px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    var(--color-signal),
+    color-mix(in srgb, var(--color-signal) 20%, var(--color-border-subtle))
+  );
+}
+
+.landing-flow-step {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-6);
+}
+
+/* Each step's marker is the pupil: a small diamond on the rail. */
+.landing-flow-step::before {
+  content: '';
+  position: absolute;
+  top: 0.5rem;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--color-signal);
+  background: var(--color-bg);
+  transform: rotate(45deg);
+}
+
+.landing-flow-step:first-child::before {
+  background: var(--color-signal);
+}
+
+.landing-flow-step .landing-body {
+  max-width: 34rem;
+}
+
+.landing-specimen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.landing-specimen-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.landing-arrow {
+  width: 16px;
+  height: 8px;
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.landing-roles {
+  max-width: 34rem;
+  padding-left: var(--space-6);
+  color: var(--color-text);
+}
+
+/* How it protects data: four groups of facts, each with its figure in mono. */
+.landing-guard {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.landing-guard-lede {
+  max-width: 34rem;
+}
+
+.landing-guard-grid {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-5);
+}
+
+.landing-guard-group {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* A short signal edge where each group starts. */
+.landing-guard-group::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 2.5rem;
+  height: 1px;
+  background: var(--color-signal);
+}
+
+.landing-facts {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+  font: 400 1rem/1.5rem var(--font-sans);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.landing-fact-tag {
+  margin-top: 2px;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--color-signal) 40%, transparent);
+  border-radius: var(--radius-sm);
+  font: 500 0.75rem/1.125rem var(--font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--color-signal);
+}
+
+/* The last call to sign in. */
+.landing-close {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+}
+
+.landing-close-mark {
+  color: var(--color-text);
+}
+
+.landing-close-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* ---------- Wider screens ---------- */
+
+@media (min-width: 640px) {
+  .landing-hero {
+    --landing-eye: 144px;
+    --landing-rings-ry: 132px;
+  }
+
+  .landing-title {
+    font-size: 3.5rem;
+    line-height: 3.75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .landing-hero {
+    margin-inline: calc(-1 * var(--space-5));
+    padding-inline: var(--space-5);
+  }
+
+  .landing-section {
+    padding-block: var(--space-8);
+  }
+
+  .landing-h2 {
+    font-size: 2rem;
+    line-height: 2.5rem;
+  }
+
+  .landing-close {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-5);
+  }
+}
+
+@media (min-width: 960px) {
+  /* Split: the words on the left, the eye keeping watch on the right. */
+  .landing-hero {
+    --landing-eye: 200px;
+    --landing-rings-ry: 300px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    align-items: center;
+    min-height: min(36rem, calc(100svh - 4rem));
+    padding-block: var(--space-6) var(--space-8);
+  }
+
+  .landing-hero-eye {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: 0;
+  }
+
+  .landing-hero-copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .landing-flow {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: var(--space-7);
+    align-items: start;
+  }
+
+  .landing-flow-intro {
+    position: sticky;
+    top: var(--space-6);
+  }
+
+  .landing-roles {
+    grid-column: 2;
+  }
+
+  .landing-guard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Two columns of two groups: the longer "Getting in" shares its column with the short roles group. */
+    grid-template-rows: auto auto;
+    grid-auto-flow: column;
+    gap: var(--space-7) var(--space-7);
+  }
+}
+
+/* ---------- Motion (decoration only; see the top of this file) ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-hero-rings {
+    animation: landing-rings 900ms var(--ease-out) both;
+  }
+
+  .landing-eye-glide {
+    animation: landing-glide 3200ms var(--ease-in-out) 1000ms 1 both;
+  }
+
+  .landing-eye-ping {
+    animation: landing-ping 1800ms var(--ease-out) 1000ms 1 both;
+  }
+}
+
+/* Keeps the rings' own centring translate while they open. */
+@keyframes landing-rings {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+/* 4 units left, 4 right, and back to the middle; in the mark's own units. */
+@keyframes landing-glide {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* One ping, out from the pupil and gone. */
+@keyframes landing-ping {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  8% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(5);
+  }
+}
+
+/* Printing: whatever has not scrolled into view yet is still at its entrance state (inline opacity
+   and transform from Motion). The hook reveals it before printing; this makes sure the printout
+   never catches a frame of the fade. */
+@media print {
+  .landing-hero-copy > *,
+  .landing-flow-step,
+  .landing-guard-group {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

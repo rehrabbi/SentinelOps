@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelOps Brand Board</title>
+<meta name="description" content="The SentinelOps brand board for sign-off: palette in both themes, type, the Facet logo system and the eye in motion.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap">
+<style>
+:root { color-scheme: light; --color-bg: #f4f7fb; --color-surface: #ffffff; --color-surface-raised: #ffffff; --color-border: #7486a4; --color-border-subtle: #d9e1ec; --color-text: #0b1426; --color-text-muted: #46546d; --color-signal: #0a6ea8; --color-signal-strong: #06547f; --color-on-signal: #ffffff; --color-focus: #06547f; --color-danger: #b42318; --color-sev-critical: #b82525; --color-sev-high: #a34a0b; --color-sev-medium: #7d5800; --color-sev-low: #52607a; --color-status-open: #0a6ea8; --color-status-investigating: #6a48c9; --color-status-resolved: #17703f; --color-status-closed: #5d6a80; --tint: 10%; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --color-bg: #0a1020; --color-surface: #0f1729; --color-surface-raised: #162139; --color-border: #5f75a0; --color-border-subtle: #223050; --color-text: #e6edf8; --color-text-muted: #9eafcb; --color-signal: #86d8ff; --color-signal-strong: #c4ecff; --color-on-signal: #04121f; --color-focus: #c4ecff; --color-danger: #ff8f8f; --color-sev-critical: #ff7070; --color-sev-high: #ffa24d; --color-sev-medium: #f2c94c; --color-sev-low: #a7b6cf; --color-status-open: #86d8ff; --color-status-investigating: #c3b1ff; --color-status-resolved: #6fe3a2; --color-status-closed: #8d9bb4; --tint: 16%; } }
+:root[data-theme="dark"] { color-scheme: dark; --color-bg: #0a1020; --color-surface: #0f1729; --color-surface-raised: #162139; --color-border: #5f75a0; --color-border-subtle: #223050; --color-text: #e6edf8; --color-text-muted: #9eafcb; --color-signal: #86d8ff; --color-signal-strong: #c4ecff; --color-on-signal: #04121f; --color-focus: #c4ecff; --color-danger: #ff8f8f; --color-sev-critical: #ff7070; --color-sev-high: #ffa24d; --color-sev-medium: #f2c94c; --color-sev-low: #a7b6cf; --color-status-open: #86d8ff; --color-status-investigating: #c3b1ff; --color-status-resolved: #6fe3a2; --color-status-closed: #8d9bb4; --tint: 16%; }
+.t-dark { color-scheme: dark; --color-bg: #0a1020; --color-surface: #0f1729; --color-surface-raised: #162139; --color-border: #5f75a0; --color-border-subtle: #223050; --color-text: #e6edf8; --color-text-muted: #9eafcb; --color-signal: #86d8ff; --color-signal-strong: #c4ecff; --color-on-signal: #04121f; --color-focus: #c4ecff; --color-danger: #ff8f8f; --color-sev-critical: #ff7070; --color-sev-high: #ffa24d; --color-sev-medium: #f2c94c; --color-sev-low: #a7b6cf; --color-status-open: #86d8ff; --color-status-investigating: #c3b1ff; --color-status-resolved: #6fe3a2; --color-status-closed: #8d9bb4; --tint: 16%; }
+.t-light { color-scheme: light; --color-bg: #f4f7fb; --color-surface: #ffffff; --color-surface-raised: #ffffff; --color-border: #7486a4; --color-border-subtle: #d9e1ec; --color-text: #0b1426; --color-text-muted: #46546d; --color-signal: #0a6ea8; --color-signal-strong: #06547f; --color-on-signal: #ffffff; --color-focus: #06547f; --color-danger: #b42318; --color-sev-critical: #b82525; --color-sev-high: #a34a0b; --color-sev-medium: #7d5800; --color-sev-low: #52607a; --color-status-open: #0a6ea8; --color-status-investigating: #6a48c9; --color-status-resolved: #17703f; --color-status-closed: #5d6a80; --tint: 10%; }
+.t-dark, .t-light { background: var(--color-bg); color: var(--color-text); }
+
+:root {
+  --font-sans: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --gutter: 16px;
+}
+@media (min-width: 720px) { :root { --gutter: 40px; } }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font: 400 16px/24px var(--font-sans); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 var(--gutter); }
+.mono { font-family: var(--font-mono); }
+h1, h2, h3, h4, p { margin: 0; }
+
+/* Header */
+.top { padding: 56px 0 40px; border-bottom: 1px solid var(--color-border-subtle); }
+.top .lockup { width: min(440px, 100%); height: auto; display: block; color: var(--color-text); }
+.top-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 28px; font: 500 12px/16px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); }
+.top-meta b { color: var(--color-signal); font-weight: 500; }
+.lede { max-width: 62ch; margin-top: 20px; font-size: 18px; line-height: 28px; color: var(--color-text-muted); }
+
+/* Sections */
+section { padding: 56px 0; border-bottom: 1px solid var(--color-border-subtle); }
+.sec-head { display: grid; gap: 8px; margin-bottom: 28px; max-width: 70ch; }
+.eyebrow { font: 500 12px/16px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-signal); }
+.sec-head h2 { font-size: 28px; line-height: 36px; font-weight: 600; letter-spacing: -0.015em; }
+.sec-head p { color: var(--color-text-muted); }
+.pair { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .pair { grid-template-columns: 1fr 1fr; } }
+.panel { border-radius: 14px; padding: 24px; border: 1px solid var(--color-border-subtle); min-width: 0; }
+.panel-label { font: 500 12px/16px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 20px; }
+
+/* Eye */
+.eye, .eye-g { fill: currentColor; }
+.pupil { fill: var(--color-signal); }
+.ping { fill: none; stroke: var(--color-signal); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: 0; }
+.pupil, .ping, .look { transform-box: fill-box; transform-origin: center; }
+.wm-text { font-family: var(--font-sans); font-weight: 600; fill: currentColor; }
+
+/* 01 mark */
+.mark-stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: center; }
+@media (min-width: 560px) { .mark-stage { grid-template-columns: minmax(0, 220px) minmax(0, 1fr); } }
+.mark-stage .eye { width: 100%; max-width: 220px; height: auto; display: block; }
+.sizes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; }
+.sizes figure { margin: 0; display: grid; justify-items: center; gap: 8px; }
+.sizes figcaption { font: 500 12px/16px var(--font-mono); color: var(--color-text-muted); }
+.px { image-rendering: pixelated; width: 64px; height: 64px; display: block; border-radius: 2px; }
+.anatomy { display: grid; gap: 12px; margin-top: 24px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .anatomy { grid-template-columns: repeat(4, 1fr); } }
+.anatomy div { border-top: 1px solid var(--color-border-subtle); padding-top: 12px; }
+.anatomy b { display: block; font-weight: 600; margin-bottom: 4px; }
+.anatomy p { color: var(--color-text-muted); font-size: 14px; line-height: 20px; }
+
+/* 02 wordmark + lockup */
+.logo-panel { display: grid; gap: 28px; }
+.logo-panel .lockup { width: min(360px, 100%); height: auto; display: block; }
+.logo-panel .wordmark { width: min(260px, 100%); height: auto; display: block; }
+.logo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; }
+.logo-panel .lockup.small-lockup { width: 132px; height: auto; display: block; }
+.tab { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 8px 8px 0 0; background: var(--color-surface-raised); border: 1px solid var(--color-border-subtle); border-bottom: 0; font-size: 12px; max-width: 100%; }
+.tab .eye { width: 16px; height: 16px; flex: none; }
+.tab .x { color: var(--color-text-muted); margin-left: 12px; }
+.app-icon { flex: none; width: 64px; height: 64px; border-radius: 14px; background: #0a1020; box-shadow: inset 0 0 0 1px #223050; color: #e6edf8; display: grid; place-items: center; --color-signal: #86d8ff; }
+.app-icon .eye { width: 44px; height: 44px; }
+.cap { font: 500 12px/16px var(--font-mono); color: var(--color-text-muted); }
+
+/* 03 motion */
+.motion-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .motion-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1100px) { .motion-grid { grid-template-columns: repeat(4, 1fr); } }
+.tile { border-radius: 14px; border: 1px solid var(--color-border-subtle); overflow: hidden; display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.tile-stage { display: grid; grid-template-columns: 1fr 1fr; }
+.tile-stage > div { display: grid; place-items: center; padding: 28px 12px; }
+.tile-stage .eye { width: 100%; max-width: 112px; height: auto; }
+.tile-text { padding: 16px 18px 20px; display: grid; gap: 8px; align-content: start; }
+.tile-text h3 { font-size: 18px; line-height: 26px; font-weight: 600; }
+.tile-text p { font-size: 14px; line-height: 20px; color: var(--color-text-muted); }
+.tile-text .spec { font: 400 12px/16px var(--font-mono); color: var(--color-text-muted); }
+
+.lock .lid-up { animation: lock-up 3s infinite; }
+.lock .lid-down { animation: lock-down 3s infinite; }
+.lock .pupil { animation: lock-tick 3s infinite; }
+@keyframes lock-up { 0%, 10% { transform: translateY(0); animation-timing-function: var(--ease-in-out); } 19%, 40% { transform: translateY(4px); animation-timing-function: var(--ease-out); } 52%, 100% { transform: translateY(0); } }
+@keyframes lock-down { 0%, 10% { transform: translateY(0); animation-timing-function: var(--ease-in-out); } 19%, 40% { transform: translateY(-4px); animation-timing-function: var(--ease-out); } 52%, 100% { transform: translateY(0); } }
+@keyframes lock-tick { 0%, 21% { transform: rotate(0) scale(1); animation-timing-function: var(--ease-out); } 27% { transform: rotate(60deg) scale(1.14); animation-timing-function: var(--ease-out); } 33%, 100% { transform: rotate(90deg) scale(1); } }
+
+.wake { animation: wake-fade 4.2s infinite; }
+.wake .lid-up { animation: wake-up 4.2s infinite; }
+.wake .lid-down { animation: wake-down 4.2s infinite; }
+.wake .pupil { animation: wake-pupil 4.2s infinite; }
+@keyframes wake-fade { 0%, 86% { opacity: 1; } 91%, 95% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes wake-up { 0%, 8% { transform: translateY(4px); animation-timing-function: var(--ease-out); } 21%, 92% { transform: translateY(0); } 93%, 100% { transform: translateY(4px); } }
+@keyframes wake-down { 0%, 8% { transform: translateY(-4px); animation-timing-function: var(--ease-out); } 21%, 92% { transform: translateY(0); } 93%, 100% { transform: translateY(-4px); } }
+@keyframes wake-pupil { 0%, 13% { opacity: 0; transform: rotate(-90deg) scale(0.5); animation-timing-function: var(--ease-out); } 23%, 92% { opacity: 1; transform: rotate(0) scale(1); } 93%, 100% { opacity: 0; transform: rotate(-90deg) scale(0.5); } }
+
+.idle .look { animation: idle-look 8s infinite var(--ease-in-out); }
+.idle .ping { animation: idle-ping 8s infinite; }
+@keyframes idle-look { 0%, 10% { transform: translateX(0); } 22%, 34% { transform: translateX(-4px); } 52%, 62% { transform: translateX(4px); } 76%, 100% { transform: translateX(0); } }
+@keyframes idle-ping { 0%, 78% { opacity: 0; transform: scale(1); } 79% { opacity: 0.7; transform: scale(1); animation-timing-function: var(--ease-out); } 99% { opacity: 0; transform: scale(2.8); } 100% { opacity: 0; transform: scale(1); } }
+
+.reduced { animation: rm-fade 3s infinite linear; }
+@keyframes rm-fade { 0% { opacity: 0; } 6.7%, 100% { opacity: 1; } }
+
+/* The header lockup wakes once on load. */
+.wake-once .lid-up { animation: once-up 560ms var(--ease-out) 200ms both; }
+.wake-once .lid-down { animation: once-down 560ms var(--ease-out) 200ms both; }
+.wake-once .look .pupil { animation: once-pupil 420ms var(--ease-out) 420ms both; }
+@keyframes once-up { from { transform: translateY(4px); } to { transform: translateY(0); } }
+@keyframes once-down { from { transform: translateY(-4px); } to { transform: translateY(0); } }
+@keyframes once-pupil { from { opacity: 0; transform: rotate(-90deg) scale(0.5); } to { opacity: 1; transform: rotate(0) scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lock *, .wake, .wake *, .idle *, .wake-once *, .reduced { animation: none !important; }
+}
+
+/* 04 palette */
+.sw-group { margin-bottom: 20px; }
+.sw-group h4 { font: 500 12px/16px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 8px; }
+.sw-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sw-group li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "chip name hex" "chip ratio ratio"; column-gap: 12px; align-items: center; }
+@media (min-width: 480px) { .sw-group li { grid-template-columns: 28px minmax(0, 1fr) 76px 108px; grid-template-areas: "chip name hex ratio"; } }
+.chip { grid-area: chip; width: 28px; height: 28px; border-radius: 6px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text) 18%, transparent); }
+.sw-name { grid-area: name; font-size: 14px; overflow-wrap: anywhere; }
+.sw-hex { grid-area: hex; font: 400 13px/20px var(--font-mono); }
+.sw-ratio { grid-area: ratio; font: 400 12px/16px var(--font-mono); color: var(--color-text-muted); }
+@media (min-width: 480px) { .sw-ratio { text-align: right; } }
+.callout { margin-top: 24px; border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 20px 24px; display: grid; gap: 16px; }
+@media (min-width: 900px) { .callout { grid-template-columns: 1fr 1fr 1fr; } }
+.callout h3 { font-size: 18px; line-height: 26px; }
+.callout p { font-size: 14px; line-height: 20px; color: var(--color-text-muted); margin-top: 4px; }
+.ice { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.ice span { font: 500 12px/16px var(--font-mono); padding: 6px 10px; border-radius: 4px; }
+
+/* 05 type */
+.type-list { display: grid; }
+.type-row { display: grid; grid-template-columns: 1fr; gap: 6px 24px; padding: 18px 0; border-top: 1px solid var(--color-border-subtle); }
+@media (min-width: 900px) { .type-row { grid-template-columns: 300px minmax(0, 1fr); align-items: start; } }
+.type-row .meta { padding-top: 4px; }
+.strip { display: grid; grid-template-columns: 6fr 2fr 1.4fr 0.6fr; height: 56px; border-radius: 8px; overflow: hidden; margin-bottom: 24px; box-shadow: inset 0 0 0 1px var(--color-border-subtle); }
+.strip span { display: block; }
+.ctx { display: grid; gap: 10px; }
+.ctx .h1 { font-size: 28px; line-height: 36px; }
+@media (min-width: 640px) { .ctx .h1 { font-size: 36px; line-height: 44px; } }
+.ctx-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.type-row .meta { font: 400 12px/16px var(--font-mono); color: var(--color-text-muted); display: grid; gap: 2px; }
+.type-row .meta b { font-weight: 600; color: var(--color-text); }
+.sample { min-width: 0; overflow-wrap: anywhere; }
+.display { font-size: 40px; line-height: 44px; font-weight: 600; letter-spacing: -0.03em; }
+@media (min-width: 640px) { .display { font-size: 56px; line-height: 60px; } }
+.h1 { font-size: 36px; line-height: 44px; font-weight: 600; letter-spacing: -0.02em; }
+.h2 { font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: -0.01em; }
+.h3 { font-size: 18px; line-height: 26px; font-weight: 600; letter-spacing: -0.005em; }
+.body-l { font-size: 18px; line-height: 28px; max-width: 60ch; }
+.body { font-size: 16px; line-height: 24px; max-width: 60ch; }
+.small { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.005em; color: var(--color-text-muted); }
+.eyebrow-s { font: 500 12px/16px var(--font-mono); letter-spacing: 0.12em; color: var(--color-signal); }
+.data { font: 400 14px/20px var(--font-mono); font-variant-numeric: tabular-nums; white-space: pre-wrap; }
+.data-s { font: 500 12px/16px var(--font-mono); letter-spacing: 0.02em; color: var(--color-text-muted); }
+
+/* 06 components */
+.cmp { border-radius: 14px; padding: 24px; display: grid; gap: 20px; border: 1px solid var(--color-border-subtle); min-width: 0; }
+.cmp-label { font: 500 12px/16px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); }
+.cmp-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.btn { font: 600 14px/20px var(--font-sans); letter-spacing: 0.005em; height: 40px; padding: 0 16px; border-radius: 4px; cursor: pointer; transition: transform 160ms var(--ease-out), background-color 160ms ease; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--color-signal); color: var(--color-on-signal); border: 0; }
+@media (hover: hover) and (pointer: fine) { .btn-primary:hover { background: var(--color-signal-strong); } .btn-secondary:hover { background: var(--color-surface-raised); } }
+.btn-secondary { background: transparent; color: var(--color-text); border: 1px solid var(--color-border); }
+.btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.fields { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 520px) { .fields { grid-template-columns: 1fr 1fr; } }
+.field { display: grid; align-content: start; gap: 6px; font-size: 14px; line-height: 20px; font-weight: 500; min-width: 0; }
+.field input { font: 400 16px/24px var(--font-sans); height: 40px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); width: 100%; min-width: 0; }
+.field input::placeholder { color: var(--color-text-muted); opacity: 1; }
+.field small { font: 400 12px/16px var(--font-mono); color: var(--color-text-muted); }
+.field.is-focus input, .field input:focus-visible { border-color: var(--color-signal); outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px; font: 600 13px/16px var(--font-sans); color: var(--c); background: color-mix(in srgb, var(--c) var(--tint), var(--color-surface)); white-space: nowrap; }
+.badge .bars { width: 14px; height: 12px; fill: currentColor; }
+.badge .bars .off { opacity: 0.28; }
+.badge .g { width: 12px; height: 12px; }
+.badge.status { font-weight: 500; }
+.card { background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: 8px; padding: 16px 18px; display: grid; gap: 10px; box-shadow: 0 1px 0 color-mix(in srgb, var(--color-text) 4%, transparent), 0 12px 24px -12px rgb(0 0 0 / 0.35); }
+.t-light .card { box-shadow: 0 1px 2px rgb(11 20 38 / 0.06), 0 12px 24px -12px rgb(11 20 38 / 0.18); }
+.card-top { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; }
+.card .id { font: 500 13px/20px var(--font-mono); color: var(--color-signal); }
+.card .ts { font: 500 12px/20px var(--font-mono); letter-spacing: 0.02em; color: var(--color-text-muted); }
+.card h3 { font-size: 18px; line-height: 26px; font-weight: 600; letter-spacing: -0.005em; }
+.card-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.who { font-size: 14px; line-height: 20px; color: var(--color-text-muted); }
+.who .mono { font-size: 13px; color: var(--color-text); }
+
+/* 07 contrast */
+details { border: 1px solid var(--color-border-subtle); border-radius: 14px; padding: 16px 20px; }
+summary { cursor: pointer; font-weight: 600; }
+summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 4px; border-radius: 4px; }
+.tables { display: grid; gap: 24px; margin-top: 16px; }
+@media (min-width: 1000px) { .tables { grid-template-columns: 1fr 1fr; } }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 400 12px/16px var(--font-mono); }
+caption { text-align: left; font: 600 14px/20px var(--font-sans); padding-bottom: 8px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--color-border-subtle); text-align: right; white-space: nowrap; }
+th[scope="row"], thead th:first-child { text-align: left; font-weight: 500; }
+td.ok::after { content: " \2713"; color: var(--color-status-resolved); }
+td.bad { color: var(--color-danger); font-weight: 600; }
+td.na { color: var(--color-text-muted); }
+footer { padding: 32px 0 56px; font: 400 12px/16px var(--font-mono); color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <svg class="lockup wake-once" viewBox="0 95 724 140" role="img" aria-label="SentinelOps"><g transform="translate(0 95) scale(2.1875)" class="eye-g"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></g><g transform="translate(164 0)"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></g></svg>
+  <div class="top-meta"><span>Brand board</span><span><b>Sign-off 2</b></span><span>Logo: C, Facet</span><span>2026-11-25</span></div>
+  <p class="lede">A watchtower at night: deep ink-blue, one ice-blue signal, sharp type and an eye that locks on. Everything below is shown in both themes. Nothing here ships yet; once approved, the values in section 04 go into the app.</p>
+</div></header>
+
+<main>
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">01 · The mark</span><h2>Facet, refined</h2><p>Your pick, kept as drawn: two chevron lids and a diamond pupil. The changes are about precision. Every horizontal edge now sits on the 16 px pixel grid, the slit between the lids is a little wider, and the pupil is a little larger, so the eye still reads at favicon size.</p></div>
+  <div class="pair">
+    <div class="panel t-dark"><p class="panel-label">Night watch</p>
+      <div class="mark-stage"><svg class="eye " viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg>
+        <div class="sizes">
+          <figure><svg class="eye" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>64</figcaption></figure>
+          <figure><svg class="eye" viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg class="eye" viewBox="0 0 64 64" width="20" height="20" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>20</figcaption></figure>
+          <figure><svg class="eye" viewBox="0 0 64 64" width="16" height="16" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>16</figcaption></figure>
+          <figure><img class="px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABBElEQVR4nLWQMarCQBRFr+2HhF/+yq8bULDRxkpjI3YuRSMKNgYUY+U+tFGsoqBL0KUkC9B3IxOSyQiCeKoXJve8O1P4+S3d8QHfE9i2jaU/lwkYuROEYShTHqPAcdpxmBLCMCVBcJSvLBkBAwxSYIICiihUJAKGGKaERFEEdziWCfBXC1iWJVO+TeGvWLkzSIHiGJzgumOUmx0Ua3Vc1h58f4G205LTJxRQlDTQqXb76E1XMgHXwwZ7byhTnrcEt8MWO28gU574Cq/q8Qr/tQbO61n8PqZrJg14aHoswrD+uFxCEgHhT3qbNGor5YqMQKG30bemMQqIakP0rWleCt7lY8EDZn6L9SAL2BYAAAAASUVORK5CYII=" width="64" height="64" alt="The mark rendered at 16 pixels, magnified four times"><figcaption>16 &times;4</figcaption></figure>
+        </div>
+      </div>
+    </div>
+    <div class="panel t-light"><p class="panel-label">Daylight watch</p>
+      <div class="mark-stage"><svg class="eye " viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg>
+        <div class="sizes">
+          <figure><svg class="eye" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>64</figcaption></figure>
+          <figure><svg class="eye" viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg class="eye" viewBox="0 0 64 64" width="20" height="20" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>20</figcaption></figure>
+          <figure><svg class="eye" viewBox="0 0 64 64" width="16" height="16" aria-hidden="true"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></svg><figcaption>16</figcaption></figure>
+          <figure><img class="px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABCElEQVR4nLWQPWoCURRGrwvIuIR02UCyggRisoEkqzCQlEmnlgrqJgQX4A9op5WuQBAbwUIFR8HCQu8ZecObNzMgiKe6w5vvvO++zG5/OMoV3E6w2fjy/fuvk0i1XJRs1tMpTqKg1ekFYSRAGMl77kW/okQEBAgiSAIBIoSGUECIMBLwvDupVUo6ieR//sT3tzrF22Tmi9WRIALD2+tzEG5N1jKcLqWQewgk7W5fT88gQBQ2cGmMZpJvjnUS+Xq8l9rHk05xLhJ8qqCeJmCFtHqsMNAVirpC2pphAw4RuY8FhN3H5RIIBcBPSOw2NuZW5IaIwOC2cW+1SRSAaQOE7VttUgWXcrXgBA/MvAmr10cxAAAAAElFTkSuQmCC" width="64" height="64" alt="The mark rendered at 16 pixels, magnified four times"><figcaption>16 &times;4</figcaption></figure>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="anatomy">
+    <div><b>Upper lid</b><p>A chevron, 10 units thick on a 64 grid. Its flat ends close the eye's outer corners.</p></div>
+    <div><b>Lower lid</b><p>The same chevron turned over: the point of a shield. The two lids are mirror images, so the mark is calm and balanced.</p></div>
+    <div><b>Pupil</b><p>A 16-unit diamond in the signal colour, the only colour in the mark. It is 4 px wide at 16 px.</p></div>
+    <div><b>Grid</b><p>Edges at y 28 and 36 land on whole pixels at 16 px, so the slit is two crisp pixels. Clear space: one pupil width on every side.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">02 · Wordmark and lockup</span><h2>SentinelOps, with the eye's pupil for a dot</h2><p>Space Grotesk 600, tracked in to -0.02em so the word holds together as one shape. The one custom touch: the dot of the i is the mark's ice-blue diamond. In the lockup the mark stands 1.5 times the cap height, with 0.32 em between mark and word.</p></div>
+  <div class="pair">
+    <div class="panel t-dark logo-panel"><p class="panel-label">Night watch</p>
+      <svg class="lockup " viewBox="0 95 724 140" role="img" aria-label="SentinelOps"><g transform="translate(0 95) scale(2.1875)" class="eye-g"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></g><g transform="translate(164 0)"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></g></svg>
+      <div class="logo-row"><svg class="wordmark" viewBox="0 118 562 108" role="img" aria-label="SentinelOps"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></svg><svg class="lockup small-lockup" viewBox="0 95 724 140" role="img" aria-label="SentinelOps"><g transform="translate(0 95) scale(2.1875)" class="eye-g"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></g><g transform="translate(164 0)"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></g></svg></div>
+      <div class="logo-row">
+        <span class="tab"><svg class="eye " viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg><span>SentinelOps</span><span class="x" aria-hidden="true">&times;</span></span>
+        <span class="cap">Browser tab, real 16 px</span>
+      </div>
+    </div>
+    <div class="panel t-light logo-panel"><p class="panel-label">Daylight watch</p>
+      <svg class="lockup " viewBox="0 95 724 140" role="img" aria-label="SentinelOps"><g transform="translate(0 95) scale(2.1875)" class="eye-g"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></g><g transform="translate(164 0)"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></g></svg>
+      <div class="logo-row"><svg class="wordmark" viewBox="0 118 562 108" role="img" aria-label="SentinelOps"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></svg><svg class="lockup small-lockup" viewBox="0 95 724 140" role="img" aria-label="SentinelOps"><g transform="translate(0 95) scale(2.1875)" class="eye-g"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></g><g transform="translate(164 0)"><text x="0" y="200" font-size="100" letter-spacing="-2" class="wm-text">SentınelOps</text><path class="pupil" d="M229.4 125.5L238.9 135L229.4 144.5L219.9 135Z"/></g></svg></div>
+      <div class="logo-row">
+        <span class="tab"><svg class="eye " viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg><span>SentinelOps</span><span class="x" aria-hidden="true">&times;</span></span>
+        <span class="cap">Browser tab, real 16 px</span>
+      </div>
+    </div>
+  </div>
+  <div class="logo-row" style="margin-top:20px"><span class="app-icon"><svg class="eye " viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></span><p class="cap">App icon (home screen, 192 / 512, apple-touch): the mark on a night tile, because the icon's background is unknown.</p></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">03 · The eye in motion</span><h2>Lock, wake, and a quiet scan</h2><p>Transform and opacity only. Loops here so you can watch them; in the app each plays once, at the moment named. If your device asks for reduced motion, this page shows them still.</p></div>
+  <div class="motion-grid">
+    <div class="tile">
+      <div class="tile-stage"><div class="t-dark"><svg class="eye lock" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div><div class="t-light"><svg class="eye lock" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div></div>
+      <div class="tile-text"><h3>Lock</h3><p>The lids close onto the pupil like a shutter, the diamond ticks a quarter turn, the lids part. Says "secured": after sign-in succeeds, when a session is verified.</p><p class="spec">Close 270 ms ease-in-out · tick 360 ms ease-out · open 360 ms ease-out</p></div>
+    </div>
+    <div class="tile">
+      <div class="tile-stage"><div class="t-dark"><svg class="eye wake" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div><div class="t-light"><svg class="eye wake" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div></div>
+      <div class="tile-text"><h3>Wake</h3><p>The eye starts shut, the lids part and the pupil ignites, turning into place. The sign-in moment, once on load.</p><p class="spec">Part 560 ms ease-out · pupil 420 ms ease-out, 220 ms after</p></div>
+    </div>
+    <div class="tile">
+      <div class="tile-stage"><div class="t-dark"><svg class="eye idle" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div><div class="t-light"><svg class="eye idle" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div></div>
+      <div class="tile-text"><h3>Idle scan</h3><p>The pupil checks left and right, then sends one quiet ping. Landing hero only, never on working screens.</p><p class="spec">8 s loop · glide ease-in-out · ping 1.6 s ease-out</p></div>
+    </div>
+    <div class="tile">
+      <div class="tile-stage"><div class="t-dark"><svg class="eye reduced" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div><div class="t-light"><svg class="eye reduced" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="ping" d="M32 24L40 32L32 40L24 32Z"/><g class="lid lid-up"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/></g><g class="lid lid-down"><path d="M2 36H20L32 44L44 36H62L32 56Z"/></g><g class="look"><path class="pupil" d="M32 24L40 32L32 40L24 32Z"/></g></svg></div></div>
+      <div class="tile-text"><h3>Reduced motion</h3><p>With reduce motion on: no travel, no turn. Lock and wake become a 200 ms fade; the idle scan does not run.</p><p class="spec">200 ms linear opacity, or nothing</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">04 · Palette</span><h2>Night watch and daylight watch</h2><p>Deep ink-blue at night, not black. A crisp, cool daylight theme. One signal colour, ice blue, which never means danger: severity and status keep their own scales. Ratios are the worst case across bg, surface and raised.</p></div>
+  <div class="pair">
+    <div class="panel t-dark"><p class="panel-label">Night watch (dark)</p><div class="strip" aria-hidden="true"><span style="background:var(--color-bg)"></span><span style="background:var(--color-surface)"></span><span style="background:var(--color-surface-raised)"></span><span style="background:var(--color-signal)"></span></div><div class="sw-group"><h4>Surfaces</h4><ul><li><span class="chip" style="background:#0a1020"></span><span class="sw-name">bg</span><span class="sw-hex">#0a1020</span><span class="sw-ratio"></span></li><li><span class="chip" style="background:#0f1729"></span><span class="sw-name">surface</span><span class="sw-hex">#0f1729</span><span class="sw-ratio"></span></li><li><span class="chip" style="background:#162139"></span><span class="sw-name">surface-raised</span><span class="sw-hex">#162139</span><span class="sw-ratio"></span></li><li><span class="chip" style="background:#5f75a0"></span><span class="sw-name">border</span><span class="sw-hex">#5f75a0</span><span class="sw-ratio">3.5:1</span></li><li><span class="chip" style="background:#223050"></span><span class="sw-name">border-subtle</span><span class="sw-hex">#223050</span><span class="sw-ratio">decorative</span></li></ul></div><div class="sw-group"><h4>Text</h4><ul><li><span class="chip" style="background:#e6edf8"></span><span class="sw-name">text</span><span class="sw-hex">#e6edf8</span><span class="sw-ratio">13.6:1</span></li><li><span class="chip" style="background:#9eafcb"></span><span class="sw-name">text-muted</span><span class="sw-hex">#9eafcb</span><span class="sw-ratio">7.2:1</span></li></ul></div><div class="sw-group"><h4>Signal</h4><ul><li><span class="chip" style="background:#86d8ff"></span><span class="sw-name">signal</span><span class="sw-hex">#86d8ff</span><span class="sw-ratio">10.1:1</span></li><li><span class="chip" style="background:#c4ecff"></span><span class="sw-name">signal-strong</span><span class="sw-hex">#c4ecff</span><span class="sw-ratio">12.8:1</span></li><li><span class="chip" style="background:#04121f"></span><span class="sw-name">on-signal</span><span class="sw-hex">#04121f</span><span class="sw-ratio">11.9:1 on signal</span></li><li><span class="chip" style="background:#c4ecff"></span><span class="sw-name">focus</span><span class="sw-hex">#c4ecff</span><span class="sw-ratio">12.8:1</span></li></ul></div><div class="sw-group"><h4>Severity</h4><ul><li><span class="chip" style="background:#ff7070"></span><span class="sw-name">sev-critical</span><span class="sw-hex">#ff7070</span><span class="sw-ratio">6.0:1</span></li><li><span class="chip" style="background:#ffa24d"></span><span class="sw-name">sev-high</span><span class="sw-hex">#ffa24d</span><span class="sw-ratio">8.0:1</span></li><li><span class="chip" style="background:#f2c94c"></span><span class="sw-name">sev-medium</span><span class="sw-hex">#f2c94c</span><span class="sw-ratio">10.1:1</span></li><li><span class="chip" style="background:#a7b6cf"></span><span class="sw-name">sev-low</span><span class="sw-hex">#a7b6cf</span><span class="sw-ratio">7.8:1</span></li></ul></div><div class="sw-group"><h4>Status</h4><ul><li><span class="chip" style="background:#86d8ff"></span><span class="sw-name">status-open</span><span class="sw-hex">#86d8ff</span><span class="sw-ratio">10.1:1</span></li><li><span class="chip" style="background:#c3b1ff"></span><span class="sw-name">status-investigating</span><span class="sw-hex">#c3b1ff</span><span class="sw-ratio">8.4:1</span></li><li><span class="chip" style="background:#6fe3a2"></span><span class="sw-name">status-resolved</span><span class="sw-hex">#6fe3a2</span><span class="sw-ratio">10.1:1</span></li><li><span class="chip" style="background:#8d9bb4"></span><span class="sw-name">status-closed</span><span class="sw-hex">#8d9bb4</span><span class="sw-ratio">5.7:1</span></li></ul></div><div class="sw-group"><h4>Danger</h4><ul><li><span class="chip" style="background:#ff8f8f"></span><span class="sw-name">danger</span><span class="sw-hex">#ff8f8f</span><span class="sw-ratio">7.3:1</span></li></ul></div></div>
+    <div class="panel t-light"><p class="panel-label">Daylight watch (light)</p><div class="strip" aria-hidden="true"><span style="background:var(--color-bg)"></span><span style="background:var(--color-surface)"></span><span style="background:var(--color-surface-raised)"></span><span style="background:var(--color-signal)"></span></div><div class="sw-group"><h4>Surfaces</h4><ul><li><span class="chip" style="background:#f4f7fb"></span><span class="sw-name">bg</span><span class="sw-hex">#f4f7fb</span><span class="sw-ratio"></span></li><li><span class="chip" style="background:#ffffff"></span><span class="sw-name">surface</span><span class="sw-hex">#ffffff</span><span class="sw-ratio"></span></li><li><span class="chip" style="background:#ffffff"></span><span class="sw-name">surface-raised</span><span class="sw-hex">#ffffff</span><span class="sw-ratio"></span></li><li><span class="chip" style="background:#7486a4"></span><span class="sw-name">border</span><span class="sw-hex">#7486a4</span><span class="sw-ratio">3.4:1</span></li><li><span class="chip" style="background:#d9e1ec"></span><span class="sw-name">border-subtle</span><span class="sw-hex">#d9e1ec</span><span class="sw-ratio">decorative</span></li></ul></div><div class="sw-group"><h4>Text</h4><ul><li><span class="chip" style="background:#0b1426"></span><span class="sw-name">text</span><span class="sw-hex">#0b1426</span><span class="sw-ratio">17.1:1</span></li><li><span class="chip" style="background:#46546d"></span><span class="sw-name">text-muted</span><span class="sw-hex">#46546d</span><span class="sw-ratio">7.1:1</span></li></ul></div><div class="sw-group"><h4>Signal</h4><ul><li><span class="chip" style="background:#0a6ea8"></span><span class="sw-name">signal</span><span class="sw-hex">#0a6ea8</span><span class="sw-ratio">5.1:1</span></li><li><span class="chip" style="background:#06547f"></span><span class="sw-name">signal-strong</span><span class="sw-hex">#06547f</span><span class="sw-ratio">7.6:1</span></li><li><span class="chip" style="background:#ffffff"></span><span class="sw-name">on-signal</span><span class="sw-hex">#ffffff</span><span class="sw-ratio">5.5:1 on signal</span></li><li><span class="chip" style="background:#06547f"></span><span class="sw-name">focus</span><span class="sw-hex">#06547f</span><span class="sw-ratio">7.6:1</span></li></ul></div><div class="sw-group"><h4>Severity</h4><ul><li><span class="chip" style="background:#b82525"></span><span class="sw-name">sev-critical</span><span class="sw-hex">#b82525</span><span class="sw-ratio">5.9:1</span></li><li><span class="chip" style="background:#a34a0b"></span><span class="sw-name">sev-high</span><span class="sw-hex">#a34a0b</span><span class="sw-ratio">5.5:1</span></li><li><span class="chip" style="background:#7d5800"></span><span class="sw-name">sev-medium</span><span class="sw-hex">#7d5800</span><span class="sw-ratio">6.0:1</span></li><li><span class="chip" style="background:#52607a"></span><span class="sw-name">sev-low</span><span class="sw-hex">#52607a</span><span class="sw-ratio">5.9:1</span></li></ul></div><div class="sw-group"><h4>Status</h4><ul><li><span class="chip" style="background:#0a6ea8"></span><span class="sw-name">status-open</span><span class="sw-hex">#0a6ea8</span><span class="sw-ratio">5.1:1</span></li><li><span class="chip" style="background:#6a48c9"></span><span class="sw-name">status-investigating</span><span class="sw-hex">#6a48c9</span><span class="sw-ratio">5.8:1</span></li><li><span class="chip" style="background:#17703f"></span><span class="sw-name">status-resolved</span><span class="sw-hex">#17703f</span><span class="sw-ratio">5.7:1</span></li><li><span class="chip" style="background:#5d6a80"></span><span class="sw-name">status-closed</span><span class="sw-hex">#5d6a80</span><span class="sw-ratio">5.1:1</span></li></ul></div><div class="sw-group"><h4>Danger</h4><ul><li><span class="chip" style="background:#b42318"></span><span class="sw-name">danger</span><span class="sw-hex">#b42318</span><span class="sw-ratio">6.1:1</span></li></ul></div></div>
+  </div>
+  <div class="callout">
+    <div><h3>The signal problem</h3><p>The exploration found that the icy <span class="mono">#7dd3fc</span> is only 1.57:1 on the light background, while <span class="mono">#1596d6</span> clears both but looks dull at night.</p></div>
+    <div><h3>The answer: one hue, two depths</h3><p>Ice blue at hue 199 to 202, light on dark and deep on light. Night: <span class="mono">#86d8ff</span>, 12.0:1. Day: <span class="mono">#0a6ea8</span>, 5.1:1. Both are safe for text, not just for shapes.</p>
+      <div class="ice"><span class="t-dark" style="color:var(--color-signal)">#86d8ff on night</span><span class="t-light" style="color:var(--color-signal)">#0a6ea8 on day</span></div></div>
+    <div><h3>Where there is no theme</h3><p>A standalone logo file or an unknown background uses <span class="mono">#1596d6</span>, which clears 3:1 on both (5.7 and 3.1). The favicon picks the right depth from the system theme.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">05 · Type</span><h2>Sharp grotesk, honest mono</h2><p>Space Grotesk for headings and interface. JetBrains Mono wherever a value must be read exactly: IDs, timestamps, counts. Nothing smaller than 12 px, and 12 px only in mono.</p></div>
+  <div class="panel t-dark"><p class="panel-label">Scale</p><div class="type-list">
+      <div class="type-row"><div class="meta"><b>Display</b><span>Space Grotesk 600 · 56/60 (40/44 under 640 px) · -0.03em</span><span>Landing hero only</span></div><div class="sample display">Something is always watching.</div></div>
+      <div class="type-row"><div class="meta"><b>H1</b><span>Space Grotesk 600 · 36/44 · -0.02em</span><span>Page titles</span></div><div class="sample h1">Incidents</div></div>
+      <div class="type-row"><div class="meta"><b>H2</b><span>Space Grotesk 600 · 24/32 · -0.01em</span><span>Section titles</span></div><div class="sample h2">Needs attention</div></div>
+      <div class="type-row"><div class="meta"><b>H3</b><span>Space Grotesk 600 · 18/26 · -0.005em</span><span>Card and dialog titles</span></div><div class="sample h3">Elevated 5xx on the invoices API after the 14:02 deploy</div></div>
+      <div class="type-row"><div class="meta"><b>Body L</b><span>Space Grotesk 400 · 18/28 · 0</span><span>Landing copy</span></div><div class="sample body-l">Report, triage and resolve incidents in one place, with every change written to a tamper-evident audit log.</div></div>
+      <div class="type-row"><div class="meta"><b>Body</b><span>Space Grotesk 400 · 16/24 · 0</span><span>Interface text</span></div><div class="sample body">Rollback started at 14:09. Error rate is back under 0.1% on two of three regions.</div></div>
+      <div class="type-row"><div class="meta"><b>Small</b><span>Space Grotesk 500 · 14/20 · 0.005em</span><span>Labels, buttons, help</span></div><div class="sample small">Assigned to m.santos · Last updated 4 minutes ago</div></div>
+      <div class="type-row"><div class="meta"><b>Eyebrow</b><span>JetBrains Mono 500 · 12/16 · 0.12em · uppercase</span><span>Section labels</span></div><div class="sample eyebrow-s">AUDIT LOG · ANCHORED 6 H AGO</div></div>
+      <div class="type-row"><div class="meta"><b>Data</b><span>JetBrains Mono 400 · 14/20 · 0 · tabular</span><span>IDs, counts, figures</span></div><div class="sample data">INC-0142   3 open   1 critical   p95 412 ms</div></div>
+      <div class="type-row"><div class="meta"><b>Data S</b><span>JetBrains Mono 500 · 12/16 · 0.02em</span><span>Timestamps</span></div><div class="sample data-s">2026-11-25 14:07:33 UTC</div></div>
+  </div></div>
+  <div class="pair" style="margin-top:16px">
+    <div class="panel t-dark ctx"><p class="panel-label">In context · night watch</p>
+      <span class="eyebrow-s">INCIDENT · INC-0142</span>
+      <h3 class="h1">Elevated 5xx on the invoices API after the 14:02 deploy</h3>
+      <div class="ctx-meta"><span class="badge sev" style="--c: var(--color-sev-critical)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" /></svg>Critical</span><span class="badge status" style="--c: var(--color-status-investigating)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 2a4 4 0 0 1 0 8Z" fill="currentColor"/></svg>Investigating</span><time class="data-s">2026-11-25 14:07:33 UTC</time><span class="data">3 updates</span></div>
+      <p class="body">Rollback started at 14:09. Error rate is back under 0.1% on two of three regions.</p>
+    </div>
+    <div class="panel t-light ctx"><p class="panel-label">In context · daylight watch</p>
+      <span class="eyebrow-s">INCIDENT · INC-0142</span>
+      <h3 class="h1">Elevated 5xx on the invoices API after the 14:02 deploy</h3>
+      <div class="ctx-meta"><span class="badge sev" style="--c: var(--color-sev-critical)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" /></svg>Critical</span><span class="badge status" style="--c: var(--color-status-investigating)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 2a4 4 0 0 1 0 8Z" fill="currentColor"/></svg>Investigating</span><time class="data-s">2026-11-25 14:07:33 UTC</time><span class="data">3 updates</span></div>
+      <p class="body">Rollback started at 14:09. Error rate is back under 0.1% on two of three regions.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">06 · Components</span><h2>The system at work</h2><p>Radii stay small (4 px on controls, 8 px on cards) to echo the mark's sharp angles. Severity reads by bars as well as colour; status by a glyph. Colour is never the only cue.</p></div>
+  <div class="pair"><div class="cmp t-dark">
+  <p class="cmp-label">Night watch</p>
+  <div class="cmp-row"><button class="btn btn-primary" type="button">Sign in</button><button class="btn btn-secondary" type="button">Have an invite?</button></div>
+  <div class="fields">
+    <label class="field"><span>Email</span><input type="email" placeholder="name@example.com" tabindex="-1"></label>
+    <label class="field is-focus"><span>Password</span><input type="password" value="watchtower-at-night" tabindex="-1"><small>Focused: 2 px ring, 2 px offset</small></label>
+  </div>
+  <div class="cmp-row"><span class="badge sev" style="--c: var(--color-sev-critical)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" /></svg>Critical</span><span class="badge sev" style="--c: var(--color-sev-high)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" class="off"/></svg>High</span><span class="badge sev" style="--c: var(--color-sev-medium)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" class="off"/><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" class="off"/></svg>Medium</span><span class="badge sev" style="--c: var(--color-sev-low)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" class="off"/><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" class="off"/><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" class="off"/></svg>Low</span></div>
+  <div class="cmp-row"><span class="badge status" style="--c: var(--color-status-open)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Open</span><span class="badge status" style="--c: var(--color-status-investigating)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 2a4 4 0 0 1 0 8Z" fill="currentColor"/></svg>Investigating</span><span class="badge status" style="--c: var(--color-status-resolved)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 6.3 4.8 8.8 9.8 3.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Resolved</span><span class="badge status" style="--c: var(--color-status-closed)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="currentColor"/></svg>Closed</span></div>
+  <article class="card">
+    <div class="card-top"><span class="mono id">INC-0142</span><time class="mono ts">2026-11-25 14:07:33 UTC</time></div>
+    <h3>Elevated 5xx on the invoices API after the 14:02 deploy</h3>
+    <div class="card-meta"><span class="badge sev" style="--c: var(--color-sev-critical)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" /></svg>Critical</span><span class="badge status" style="--c: var(--color-status-investigating)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 2a4 4 0 0 1 0 8Z" fill="currentColor"/></svg>Investigating</span><span class="who">Assigned to <span class="mono">m.santos</span></span></div>
+  </article>
+</div><div class="cmp t-light">
+  <p class="cmp-label">Daylight watch</p>
+  <div class="cmp-row"><button class="btn btn-primary" type="button">Sign in</button><button class="btn btn-secondary" type="button">Have an invite?</button></div>
+  <div class="fields">
+    <label class="field"><span>Email</span><input type="email" placeholder="name@example.com" tabindex="-1"></label>
+    <label class="field is-focus"><span>Password</span><input type="password" value="watchtower-at-night" tabindex="-1"><small>Focused: 2 px ring, 2 px offset</small></label>
+  </div>
+  <div class="cmp-row"><span class="badge sev" style="--c: var(--color-sev-critical)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" /></svg>Critical</span><span class="badge sev" style="--c: var(--color-sev-high)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" class="off"/></svg>High</span><span class="badge sev" style="--c: var(--color-sev-medium)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" class="off"/><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" class="off"/></svg>Medium</span><span class="badge sev" style="--c: var(--color-sev-low)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" class="off"/><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" class="off"/><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" class="off"/></svg>Low</span></div>
+  <div class="cmp-row"><span class="badge status" style="--c: var(--color-status-open)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Open</span><span class="badge status" style="--c: var(--color-status-investigating)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 2a4 4 0 0 1 0 8Z" fill="currentColor"/></svg>Investigating</span><span class="badge status" style="--c: var(--color-status-resolved)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 6.3 4.8 8.8 9.8 3.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Resolved</span><span class="badge status" style="--c: var(--color-status-closed)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.2" fill="currentColor"/></svg>Closed</span></div>
+  <article class="card">
+    <div class="card-top"><span class="mono id">INC-0142</span><time class="mono ts">2026-11-25 14:07:33 UTC</time></div>
+    <h3>Elevated 5xx on the invoices API after the 14:02 deploy</h3>
+    <div class="card-meta"><span class="badge sev" style="--c: var(--color-sev-critical)"><svg class="bars" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="9" width="2.4" height="3" rx="0.6" /><rect x="3.6" y="6" width="2.4" height="6" rx="0.6" /><rect x="7.2" y="3" width="2.4" height="9" rx="0.6" /><rect x="10.8" y="0" width="2.4" height="12" rx="0.6" /></svg>Critical</span><span class="badge status" style="--c: var(--color-status-investigating)"><svg class="g" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 2a4 4 0 0 1 0 8Z" fill="currentColor"/></svg>Investigating</span><span class="who">Assigned to <span class="mono">m.santos</span></span></div>
+  </article>
+</div></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="sec-head"><span class="eyebrow">07 · Contrast</span><h2>Every pair, checked</h2><p>WCAG 2.1: text at least 4.5:1, interface parts at least 3:1. Badge tint is the badge text on its own tinted background (16% at night, 10% by day, over surface). <span class="mono">border-subtle</span> is decorative and never the only edge of a control.</p></div>
+  <details open><summary>Contrast tables, both themes</summary>
+    <div class="tables"><div class="scroll"><table><caption>Night watch (dark)</caption><thead><tr><th scope="col">Foreground</th><th scope="col">bg</th><th scope="col">surface</th><th scope="col">raised</th><th scope="col">badge tint</th><th scope="col">needs</th></tr></thead><tbody><tr><th scope="row">text</th><td class="ok">16.10</td><td class="ok">15.18</td><td class="ok">13.61</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">text-muted</th><td class="ok">8.53</td><td class="ok">8.04</td><td class="ok">7.21</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">signal</th><td class="ok">11.99</td><td class="ok">11.30</td><td class="ok">10.13</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">signal-strong</th><td class="ok">15.15</td><td class="ok">14.29</td><td class="ok">12.81</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">danger</th><td class="ok">8.65</td><td class="ok">8.15</td><td class="ok">7.31</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">border</th><td class="ok">4.10</td><td class="ok">3.86</td><td class="ok">3.46</td><td class="na">&ndash;</td><td>3</td></tr><tr><th scope="row">focus</th><td class="ok">15.15</td><td class="ok">14.29</td><td class="ok">12.81</td><td class="na">&ndash;</td><td>3</td></tr><tr><th scope="row">sev-critical</th><td class="ok">7.04</td><td class="ok">6.64</td><td class="ok">5.95</td><td class="ok">5.32</td><td>4.5</td></tr><tr><th scope="row">sev-high</th><td class="ok">9.50</td><td class="ok">8.96</td><td class="ok">8.03</td><td class="ok">6.71</td><td>4.5</td></tr><tr><th scope="row">sev-medium</th><td class="ok">11.95</td><td class="ok">11.26</td><td class="ok">10.10</td><td class="ok">8.00</td><td>4.5</td></tr><tr><th scope="row">sev-low</th><td class="ok">9.24</td><td class="ok">8.71</td><td class="ok">7.81</td><td class="ok">6.43</td><td>4.5</td></tr><tr><th scope="row">status-open</th><td class="ok">11.99</td><td class="ok">11.30</td><td class="ok">10.13</td><td class="ok">7.82</td><td>4.5</td></tr><tr><th scope="row">status-investigating</th><td class="ok">9.98</td><td class="ok">9.41</td><td class="ok">8.43</td><td class="ok">6.78</td><td>4.5</td></tr><tr><th scope="row">status-resolved</th><td class="ok">11.90</td><td class="ok">11.22</td><td class="ok">10.06</td><td class="ok">7.82</td><td>4.5</td></tr><tr><th scope="row">status-closed</th><td class="ok">6.75</td><td class="ok">6.37</td><td class="ok">5.71</td><td class="ok">4.98</td><td>4.5</td></tr><tr><th scope="row">on-signal / signal</th><td colspan="3" class="ok">11.95 (button text)</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">on-signal / signal-strong</th><td colspan="3" class="ok">15.11 (hover)</td><td class="na">&ndash;</td><td>4.5</td></tr></tbody></table></div><div class="scroll"><table><caption>Daylight watch (light)</caption><thead><tr><th scope="col">Foreground</th><th scope="col">bg</th><th scope="col">surface</th><th scope="col">raised</th><th scope="col">badge tint</th><th scope="col">needs</th></tr></thead><tbody><tr><th scope="row">text</th><td class="ok">17.11</td><td class="ok">18.38</td><td class="ok">18.38</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">text-muted</th><td class="ok">7.11</td><td class="ok">7.64</td><td class="ok">7.64</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">signal</th><td class="ok">5.13</td><td class="ok">5.51</td><td class="ok">5.51</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">signal-strong</th><td class="ok">7.57</td><td class="ok">8.13</td><td class="ok">8.13</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">danger</th><td class="ok">6.12</td><td class="ok">6.57</td><td class="ok">6.57</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">border</th><td class="ok">3.44</td><td class="ok">3.69</td><td class="ok">3.69</td><td class="na">&ndash;</td><td>3</td></tr><tr><th scope="row">focus</th><td class="ok">7.57</td><td class="ok">8.13</td><td class="ok">8.13</td><td class="na">&ndash;</td><td>3</td></tr><tr><th scope="row">sev-critical</th><td class="ok">5.87</td><td class="ok">6.31</td><td class="ok">6.31</td><td class="ok">5.35</td><td>4.5</td></tr><tr><th scope="row">sev-high</th><td class="ok">5.52</td><td class="ok">5.93</td><td class="ok">5.93</td><td class="ok">5.13</td><td>4.5</td></tr><tr><th scope="row">sev-medium</th><td class="ok">5.98</td><td class="ok">6.43</td><td class="ok">6.43</td><td class="ok">5.55</td><td>4.5</td></tr><tr><th scope="row">sev-low</th><td class="ok">5.90</td><td class="ok">6.34</td><td class="ok">6.34</td><td class="ok">5.51</td><td>4.5</td></tr><tr><th scope="row">status-open</th><td class="ok">5.13</td><td class="ok">5.51</td><td class="ok">5.51</td><td class="ok">4.81</td><td>4.5</td></tr><tr><th scope="row">status-investigating</th><td class="ok">5.78</td><td class="ok">6.21</td><td class="ok">6.21</td><td class="ok">5.38</td><td>4.5</td></tr><tr><th scope="row">status-resolved</th><td class="ok">5.70</td><td class="ok">6.13</td><td class="ok">6.13</td><td class="ok">5.32</td><td>4.5</td></tr><tr><th scope="row">status-closed</th><td class="ok">5.09</td><td class="ok">5.47</td><td class="ok">5.47</td><td class="ok">4.80</td><td>4.5</td></tr><tr><th scope="row">on-signal / signal</th><td colspan="3" class="ok">5.51 (button text)</td><td class="na">&ndash;</td><td>4.5</td></tr><tr><th scope="row">on-signal / signal-strong</th><td colspan="3" class="ok">8.13 (hover)</td><td class="na">&ndash;</td><td>4.5</td></tr></tbody></table></div></div>
+  </details>
+</div></section>
+</main>
+<footer><div class="wrap">SentinelOps brand board · for sign-off 2 · proposed values in docs/brand/board/proposed-tokens.md</div></footer>
+</body>
+</html>

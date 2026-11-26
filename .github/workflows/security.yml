@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, redesign]
   schedule:
     - cron: "0 3 * * 1"   # Mondays 03:00 UTC
   workflow_dispatch:      # run by hand from the Actions tab

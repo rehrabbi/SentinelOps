@@ -1,0 +1,82 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, getIncidents, getMe, login, logout, onSessionExpired } from './api'
+
+// Every call goes through fetch, so a stub stands in for the API: each test says what the next
+// response is, and the session-expiry handler records whether it ran.
+
+function respond(status: number, body?: unknown): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(body === undefined ? null : JSON.stringify(body), { status })),
+  )
+}
+
+const expired = vi.fn()
+let unsubscribe = () => {}
+
+beforeEach(() => {
+  expired.mockClear()
+  unsubscribe = onSessionExpired(expired)
+})
+
+afterEach(() => {
+  unsubscribe()
+  vi.unstubAllGlobals()
+})
+
+describe('onSessionExpired', () => {
+  it('runs its handler on a 401 from getIncidents, and the call still fails', async () => {
+    respond(401)
+    await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
+    expect(expired).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not run on a 401 from login (that is a wrong password, not an ended session)', async () => {
+    respond(401)
+    await expect(login('m.santos@example.com', 'wrong')).rejects.toThrow('Invalid email or password')
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('does not run on a 401 from getMe (that only means nobody is signed in)', async () => {
+    respond(401)
+    await expect(getMe()).resolves.toBeNull()
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('does not run on a 401 from logout (the session is already gone, as asked)', async () => {
+    respond(401)
+    await expect(logout()).rejects.toBeInstanceOf(ApiError)
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  // The client reports every 401; making several into one sign-out is App's job (SignIn.test.tsx).
+  it('runs once per 401 when two requests fail together', async () => {
+    respond(401)
+    await Promise.allSettled([getIncidents(), getIncidents()])
+    expect(expired).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not run on other failures, such as a 403', async () => {
+    respond(403)
+    await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('stops running once unsubscribed', async () => {
+    unsubscribe()
+    respond(401)
+    await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
+    expect(expired).not.toHaveBeenCalled()
+  })
+
+  it('unsubscribing an old handler leaves a newer one in place', async () => {
+    const newer = vi.fn()
+    const unsubscribeNewer = onSessionExpired(newer)
+    unsubscribe()
+    respond(401)
+    await expect(getIncidents()).rejects.toBeInstanceOf(ApiError)
+    expect(newer).toHaveBeenCalledTimes(1)
+    expect(expired).not.toHaveBeenCalled()
+    unsubscribeNewer()
+  })
+})

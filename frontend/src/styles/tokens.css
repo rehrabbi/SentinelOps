@@ -1,0 +1,129 @@
+/*
+ * Design tokens, from the approved brand board (docs/brand/board/, docs/brand.md).
+ * Names are stable; change values here only.
+ *
+ * Theme selection (no inline script, so no flash under the CSP):
+ *   - <html> without data-theme  -> follows prefers-color-scheme (dark by default)
+ *   - data-theme="dark"|"light"  -> explicit choice, set by main.tsx before first render
+ *
+ * Contrast (computed, tables in docs/brand.md): text >= 4.5:1 and UI parts >= 3:1 on --color-bg,
+ * --color-surface and --color-surface-raised in both themes.
+ * --color-border-subtle is the exception on purpose: decorative hairlines (card edges, dividers)
+ * only, never the only visible edge of a control. Control edges use --color-border (>= 3:1).
+ */
+
+/* Theme-independent tokens. */
+:root {
+  --font-sans: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+
+  /* Stacking order, lowest to highest. Use these, never a bare number. */
+  --z-header: 10;
+  --z-menu: 20;
+  --z-toast: 30;
+}
+
+/* Dark: the default, and what an explicit dark choice gives. */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #0a1020;
+  --color-surface: #0f1729;
+  --color-surface-raised: #162139;
+  --color-border: #5f75a0;
+  --color-border-subtle: #223050;
+  --color-text: #e6edf8;
+  --color-text-muted: #9eafcb;
+  --color-signal: #86d8ff;
+  --color-signal-strong: #c4ecff;
+  --color-on-signal: #04121f;
+  --color-danger: #ff8f8f;
+  --color-sev-critical: #ff7070;
+  --color-sev-high: #ffa24d;
+  --color-sev-medium: #f2c94c;
+  --color-sev-low: #a7b6cf;
+  --color-status-open: #86d8ff;
+  --color-status-investigating: #c3b1ff;
+  --color-status-resolved: #6fe3a2;
+  --color-status-closed: #8d9bb4;
+  --color-focus: var(--color-signal-strong);
+  --shadow-raised: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -2px rgb(0 0 0 / 0.3);
+  /* How much of a severity or status colour tints its badge over the surface. */
+  --tint-badge: 16%;
+  --shadow-card: 0 1px 0 color-mix(in srgb, var(--color-text) 4%, transparent), 0 12px 24px -12px rgb(0 0 0 / 0.35);
+}
+
+/* Light, when the system asks for it and no explicit choice is set. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --color-bg: #f4f7fb;
+    --color-surface: #ffffff;
+    --color-surface-raised: #ffffff;
+    --color-border: #7486a4;
+    --color-border-subtle: #d9e1ec;
+    --color-text: #0b1426;
+    --color-text-muted: #46546d;
+    --color-signal: #0a6ea8;
+    --color-signal-strong: #06547f;
+    --color-on-signal: #ffffff;
+    --color-danger: #b42318;
+    --color-sev-critical: #b82525;
+    --color-sev-high: #a34a0b;
+    --color-sev-medium: #7d5800;
+    --color-sev-low: #52607a;
+    --color-status-open: #0a6ea8;
+    --color-status-investigating: #6a48c9;
+    --color-status-resolved: #17703f;
+    --color-status-closed: #5d6a80;
+    --shadow-raised: 0 10px 15px -3px rgb(11 20 38 / 0.1), 0 4px 6px -2px rgb(11 20 38 / 0.05);
+    --tint-badge: 10%;
+    --shadow-card: 0 1px 2px rgb(11 20 38 / 0.06), 0 12px 24px -12px rgb(11 20 38 / 0.18);
+  }
+}
+
+/* Light, explicit choice. Same values as the block above. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-border: #7486a4;
+  --color-border-subtle: #d9e1ec;
+  --color-text: #0b1426;
+  --color-text-muted: #46546d;
+  --color-signal: #0a6ea8;
+  --color-signal-strong: #06547f;
+  --color-on-signal: #ffffff;
+  --color-danger: #b42318;
+  --color-sev-critical: #b82525;
+  --color-sev-high: #a34a0b;
+  --color-sev-medium: #7d5800;
+  --color-sev-low: #52607a;
+  --color-status-open: #0a6ea8;
+  --color-status-investigating: #6a48c9;
+  --color-status-resolved: #17703f;
+  --color-status-closed: #5d6a80;
+  --shadow-raised: 0 10px 15px -3px rgb(11 20 38 / 0.1), 0 4px 6px -2px rgb(11 20 38 / 0.05);
+  --tint-badge: 10%;
+  --shadow-card: 0 1px 2px rgb(11 20 38 / 0.06), 0 12px 24px -12px rgb(11 20 38 / 0.18);
+}

@@ -1,0 +1,261 @@
+/*
+ * The signed-in frame. Phones: logo and user menu on one row, the nav as a row of tabs below.
+ * From 768 px: one 64 px row, logo, nav, then the user menu at the far end.
+ */
+.ui-app-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.ui-app-header-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'brand user'
+    'nav nav';
+  align-items: center;
+  column-gap: var(--space-4);
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.ui-app-brand {
+  grid-area: brand;
+  justify-self: start;
+}
+
+/* The lockup needs room (120 px at least); on narrow phones the mark stands alone. */
+.ui-app-brand-lockup {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .ui-app-brand-lockup {
+    display: inline-block;
+  }
+  .ui-app-brand-mark {
+    display: none;
+  }
+}
+
+.ui-app-nav {
+  grid-area: nav;
+  min-width: 0;
+}
+
+.ui-app-nav ul {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0 calc(-1 * var(--space-3));
+  padding: 0;
+  list-style: none;
+}
+
+.ui-app-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-app-nav a:hover {
+    color: var(--color-text);
+  }
+}
+
+.ui-app-nav a:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+/* Current page: full-strength text and a signal rule on the header's bottom edge. */
+.ui-app-nav a[aria-current='page'] {
+  color: var(--color-text);
+}
+
+.ui-app-nav a[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  right: var(--space-3);
+  bottom: -1px;
+  left: var(--space-3);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-signal);
+}
+
+/* Forced colours replace backgrounds, which would erase the current-page bar; draw it in the
+   system's text colour instead. */
+@media (forced-colors: active) {
+  .ui-app-nav a[aria-current='page']::after {
+    background: CanvasText;
+  }
+}
+
+.ui-user-menu {
+  grid-area: user;
+  position: relative;
+}
+
+.ui-user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  max-width: 12rem;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    transform 160ms var(--ease-out);
+}
+
+.ui-user-menu-trigger:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-user-menu-trigger:hover {
+    background: var(--color-surface-raised);
+  }
+}
+
+.ui-user-menu-trigger[aria-expanded='true'] {
+  background: var(--color-surface-raised);
+}
+
+.ui-user-menu-trigger:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The full name is in the panel; the button may shorten it. */
+.ui-user-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-user-menu-chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--color-text-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.ui-user-menu-trigger[aria-expanded='true'] .ui-user-menu-chevron {
+  transform: rotate(180deg);
+}
+
+.ui-user-menu-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: var(--z-menu);
+  display: grid;
+  width: 18rem;
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-1) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+  transform-origin: top right;
+  overflow-wrap: anywhere;
+}
+
+.ui-user-menu-panel:focus {
+  outline: none;
+}
+
+.ui-user-menu-who,
+.ui-user-menu-section {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) 0;
+}
+
+.ui-user-menu-section {
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.ui-user-menu-who p,
+.ui-user-menu-heading {
+  margin: 0;
+}
+
+.ui-user-menu-fullname {
+  font: 600 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text);
+}
+
+.ui-user-menu-email,
+.ui-user-menu-role,
+.ui-user-menu-heading {
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text-muted);
+}
+
+.ui-user-menu-logout {
+  width: 100%;
+}
+
+.ui-app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+@media (min-width: 768px) {
+  .ui-app-header-inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'brand nav user';
+    column-gap: var(--space-6);
+    min-height: 4rem;
+    padding: 0 var(--space-5);
+  }
+
+  .ui-app-nav {
+    align-self: stretch;
+    display: flex;
+  }
+
+  .ui-app-nav ul {
+    margin: 0;
+  }
+
+  .ui-app-nav li {
+    display: flex;
+  }
+
+  .ui-app-nav a {
+    min-height: 0;
+  }
+
+  .ui-app-main {
+    padding: var(--space-6) var(--space-5) var(--space-8);
+  }
+}

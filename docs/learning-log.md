@@ -1479,6 +1479,86 @@ in #72 to #76; released as v1.0.0.)*
 
 ---
 
+## Stage: Frontend redesign (issue #79, milestone #7, built 2026-11-25 on `redesign`, heads for v1.1.0)
+
+**Decisions:** the interface was the plain one the app started with, so the owner asked for a full
+overhaul with its own identity. For this stage the code was written for the owner and explained, an
+exception to the usual rule that the owner types it. The choices, all in
+`docs/adr/0001-frontend-design-system.md`:
+- A watchtower at night: deep ink-blue with one ice-blue signal colour, and severity on its own scale so
+  the signal never reads as danger. Why: an incident tracker is opened when something is wrong, so it
+  should look calm, precise and awake.
+- A mark (Facet) drawn in straight lines from one geometry file, so every logo and icon agrees.
+- Plain CSS tokens and a class prefix per area, not a framework. Why: the content security policy
+  forbids the style injection most CSS-in-JS needs, and the spec allowed no new packages.
+- Fonts as `@fontsource` packages, because the CSP allows no other origin and a font CDN would tell a
+  third party who visits.
+- Motion with presets and one reduced-motion rule, kept loud on the landing and sign-in pages and quiet
+  in working screens.
+- System theme with a toggle. Frontend tests (Vitest) as a CI step, closing the oldest known gap.
+- A long-lived `redesign` branch with one pull request per task, and a single launch pull request into
+  `main`, because every merge to `main` deploys to production and nothing half-finished should go public.
+
+**What happened:** the work, tasks 0 to 15a, went into `redesign` as reviewed pull requests, with the owner signing
+off the logo, the brand board and the first redesigned screen (sign-in) before the rest followed. Reviews
+found real bugs in each task: a failed load that fed a misleading overview, focus lost after creating an
+incident, a reset link that kept a "Copied" state after it was replaced. The last task, 15a, audited the
+whole thing for accessibility, performance and motion, and fixed what it found (app-wide route focus, an
+idle animation that looped forever, a chart readable only by hover, lazy routes). 289 tests pass.
+
+**Concepts learned:**
+- **Design tokens.** Colours, spacing, radii, timings and stacking order are named custom properties in
+  one file, and two themes redefine the same names. A screen never hard-codes a value, so a re-theme is
+  one file. Naming by role (`--color-text-muted`) rather than by value is what lets light and dark share
+  the names.
+- **CSP-safe styling.** With `style-src 'self'` there are no inline `<style>` tags or `style=""`
+  attributes in HTML, but styles set from JavaScript through the CSSOM are allowed. That is why Motion
+  and React work and why the production build links its CSS from files. The theme is chosen by a
+  `data-theme` attribute set from a bundled script before first render, not by an inline script, so
+  there is no flash.
+- **Motion and reduced motion.** Animate only transform and opacity where possible, give each animation
+  a job, and make `prefers-reduced-motion` a first-class path: the presets turn into short fades and
+  content is visible from frame one, so nothing waits on an animation. Reduced motion is a preference,
+  not a pause control.
+- **Route focus management.** In a single-page app a route change replaces the page without a reload, so
+  a keyboard or screen-reader user's focus stays on a control that may no longer exist. The fix is to move
+  focus to the new page's `h1` after each navigation (waiting for the heading when the screen is a lazy
+  chunk), set a page title, and not steal focus if the person has already moved it.
+- **Lazy routes and error boundaries.** Splitting the signed-in screens into chunks cut JavaScript on
+  public pages from 469.03 kB to 427.96 kB. The price is a new failure: a chunk can fail to load. A route
+  error boundary keeps the header and footer on screen and says what happened.
+- **WCAG 2.2.1 and 2.2.2.** 2.2.1 (timing adjustable): error toasts never auto-dismiss, because a person
+  may need more than 5 seconds to read one; success toasts that only confirm what is on screen may.
+  2.2.2 (pause, stop, hide): motion lasting over 5 seconds needs a way to stop. The landing page's scan
+  looped every 8 seconds, so it now plays once and ends about 4.2 seconds in.
+- **Colour is not the only cue.** Severity has a four-bar meter and status a glyph, so the badges work
+  in forced-colours mode, in greyscale and for colour-blind readers.
+
+**Lessons:**
+- **A secret scanner cannot tell a fake from a real key.** gitleaks scans every commit and flagged a
+  made-up token in a test fixture as a generic API key. A later commit cannot clear a finding that is
+  already in history, so the fixture had to be rewritten out of the branch. Fixtures now use plain words
+  (`first_token`) that match no secret pattern, which beats an ignore file that would also hide a real
+  leak with a similar shape.
+- **jsdom has no layout.** A test can assert a class or an attribute, never that a long title wraps.
+  Layout, motion and real focus were checked by hand in a browser, and the README says so.
+- **Tests that pass vacuously.** A reduced-motion test that checked an element was visible passed even
+  when the animation snapped, and a change-animation test passed with no animation. The fix was to make
+  each test fail first (remove the behaviour, watch it fail, restore it) before trusting it.
+- **Timing-sensitive assertions flake under load.** Title, hash and lazy-screen checks failed only when
+  the whole suite ran together. Wrapping them in `waitFor` and importing lazy screens up front made three
+  full runs in a row green.
+- **Disabled controls lose focus.** Disabling a button while a save runs drops focus to the page, so
+  focus had to be handed back afterwards, and not when the person had already moved on.
+- **A headline number has to match the chart beside it.** "5 open" next to a status chart saying "Open 4"
+  looked like a bug, because the headline counted open and investigating. The text now says "open or
+  investigating".
+
+*(Tasks 0 to 15a merged into `redesign`; documentation and screenshots in 15b. Release to follow the
+launch pull request.)*
+
+---
+
 ## Questions to revisit later
 - ~~Revisit if the Go learning curve slows the security/cloud learning too much~~ Settled at 1.0.0: the
   whole backend is Go, and it did not.

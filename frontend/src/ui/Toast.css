@@ -1,0 +1,104 @@
+/* The toaster: fixed to the bottom right, newest at the bottom, nearest the eye's resting place. */
+.ui-toaster {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: var(--z-toast);
+  width: min(24rem, calc(100vw - 2 * var(--space-5)));
+  /* The region itself never blocks clicks; only the toasts in it do. */
+  pointer-events: none;
+}
+
+.ui-toaster-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-raised);
+  pointer-events: auto;
+  transform-origin: bottom center;
+}
+
+.ui-toast-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.ui-toast-info .ui-toast-icon { color: var(--color-signal); }
+.ui-toast-success .ui-toast-icon { color: var(--color-status-resolved); }
+.ui-toast-error .ui-toast-icon { color: var(--color-danger); }
+
+/* An error keeps a full edge in its colour: seen at a glance, and the icon and words agree. */
+.ui-toast-error {
+  border-color: var(--color-danger);
+}
+
+.ui-toast-message {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.ui-toast-dismiss {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -6px 0 -6px 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
+}
+
+.ui-toast-dismiss svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-toast-dismiss:hover {
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  }
+}
+
+.ui-toast-dismiss:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 0;
+}
+
+/* Phones: full width with the 16 px gutter, clear of the home indicator. */
+@media (max-width: 480px) {
+  .ui-toaster {
+    right: var(--space-4);
+    left: var(--space-4);
+    bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    width: auto;
+  }
+}

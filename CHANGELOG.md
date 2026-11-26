@@ -12,6 +12,65 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-26
+
+Frontend redesign: a new look and identity for every screen. The API,
+the database and the authentication rules are unchanged, and the invite and reset links already issued
+keep working at the same paths.
+
+### Added
+
+- A brand: the Facet eye mark, the SentinelOps wordmark and lockup in dark and light versions, a
+  favicon set, app icons, a web manifest, a link-preview image and a social card. The guide is
+  `docs/brand.md`.
+- A public landing page with the animated eye, what the app does and how it protects data, with Sign in
+  and "Have an invite?" at hand. Every security claim on it was checked against the code.
+- A public privacy notice that says what is stored, where it lives and what can be deleted.
+- An incident overview above the list: counts of open and critical incidents, a chart by severity, a
+  chart by status and a chart of incidents reported per day over 30 days. The per-day chart can be
+  shown as a table.
+- A light and a dark theme that follow the system setting, with a System, Dark, Light toggle in the
+  account menu that remembers the choice on the device.
+- Motion with presets: a sign-in moment where the eye wakes, staggered entrances, animated charts.
+  With the system's reduced-motion setting on, it becomes short fades.
+- Space Grotesk and JetBrains Mono, served from the site itself, so the content security policy is
+  unchanged.
+- A shared set of interface parts (buttons, fields, severity and status badges, cards, toasts) used on
+  every screen.
+- Frontend tests (Vitest and Testing Library, 292 of them) that run in CI and cover the overview data,
+  sign-in, invite and reset flows, focus handling and the theme.
+- A neutral loading frame while the session is checked, and a retry button when the incident list
+  fails to load.
+
+### Changed
+
+- Every screen is redesigned: sign in, accept invite, reset password, incidents, users, account and
+  the loading and error states. The report form on the incident screen opens from a "Report an incident"
+  button.
+- Severity and status badges carry a shape as well as a colour: a four-bar meter for severity and a
+  glyph for status.
+- One-time invite and reset links on the users screen are stricter: shown once with Copy and Hide,
+  only one reset link on screen at a time, and a new link replaces the old one.
+- The signed-in screens (incidents, users, account) load on demand. Public pages ship 428.72 kB of
+  JavaScript (139.27 kB gzip), down from 469.03 kB (149.52 kB gzip).
+- A signed-out visitor at `/` now gets the landing page.
+- Sign-in moved to `/signin`.
+- Logging out lands on the landing page.
+- The accept-invite form asks for the password twice.
+- The landing page's idle scan plays once instead of looping.
+- Error toasts stay until dismissed; success and info toasts go after 5 seconds.
+
+### Fixed
+
+- Focus now moves to the new page's heading after each navigation, and every page has its own title,
+  so keyboard and screen-reader users keep their place.
+- Sign-in errors are tied to the email and password fields, and the password gets focus after a failure.
+- With the theme set to System, a change in the operating system's theme now applies without a reload.
+- Keyboard and touch users can read the per-day values, which were only visible on hover.
+- A page whose code fails to load keeps the header and footer instead of blanking the screen.
+- Select arrows and the current-page marker stay visible in forced-colours (high contrast) mode.
+- Text follows the reader's font-size setting.
+
 ## [1.0.0] - 2026-11-25
 
 Hardening review: the first deployment that can honestly be called hardened. People can change their
@@ -349,7 +408,8 @@ Known gaps at this version are listed in the README: registration reveals whethe
 is taken, there is no rate limiting, expired sessions are not pruned, there is no automated
 test suite, and a database superuser can rebuild the audit chain undetected.
 
-[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/rehrabbi/SentinelOps/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/rehrabbi/SentinelOps/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/rehrabbi/SentinelOps/compare/v0.4.0...v0.5.0

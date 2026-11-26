@@ -2,12 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>SentinelOps</title>
+    <meta name="description" content="SentinelOps is a secure incident and ticket tracker: report an incident, triage it, and see it through to resolution." />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a1020" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f7fb" />
+
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="mask-icon" href="/mask-icon.svg" color="#1596d6" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SentinelOps" />
+    <meta property="og:title" content="SentinelOps" />
+    <meta property="og:description" content="A secure incident and ticket tracker: report an incident, triage it, and see it through to resolution." />
+    <meta property="og:url" content="https://sentinelops.pages.dev/" />
+    <meta property="og:image" content="https://sentinelops.pages.dev/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The SentinelOps logo, an eye drawn in straight lines, above the line: Incident tracking, watched closely." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SentinelOps" />
+    <meta name="twitter:description" content="A secure incident and ticket tracker: report an incident, triage it, and see it through to resolution." />
+    <meta name="twitter:image" content="https://sentinelops.pages.dev/og-image.png" />
+    <meta name="twitter:image:alt" content="The SentinelOps logo, an eye drawn in straight lines, above the line: Incident tracking, watched closely." />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- On screen until the app starts: the same frame as LoadingFrame (src/layout/LoadingFrame.tsx). -->
+      <div class="ui-shell ui-loading-frame">
+        <svg class="ui-loading-mark" viewBox="0 0 64 64" width="48" height="48" aria-hidden="true" focusable="false"><path d="M2 28L32 8L62 28H44L32 20L20 28Z"/><path d="M2 36H20L32 44L44 36H62L32 56Z"/><path class="ui-loading-pupil" d="M32 24L40 32L32 40L24 32Z"/></svg>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

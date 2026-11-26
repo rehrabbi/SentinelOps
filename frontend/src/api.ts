@@ -30,11 +30,35 @@ export class ApiError extends Error {
     }
 }
 
+// What the app does when the session ends under it (it expired, or was ended
+// from another device). App registers this once; there is only ever one.
+const noHandler = () => {}
+let sessionExpiredHandler: () => void = noHandler
+
+// onSessionExpired sets the handler that runs when a request comes back 401
+// because the session has ended mid-use. Registering again replaces it. The
+// returned function unregisters it, and only it: if another handler has been
+// registered since, that one stays.
+export function onSessionExpired(handler: () => void): () => void {
+    sessionExpiredHandler = handler
+    return () => {
+        if (sessionExpiredHandler === handler) sessionExpiredHandler = noHandler
+    }
+}
+
+// The 401s that do not mean "your session ended while you were working":
+// - GET /api/me asks whether anyone is signed in; 401 just means no.
+// - POST /api/sessions is a sign-in attempt; 401 means wrong credentials.
+// - DELETE /api/sessions/current is a log out; 401 means the session was
+//   already gone, which is the outcome the user asked for.
+const NOT_AN_EXPIRY = new Set(['GET /api/me', 'POST /api/sessions', 'DELETE /api/sessions/current'])
+
 // Shared fetch wrapper: always includes credentials (so the session cookie is
 // sent AND stored), sets JSON content-type when there's a body, and returns the
-// raw Response for callers to interpret.
+// raw Response for callers to interpret. A 401 anywhere else also tells the app
+// that the session has ended (see onSessionExpired).
 async function request(path: string, options: RequestInit = {}): Promise<Response> {
-    return fetch(`${API_BASE}${path}`, {
+    const res = await fetch(`${API_BASE}${path}`, {
         ...options,
         credentials: 'include', // without this the session cookie is never sent/stored
         headers: {
@@ -42,6 +66,9 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
             ...options.headers,
         },
     })
+    const method = (options.method ?? 'GET').toUpperCase()
+    if (res.status === 401 && !NOT_AN_EXPIRY.has(`${method} ${path}`)) sessionExpiredHandler()
+    return res
 }
 
 // getMe returns the current user, or null when not logged in (401). Any other

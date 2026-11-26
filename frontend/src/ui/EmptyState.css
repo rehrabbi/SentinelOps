@@ -1,0 +1,46 @@
+/* An empty list's stand-in. Left-aligned like the content it replaces, quiet, one way forward. */
+.ui-empty-state {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-6) var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ui-empty-state-mark {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+/* H3 on the type scale, whatever the heading level. */
+.ui-empty-state-title {
+  margin: 0;
+  font: 600 1.125rem/1.625rem var(--font-sans);
+  letter-spacing: -0.005em;
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+.ui-empty-state-body {
+  max-width: 60ch;
+  font: 400 1rem/1.5rem var(--font-sans);
+  text-wrap: pretty;
+}
+
+.ui-empty-state-body p {
+  margin: 0;
+}
+
+.ui-empty-state-action {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 480px) {
+  .ui-empty-state {
+    padding: var(--space-5) var(--space-4);
+  }
+}

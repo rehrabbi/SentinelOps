@@ -1,0 +1,285 @@
+/*
+ * The admin screen (Users.tsx, OneTimeLink.tsx): invite form, user list, one-time links. A work
+ * screen, so steady and quiet. Classes are prefixed users- (the kit owns ui-). Colours,
+ * spacing and type come from the tokens.
+ */
+.users-page {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+  text-align: start;
+}
+
+.users-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.users-h1 {
+  margin: 0;
+  font: 600 2rem/1.2 var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.users-lede {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--color-text-muted);
+  font: 400 1rem/1.5rem var(--font-sans);
+}
+
+.users-h2 {
+  margin: 0 0 var(--space-3);
+  font: 500 0.75rem/1rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.users-section {
+  min-width: 0;
+}
+
+.users-card-title {
+  margin: 0;
+  font: 600 1.125rem/1.625rem var(--font-sans);
+  letter-spacing: -0.005em;
+  color: var(--color-text);
+}
+
+.users-mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/* The invite form: email and role side by side when there is room, stacked on a phone. */
+.users-invite {
+  max-width: 44rem;
+}
+
+.users-invite-form {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+
+.users-invite-actions {
+  grid-column: 1 / -1;
+}
+
+.users-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.users-load-error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.users-error {
+  margin: 0;
+  color: var(--color-danger);
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+.users-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.users-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  min-width: 0;
+}
+
+.users-row:first-child {
+  border-top: 0;
+}
+
+.users-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.users-name,
+.users-email,
+.users-note {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.users-name {
+  font: 600 1rem/1.5rem var(--font-sans);
+  color: var(--color-text);
+}
+
+.users-self {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.users-email {
+  font: 400 0.8125rem/1.25rem var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.users-note {
+  font: 400 0.8125rem/1.25rem var(--font-sans);
+  color: var(--color-text-muted);
+}
+
+.users-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.users-select {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 500 0.875rem/1.25rem var(--font-sans);
+}
+
+.users-select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.users-select-changed {
+  border-color: var(--color-signal);
+}
+
+.users-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.users-row[aria-busy='true'] .users-select {
+  opacity: 0.7;
+}
+
+/* The one-time link: the loudest thing on the screen while it exists, then gone. */
+.users-row-link {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.users-link {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-signal);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-signal) var(--tint-badge), var(--color-surface));
+  color: var(--color-text-muted);
+}
+
+.users-link-summary,
+.users-link-terms,
+.users-link-note {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: 400 0.9375rem/1.4rem var(--font-sans);
+}
+
+.users-link-terms {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.users-link-text {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 400 0.875rem/1.375rem var(--font-mono);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  resize: none;
+  /* Grows to fit the link (a long one wraps), never shorter than two lines. */
+  field-sizing: content;
+  min-height: 3.75rem;
+}
+
+.users-invite .users-link {
+  margin-top: var(--space-3);
+}
+
+.users-link-text:focus-visible {
+  border-color: var(--color-signal);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.users-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.users-link-note:empty {
+  display: none;
+}
+
+.users-link-note-bad {
+  color: var(--color-danger);
+}
+
+@media (pointer: coarse) {
+  .users-select {
+    min-height: 2.75rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .users-invite-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .users-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .users-controls {
+    justify-content: flex-start;
+  }
+
+  .users-select {
+    min-height: 2.75rem;
+  }
+}

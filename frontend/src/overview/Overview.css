@@ -1,0 +1,369 @@
+/*
+ * The incident overview: headline counts and three small charts above the list.
+ * Classes are prefixed overview- (the kit owns ui-).
+ * Every colour is a token, so both themes work; SVG marks take theirs through these classes.
+ * Layout follows the overview's own width (container queries), not the viewport's, so it fits
+ * whatever column the page gives it.
+ */
+.overview {
+  container: overview / inline-size;
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin-bottom: var(--space-6);
+  text-align: start;
+}
+
+.overview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+
+/* Eyebrow: a section label, not a second page title. */
+.overview-title {
+  margin: 0;
+  font: 500 0.75rem/1rem var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.overview-scope {
+  margin: 0;
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  color: var(--color-text-muted);
+}
+
+/* Headline counts. */
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-stat {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4) 18px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.overview-stat-value {
+  font: 500 2.25rem/2.5rem var(--font-mono);
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.overview-stat-label {
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Narrow: one count per row, number then label, so a five-digit count still has room. */
+@container overview (max-width: 34rem) {
+  .overview-stats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .overview-stat {
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .overview-stat-value {
+    font-size: 1.75rem;
+    line-height: 2rem;
+  }
+}
+
+/* The three charts: stacked when narrow, two across with the daily chart below at medium
+   widths, one row when wide with the daily chart a little wider. */
+.overview-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@container overview (min-width: 40rem) {
+  .overview-charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-card-daily {
+    grid-column: 1 / -1;
+  }
+}
+
+@container overview (min-width: 62rem) {
+  .overview-charts {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr);
+  }
+
+  .overview-card-daily {
+    grid-column: auto;
+  }
+}
+
+.overview-card {
+  align-content: start;
+  gap: var(--space-3);
+  container: overview-card / inline-size;
+}
+
+.overview-card-head {
+  display: grid;
+  gap: 2px;
+}
+
+.overview-card-note {
+  margin: 0;
+  font: 500 0.875rem/1.25rem var(--font-sans);
+  letter-spacing: 0.005em;
+  color: var(--color-text-muted);
+}
+
+/* Meter list: name, bar, count. The rows share the list's columns (subgrid), so every bar starts
+   on the same baseline whatever the width of its label. */
+.overview-meters {
+  display: grid;
+  grid-template-columns: max-content minmax(3rem, 1fr) max-content;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Without subgrid, each row keeps the same three columns on its own: a label column wide enough
+   for the longest badge ("Investigating"), so the bars still line up. */
+.overview-meter {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 9rem minmax(3rem, 1fr) max-content;
+  column-gap: var(--space-3);
+  align-items: center;
+  min-height: 1.75rem;
+}
+
+.overview-meter-label {
+  min-width: 0;
+}
+
+.overview-meter-track {
+  display: block;
+  min-width: 0;
+}
+
+.overview-meter-svg {
+  display: block;
+  width: 100%;
+}
+
+.overview-meter-value {
+  min-width: 3ch;
+  font: 400 0.875rem/1.25rem var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.overview-meter-value.overview-is-zero {
+  color: var(--color-text-muted);
+}
+
+/* A narrow card: the bar drops under its name and count. */
+@container overview-card (max-width: 16rem) {
+  .overview-meters {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .overview-meter {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .overview-meter-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* With subgrid (after the rules above, so it wins at every width), the rows share the list's
+   columns and every bar starts on the same line whatever its label's width. */
+@supports (grid-template-columns: subgrid) {
+  .overview-meter {
+    grid-template-columns: subgrid;
+  }
+}
+
+/* Per-day columns. */
+.overview-daily {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* The readout and the chart/table switch share one line. */
+.overview-daily-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+/* A quiet text button: the chart is the default view, the table is there for anyone who cannot
+   hover a day (keyboard, touch). */
+.overview-daily-toggle {
+  min-height: 1.75rem;
+  margin: 0;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-signal);
+  font: 500 0.8125rem/1.25rem var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.overview-daily-toggle:hover {
+  color: var(--color-signal-strong);
+}
+
+@media (pointer: coarse) {
+  .overview-daily-toggle {
+    min-height: 2.75rem;
+  }
+}
+
+.overview-daily-summary {
+  margin: 0 0 var(--space-2);
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text-muted);
+}
+
+.overview-daily-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 0.875rem/1.25rem var(--font-sans);
+  color: var(--color-text);
+}
+
+.overview-daily-table th,
+.overview-daily-table td {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  text-align: start;
+}
+
+.overview-daily-table thead th {
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.overview-daily-table tbody th {
+  font-weight: 400;
+}
+
+.overview-daily-table td {
+  font-family: var(--font-mono);
+  text-align: end;
+}
+
+.overview-daily-table thead th:last-child {
+  text-align: end;
+}
+
+/* Reserves its line, so hovering never shifts the chart. */
+.overview-readout {
+  margin: 0;
+  min-height: 1rem;
+  font: 500 0.75rem/1rem var(--font-mono);
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+.overview-readout-count,
+.overview-readout-date {
+  color: var(--color-text);
+}
+
+.overview-daily-plot {
+  min-width: 0;
+}
+
+.overview-daily-svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+/* SVG marks. */
+.overview-baseline,
+.overview-grid {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.overview-bar {
+  transition: fill var(--dur-fast) var(--ease-out);
+}
+
+.overview-fill-critical { fill: var(--color-sev-critical); }
+.overview-fill-high { fill: var(--color-sev-high); }
+.overview-fill-medium { fill: var(--color-sev-medium); }
+.overview-fill-low { fill: var(--color-sev-low); }
+.overview-fill-open { fill: var(--color-status-open); }
+.overview-fill-investigating { fill: var(--color-status-investigating); }
+.overview-fill-resolved { fill: var(--color-status-resolved); }
+.overview-fill-closed { fill: var(--color-status-closed); }
+.overview-fill-day { fill: var(--color-signal); }
+.overview-fill-day.overview-is-active { fill: var(--color-signal-strong); }
+
+.overview-tick,
+.overview-cap {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-tick {
+  fill: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.overview-cap {
+  fill: var(--color-text);
+  font-weight: 500;
+}
+
+.overview-none {
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.overview-hit {
+  fill: transparent;
+  pointer-events: all;
+}
