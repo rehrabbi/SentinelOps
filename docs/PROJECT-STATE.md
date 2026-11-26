@@ -7,7 +7,7 @@
 > **Last updated:** 2026-11-26 · **Current release:** ✅ **v1.1.0, the frontend redesign**, tagged and live at
 > https://sentinelops.pages.dev, with all nine checks required (v1.0.0 was the first hardened
 > deployment). Since v1.1.0, `main` also has browser-level tests, transactional sign-in audit and the
-> launch follow-ups; the API part waits for the owner's deploy. Next: §6.
+> launch follow-ups, all live (API `sha-3f4eac2`, deployed 2026-11-26). Next: §6.
 
 ---
 
@@ -285,7 +285,7 @@ real credentials.
 
 ## 6. ⏭️ THE EXACT NEXT STEP — pick the next stage
 
-### ⏭️ NEXT STEP: deploy the pinned API image, then the owner's signed-in pass
+### ⏭️ NEXT STEP: the owner's signed-in pass, then choose from the candidates below
 
 The frontend redesign stage (issue #79, milestone #7) is in `main`. Every task was a pull request into
 the long-lived `redesign` branch (cut from `main` at c6aa1cd), merged on green CI and archived as
@@ -299,11 +299,13 @@ security headers unchanged and the `/api/me` preload served; `v1.1.0` is tagged 
 published as a GitHub release from the CHANGELOG entry; `redesign` is archived as `merged/redesign`;
 and `docs/images/social-card.png` is the repository's social preview.
 
+The API image built from 3f4eac2 (sign-in and sign-out commit with their audit entries, and
+`golang.org/x/crypto` 0.59.0) was deployed on 2026-11-26, at the owner's request: `infra/migrate.sh`
+(nothing new to apply), `infra/deploy-api.sh` (live, `/healthz` 200), then `infra/terraform.sh apply
+-refresh-only`, after which `plan` said "No changes". Through the site, `/api/healthz` answers 200; the
+API refuses direct requests without the proxy secret (403).
+
 Owner to-dos still open:
-- Deploy the API image pinned in `infra/api-image-tag.txt` (built from 3f4eac2: sign-in and sign-out
-  commit with their audit entries, and `golang.org/x/crypto` 0.59.0). There is no new migration. In
-  order: `infra/migrate.sh`, `infra/deploy-api.sh`, then `infra/terraform.sh apply -refresh-only`, after
-  which `infra/terraform.sh plan` must say "No changes". The frontend parts are already live.
 - Sign in on the live site and go through incidents, users, invites, resets and account security.
 - Turn on 2FA for Backblaze.
 
