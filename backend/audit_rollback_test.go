@@ -112,6 +112,16 @@ func clearsSessionCookie(c *client) bool {
 	return false
 }
 
+// requireIntactChain verifies the whole audit chain, so a test that rolls an
+// entry back proves on its own that the rollback left no gap or broken link.
+func requireIntactChain(t *testing.T) {
+	t.Helper()
+	report, err := audit.Verify(context.Background(), testDB)
+	if err != nil || !report.Intact() {
+		t.Errorf("audit chain after a rolled-back entry: %+v, %v", report, err)
+	}
+}
+
 // A sign-in whose audit entry is lost creates no session and hands out no cookie.
 func TestLoginRollsBackWithoutAudit(t *testing.T) {
 	srv := newServer(t, serverConfig{})
@@ -135,6 +145,7 @@ func TestLoginRollsBackWithoutAudit(t *testing.T) {
 	if n := countAudit(t, audit.ActionLogin, u.Email); n != 1 {
 		t.Errorf("%d sign-in entries, want exactly the one that succeeded", n)
 	}
+	requireIntactChain(t)
 }
 
 // Failed sign-ins stay best effort: there is nothing to roll back, and the
@@ -192,6 +203,7 @@ func TestLogoutRollsBackWithoutAudit(t *testing.T) {
 	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
 		t.Errorf("%d sign-out entries, want 1", n)
 	}
+	requireIntactChain(t)
 }
 
 var installLookupFault sync.Once
@@ -266,6 +278,7 @@ func TestLogoutRollsBackWhenLookupFails(t *testing.T) {
 	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
 		t.Errorf("%d sign-out entries, want 1", n)
 	}
+	requireIntactChain(t)
 }
 
 // clientWithSession returns a client whose browser holds rawToken as its
@@ -334,6 +347,7 @@ func TestLogoutWithoutLiveSessionWritesNoEntry(t *testing.T) {
 	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
 		t.Errorf("%d sign-out entries, want only the one real sign-out", n)
 	}
+	requireIntactChain(t)
 }
 
 // "Log out everywhere" whose audit entry is lost ends no session.
