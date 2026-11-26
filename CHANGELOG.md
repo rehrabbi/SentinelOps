@@ -25,6 +25,11 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 - The current-password field on the Account page is marked invalid only when the server says that
   password is wrong, not for a weak new password or too many attempts.
 
+### Security
+
+- `golang.org/x/crypto` is updated from 0.55.0 to 0.59.0, which fixes CVE-2026-56855 and
+  CVE-2026-78662. `govulncheck` found neither reachable from SentinelOps' code.
+
 ## [1.1.0] - 2026-11-26
 
 Frontend redesign: a new look and identity for every screen. The API,
