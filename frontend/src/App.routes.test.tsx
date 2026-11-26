@@ -124,6 +124,54 @@ describe('routes', () => {
   })
 })
 
+describe('signing out only when the server did', () => {
+  // Signs in, raises a toast that only a local sign-out would clear, and clicks Log out.
+  async function logOutFrom(result: () => Promise<void>) {
+    vi.mocked(api.logout).mockImplementationOnce(result)
+    getMe.mockResolvedValue(user('analyst'))
+    renderAt('/')
+    await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    toast('Incident saved', 'success')
+    await userEvent.click(screen.getByRole('button', { name: /account menu/i }))
+    await userEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    expect(api.logout).toHaveBeenCalled()
+  }
+
+  function expectStillSignedIn() {
+    expect(screen.getByRole('heading', { level: 1, name: 'Incidents' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: /incident tracking/i })).toBeNull()
+    // The local sign-out clears every toast; the one raised before is still here, so it never ran.
+    expect(getToasts().map((t) => t.message)).toContain('Incident saved')
+  }
+
+  it('keeps the person signed in and says so when the server answers 500', async () => {
+    await logOutFrom(() => Promise.reject(new api.ApiError(500, 'Logout failed (500)')))
+    expect(await screen.findByText("Sign-out didn't complete. Try again.")).toBeTruthy()
+    expect(getToasts().find((t) => t.message.startsWith('Sign-out'))?.kind).toBe('error')
+    expectStillSignedIn()
+  })
+
+  it('keeps the person signed in and says so when the request never arrives', async () => {
+    await logOutFrom(() => Promise.reject(new TypeError('Failed to fetch')))
+    expect(await screen.findByText("Sign-out didn't complete. Try again.")).toBeTruthy()
+    expectStillSignedIn()
+  })
+
+  it('signs out locally when the server says the session was already gone (401)', async () => {
+    await logOutFrom(() => Promise.reject(new api.ApiError(401, 'Logout failed (401)')))
+    expect(await screen.findByRole('heading', { level: 1, name: /incident tracking/i })).toBeTruthy()
+    expect(screen.getByTestId('where').textContent).toBe('/')
+    expect(getToasts()).toHaveLength(0)
+  })
+
+  it('signs out locally on a 204', async () => {
+    await logOutFrom(() => Promise.resolve())
+    expect(await screen.findByRole('heading', { level: 1, name: /incident tracking/i })).toBeTruthy()
+    expect(screen.getByTestId('where').textContent).toBe('/')
+    expect(getToasts()).toHaveLength(0)
+  })
+})
+
 describe('toasts and the end of a session', () => {
   it('drops raised toasts when the person logs out', async () => {
     getMe.mockResolvedValue(user('analyst'))

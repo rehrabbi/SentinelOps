@@ -1,5 +1,5 @@
 import { lazy, startTransition, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
-import { getMe, logout, onSessionExpired, type User } from "./api";
+import { ApiError, getMe, logout, onSessionExpired, type User } from "./api";
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router";
 import { AppShell } from "./layout/AppShell";
 import { LoadingFrame, PageLoading } from "./layout/LoadingFrame";
@@ -12,7 +12,7 @@ import { Privacy } from "./pages/Privacy";
 import { ResetPassword } from "./pages/ResetPassword";
 import { SignIn } from "./pages/SignIn";
 import { returnPathFrom, returnState } from "./returnTo";
-import { clearToasts } from "./ui/toast-store";
+import { clearToasts, toast } from "./ui/toast-store";
 
 // The signed-in screens load on demand, as their own files, so the public pages (landing, sign
 // in, invite, reset, privacy) never download them. They come from this site like every other
@@ -124,13 +124,19 @@ function App({ firstSessionCheck }: AppProps) {
   const user = auth.kind === "authenticated" ? auth.user : null;
 
   // The shell's Log out: end the session on the server, then drop the local
-  // state and go to the front door. Logout is idempotent server-side, so a
-  // failed call still clears local state.
+  // state and go to the front door. Only a 204, or a 401 (the session was
+  // already gone), means this browser is signed out. Any other answer, or no
+  // answer at all, may have left the session and its cookie alive, so the
+  // person stays signed in and is told: on a shared computer, a front door that
+  // the next visitor could reload straight back past is worse than an error.
   async function handleLogout() {
     try {
       await logout();
-    } catch {
-      // Ignored on purpose: the local sign-out below happens either way.
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 401)) {
+        toast("Sign-out didn't complete. Try again.", "error");
+        return;
+      }
     }
     onLoggedOut();
     navigate("/", { replace: true });
