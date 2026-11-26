@@ -117,14 +117,16 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (User, error)
 	return u, nil
 }
 
-func (r *Repository) GetByID(ctx context.Context, id string) (User, error) {
+// GetByID loads one user on q, so a sign-out can name the user inside the
+// transaction that ends their session.
+func (r *Repository) GetByID(ctx context.Context, q rowQuerier, id string) (User, error) {
 	const query = `
 	SELECT id, email, full_name, role, created_at, updated_at
 	FROM users
 	WHERE id = $1`
 
 	var u User
-	err := r.db.QueryRowContext(ctx, query, id).
+	err := q.QueryRowContext(ctx, query, id).
 		Scan(&u.ID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

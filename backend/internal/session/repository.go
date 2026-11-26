@@ -78,15 +78,34 @@ func (r *Repository) GetByTokenHash(ctx context.Context, tokenHash string) (Sess
 	return s, nil
 }
 
-// DeleteByTokenHash ends one session, on q so a sign-out can commit the
-// deletion and its audit entry together.
-func (r *Repository) DeleteByTokenHash(ctx context.Context, q execer, tokenHash string) error {
-	const query = `DELETE FROM sessions WHERE token_hash = $1`
+// DeleteByTokenHash ends one session and returns the id of the user it
+// belonged to, on q so a sign-out can commit the deletion and its audit entry
+// together. It returns ErrSessionNotFound when no live session was ended: the
+// token matched nothing, or only an expired row, which is removed all the same.
+//
+// The user id comes from the deletion itself rather than an earlier read, so
+// only the caller whose DELETE actually removed the row learns who it was. Of
+// two concurrent sign-outs with one cookie, the second waits on the row lock,
+// then deletes nothing.
+func (r *Repository) DeleteByTokenHash(ctx context.Context, q rowQuerier, tokenHash string) (string, error) {
+	const query = `
+	DELETE FROM sessions
+	WHERE token_hash = $1
+	RETURNING user_id, expires_at > now()`
 
-	if _, err := q.ExecContext(ctx, query, tokenHash); err != nil {
-		return fmt.Errorf("delete session: %w", err)
+	var userID string
+	var live bool
+	err := q.QueryRowContext(ctx, query, tokenHash).Scan(&userID, &live)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrSessionNotFound
+		}
+		return "", fmt.Errorf("delete session: %w", err)
 	}
-	return nil
+	if !live {
+		return "", ErrSessionNotFound
+	}
+	return userID, nil
 }
 
 // execer is satisfied by both *sql.DB and *sql.Tx.

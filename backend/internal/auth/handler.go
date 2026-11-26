@@ -219,7 +219,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	// The context carries only the caller's id and role, so load the full row
 	// to answer with. One extra query, and the response reflects the database
 	// at response time rather than at middleware time.
-	u, err := h.users.GetByID(r.Context(), p.ID)
+	u, err := h.users.GetByID(r.Context(), h.db, p.ID)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
@@ -237,32 +237,24 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles DELETE /api/sessions/current: revoke the current session and
-// clear the cookie. It is public and idempotent — a missing or already-invalid
-// cookie still yields a clean 204 with the cookie expired. Only a failure to
-// commit (including a lost audit entry) answers 500, and then the session and
-// the cookie both stay, so the browser's state matches the database's.
+// clear the cookie. It is public and idempotent — a missing cookie, or one
+// that matches no live session, still yields a clean 204 with the cookie
+// expired and no audit entry, since no sign-out happened. Any other failure
+// (a lookup error, a lost audit entry, a failed commit) answers 500, and then
+// the session and the cookie both stay, so the browser's state matches the
+// database's.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	// If a session cookie is present, delete its row so the token is truly
 	// revoked server-side — not merely forgotten by the browser.
 	if c, err := r.Cookie(cookieName); err == nil {
 		tokenHash := session.HashToken(c.Value)
 
-		// Identify the session's owner BEFORE deleting it, so the audit entry
-		// can name them. Costs two reads on a logout, which is a fair price for
-		// a complete session lifecycle in the trail. A cookie that matches no
-		// live session simply yields no entry: there is nobody to name.
-		var actor *user.User
-		if sess, err := h.sessions.GetByTokenHash(r.Context(), tokenHash); err == nil {
-			if u, err := h.users.GetByID(r.Context(), sess.UserID); err == nil {
-				actor = &u
-			}
-		}
-
-		// The deletion and its audit entry share one transaction, like a role
-		// change: if the entry cannot be written, the session is not ended and
-		// the request fails. The two reads above stay outside it, and the
-		// audit insert comes after the deletion, so the audit chain's lock is
-		// held only for the insert and the commit, as in a role change.
+		// The deletion, the lookup of whose session it was, and the audit
+		// entry share one transaction, like a role change: if any of them
+		// fails, the session is not ended and the request fails. The order
+		// keeps the lock order of every other audited change: the session's
+		// row lock first, the audit insert (and the chain lock it takes) last,
+		// right before the commit.
 		tx, err := h.db.BeginTx(r.Context(), nil)
 		if err != nil {
 			log.Printf("logout: begin: %v", err)
@@ -271,13 +263,27 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		}
 		defer tx.Rollback() // no-op after Commit
 
-		if err := h.sessions.DeleteByTokenHash(r.Context(), tx, tokenHash); err != nil {
+		// The owner comes back from the DELETE itself, so only the request
+		// that actually ended the session names them: a second sign-out with
+		// the same cookie finds nothing and writes no second entry.
+		userID, err := h.sessions.DeleteByTokenHash(r.Context(), tx, tokenHash)
+		switch {
+		case errors.Is(err, session.ErrSessionNotFound):
+			// No live session behind this cookie: nobody signed out, so
+			// there is nothing to record.
+		case err != nil:
 			log.Printf("logout: delete session: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
-		}
-
-		if actor != nil {
+		default:
+			// Any error here, not-found included, fails the sign-out: a
+			// session was ended, so it must not commit without its entry.
+			actor, err := h.users.GetByID(r.Context(), tx, userID)
+			if err != nil {
+				log.Printf("logout: get user: %v", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
 			if err := h.audit.RecordTx(r.Context(), tx, audit.Entry{
 				ActorID:    &actor.ID,
 				ActorEmail: actor.Email,

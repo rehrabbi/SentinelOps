@@ -14,6 +14,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -170,6 +172,148 @@ func TestLogoutRollsBackWithoutAudit(t *testing.T) {
 	c.expect(http.StatusUnauthorized, "GET", "/api/me", nil)
 	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
 		t.Errorf("%d sign-out entries, want 1", n)
+	}
+}
+
+var installLookupFault sync.Once
+
+// failLookupAfterSessionDelete makes every statement that follows the deletion
+// of one of userID's sessions, in the same transaction, unable to find its
+// tables, until the returned function is called or the test ends. That is how
+// a sign-out's user lookup fails after its DELETE has already succeeded: a
+// SELECT cannot carry a trigger, so a test-only AFTER DELETE trigger on
+// sessions empties the transaction's search_path instead. set_config with
+// is_local true lasts until the transaction ends, so the rollback restores it
+// and the pooled connection is left as it was.
+func failLookupAfterSessionDelete(t *testing.T, userID string) (stop func()) {
+	t.Helper()
+	requireDB(t)
+	installLookupFault.Do(func() {
+		for _, stmt := range []string{
+			`CREATE TABLE test_session_delete_faults (user_id uuid NOT NULL)`,
+			`CREATE FUNCTION test_session_delete_fault() RETURNS trigger AS $$
+			BEGIN
+				IF EXISTS (SELECT 1 FROM test_session_delete_faults f WHERE f.user_id = OLD.user_id) THEN
+					PERFORM set_config('search_path', 'pg_catalog', true);
+				END IF;
+				RETURN OLD;
+			END;
+			$$ LANGUAGE plpgsql`,
+			`CREATE TRIGGER test_session_delete_fault AFTER DELETE ON sessions
+			 FOR EACH ROW EXECUTE FUNCTION test_session_delete_fault()`,
+		} {
+			if _, err := testDB.Exec(stmt); err != nil {
+				t.Fatalf("install lookup fault: %v", err)
+			}
+		}
+	})
+	if _, err := testDB.Exec(`INSERT INTO test_session_delete_faults (user_id) VALUES ($1)`, userID); err != nil {
+		t.Fatalf("switch on lookup fault: %v", err)
+	}
+	var once sync.Once
+	stop = func() {
+		once.Do(func() {
+			if _, err := testDB.Exec(`DELETE FROM test_session_delete_faults WHERE user_id = $1`, userID); err != nil {
+				t.Errorf("switch off lookup fault: %v", err)
+			}
+		})
+	}
+	t.Cleanup(stop)
+	return stop
+}
+
+// A sign-out whose user lookup fails after the session row is deleted rolls
+// the deletion back: no session ends without its entry.
+func TestLogoutRollsBackWhenLookupFails(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	c, u := signUp(t, srv, "logout-lookup-fault", "")
+
+	stop := failLookupAfterSessionDelete(t, u.ID)
+	c.expect(http.StatusInternalServerError, "DELETE", "/api/sessions/current", nil)
+	if clearsSessionCookie(c) {
+		t.Error("a sign-out that failed to commit still cleared the cookie")
+	}
+	if n := countSessions(t, u.ID); n != 1 {
+		t.Errorf("%d sessions after a sign-out whose lookup failed, want 1", n)
+	}
+	if n := countAudit(t, audit.ActionLogout, u.Email); n != 0 {
+		t.Errorf("%d sign-out entries after a failed sign-out, want 0", n)
+	}
+	c.expect(http.StatusOK, "GET", "/api/me", nil)
+
+	stop()
+	c.expect(http.StatusNoContent, "DELETE", "/api/sessions/current", nil)
+	c.expect(http.StatusUnauthorized, "GET", "/api/me", nil)
+	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
+		t.Errorf("%d sign-out entries, want 1", n)
+	}
+}
+
+// clientWithSession returns a client whose browser holds rawToken as its
+// session cookie, as a stale tab or a replayed cookie would.
+func clientWithSession(t *testing.T, srv *httptest.Server, rawToken string) *client {
+	t.Helper()
+	c := newClient(t, srv)
+	base, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.http.Jar.SetCookies(base, []*http.Cookie{{Name: "sentinelops_session", Value: rawToken, Path: "/"}})
+	return c
+}
+
+// A cookie that matches no live session gets a clean 204 and an expired
+// cookie, and writes no entry: nobody signed out.
+func TestLogoutWithoutLiveSessionWritesNoEntry(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	c, u := signUp(t, srv, "logout-stale", "")
+	base, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var token string
+	for _, ck := range c.http.Jar.Cookies(base) {
+		if ck.Name == "sentinelops_session" {
+			token = ck.Value
+		}
+	}
+	if token == "" {
+		t.Fatal("no session cookie after signing in")
+	}
+
+	c.expect(http.StatusNoContent, "DELETE", "/api/sessions/current", nil)
+	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
+		t.Fatalf("%d sign-out entries after one sign-out, want 1", n)
+	}
+
+	// The same cookie again, as a second tab or a replay would send it: the
+	// session is already gone, so there is no second entry.
+	replay := clientWithSession(t, srv, token)
+	replay.expect(http.StatusNoContent, "DELETE", "/api/sessions/current", nil)
+	if !clearsSessionCookie(replay) {
+		t.Error("a sign-out with a dead cookie did not expire it")
+	}
+
+	// An expired session is not a live one either; its row is removed anyway.
+	raw, hash, err := session.GenerateToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testDB.Exec(`INSERT INTO sessions (token_hash, user_id, expires_at)
+	                          VALUES ($1, $2, now() - interval '1 hour')`, hash, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	expired := clientWithSession(t, srv, raw)
+	expired.expect(http.StatusNoContent, "DELETE", "/api/sessions/current", nil)
+	if !clearsSessionCookie(expired) {
+		t.Error("a sign-out with an expired session did not expire the cookie")
+	}
+	if n := countSessions(t, u.ID); n != 0 {
+		t.Errorf("%d sessions left, want the expired one removed too", n)
+	}
+
+	if n := countAudit(t, audit.ActionLogout, u.Email); n != 1 {
+		t.Errorf("%d sign-out entries, want only the one real sign-out", n)
 	}
 }
 
