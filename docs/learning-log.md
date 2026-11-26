@@ -1618,20 +1618,37 @@ though; the role change had only been fault-injected by hand.
   effect the database cannot undo, so it is set only once the commit has succeeded.
 - **Order statements to keep lock time short.** The audit trigger takes a transaction-scoped advisory
   lock that every audit insert waits on until commit. Running the audit insert last, right before the
-  commit, and keeping bcrypt and the read-only lookups outside the transaction, means the lock covers
-  only the insert and the commit, the same window a role change holds it for.
+  commit, means the lock covers only the insert and the commit, the same window a role change holds it
+  for. A sign-in keeps bcrypt and its user lookup outside the transaction; a sign-out takes the
+  session's row lock first, then reads its owner, then writes the entry.
+- **`DELETE ... RETURNING` says what you actually removed.** Reading a row and then deleting it are two
+  steps another request can slip between. Taking the owner from the deletion itself means only the
+  request that really ended the session learns who it was: a second sign-out with the same cookie
+  waits on the row lock, then deletes nothing.
 - **Fault injection with a narrow trigger.** The tests install a test-only `BEFORE INSERT` trigger on
   `audit_log` that fails only entries matching one action and one actor or target. Revoking `INSERT`
-  would have failed every audit write in the shared test database. The chain verification test runs
-  after these tests and still finds the chain intact, because a rolled-back insert leaves no row.
+  would have failed every audit write in the shared test database. A `SELECT` cannot carry a trigger,
+  so the sign-out's user lookup is failed another way: a test-only `AFTER DELETE` trigger on
+  `sessions` empties that transaction's `search_path`, and the lookup that follows cannot find
+  `users`. Each sign-in and sign-out test then runs `audit.Verify` itself and finds the chain intact,
+  because a rolled-back insert leaves no row.
 
 **Verified:** the new tests for sign-in and sign-out failed against the old code (200 and 204 where 500
 was expected) and pass now; the full backend suite, `go vet` and `govulncheck` are clean.
 
-**Known side effect:** the frontend's Log out ignores a failed call and clears its own state anyway
-(`frontend/src/App.tsx`, `handleLogout`). With the audit log broken, a person would see the front door
-while their session and HttpOnly cookie survive, so reloading signs them back in. Left for the owner to
-decide; see the questions below.
+**Fixed in review (PR #103):**
+- *A sign-out could still commit without its entry.* The session and user lookups ran before the
+  transaction, and any error other than not-found (a timeout, an exhausted pool) left nobody to name,
+  so the deletion committed with no entry. Two sign-outs with one cookie could also both write an entry
+  for one deletion. The owner now comes from `DELETE ... RETURNING user_id` inside the transaction, any
+  lookup error is a 500, and only "no live session deleted" skips the entry (still a 204).
+- *A failed sign-out looked successful.* The frontend's Log out cleared its own state whatever the
+  server said, so with the audit log broken a person on a shared computer would see the front door
+  while their session and HttpOnly cookie survived. Now only a 204, or a 401 (already signed out),
+  signs the browser out; anything else, a network error included, keeps the person signed in with an
+  error toast that stays until dismissed. "Log out everywhere" on the Account page already behaved
+  this way: it stays put and says why.
+- A test proves wrong passwords still reach the limiter's 429 while their audit entries fail.
 
 *(Committed on `feat/transactional-auth-audit`.)*
 
@@ -1653,9 +1670,9 @@ decide; see the questions below.
 - ~~Backups live 90 days as GitHub artifacts, all under one GitHub account~~ Resolved 2026-11-25: a
   second copy goes to Backblaze B2, locked for 90 days. Lesson for the stage entry: Backblaze's "Write
   Only" key preset includes `deleteFiles`; read a key's actual capabilities, not its preset's name.
-- Since 2026-11-26 a sign-out can fail with a 500 when the audit log is broken, and the frontend's Log
-  out then clears local state while the session survives. Should it tell the person the sign-out did not
-  complete instead?
+- ~~Since 2026-11-26 a sign-out can fail with a 500 when the audit log is broken, and the frontend's
+  Log out then clears local state while the session survives~~ Resolved 2026-11-26 in PR #103: the
+  person stays signed in and an error toast says the sign-out did not complete.
 - A wrong current password on `PUT /api/me/password` writes its failure entry strictly: a lost entry
   becomes a 500, which the change limiter (it counts 403s) does not count. Failed sign-ins were kept best
   effort for exactly that reason. Should this failure entry follow them?

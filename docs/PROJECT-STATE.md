@@ -340,16 +340,18 @@ Owner to-dos still open:
    only when that field is wrong; and a test that checks the built `index.html` for inline code.~~ Done 2026-11-26 on
    `feat/launch-follow-ups`; the footer-link fix was in the public shell only, since the app shell has no footer.
 
-**✅ Done 2026-11-26, on `feat/transactional-auth-audit` (not yet in `main` or a release): transactional
-audit for authentication events.** A successful sign-in and a sign-out now commit their session change
-with its audit entry, or answer 500 and change nothing; a rolled-back sign-in sets no cookie. Password
-change, log out everywhere, invites, resets and the `invite` and `reset-password` subcommands were
-already transactional. Failed sign-ins stay best effort on purpose, because the login limiter counts only
-401s (reason in `recordFailedLogin`, `backend/internal/auth/handler.go`). `backend/audit_rollback_test.go`
-proves every one of these paths, and the role change, rolls back when its entry fails. Two questions for
-the owner came out of it, recorded in `docs/learning-log.md` under "Questions to revisit later": the
-frontend's Log out clears local state even when the server's sign-out failed, and a wrong current
-password's failure entry is still strict, so a lost one is a 500 the change limiter does not count.
+**✅ Done 2026-11-26 in PR #103 (`feat/transactional-auth-audit`): transactional audit for
+authentication events.** A successful sign-in and a sign-out now commit their session change with its
+audit entry, or answer 500 and change nothing; a rolled-back sign-in sets no cookie. A sign-out takes its
+owner from the deletion itself, so a lookup error is a 500 and one session is never logged out twice.
+Password change, log out everywhere, invites, resets and the `invite` and `reset-password` subcommands
+were already transactional. Failed sign-ins stay best effort on purpose, because the login limiter counts
+only 401s (reason in `recordFailedLogin`, `backend/internal/auth/handler.go`). `backend/audit_rollback_test.go`
+proves every one of these paths, and the role change, rolls back when its entry fails. The frontend's Log
+out now signs the browser out only after a 204 or a 401; on any other answer the person stays signed in
+and sees an error. One question for the owner remains, in `docs/learning-log.md` under "Questions to
+revisit later": a wrong current password's failure entry is still strict, so a lost one is a 500 the
+change limiter does not count.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly (also on a copy from Backblaze now
 and then); follow `docs/RUNBOOK.md` for any alert.

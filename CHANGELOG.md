@@ -24,6 +24,9 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 - The footer links are 24 px tall (WCAG 2.5.8), so they are easier to hit on touch screens.
 - The current-password field on the Account page is marked invalid only when the server says that
   password is wrong, not for a weak new password or too many attempts.
+- Log out signs you out of the browser only once the server has ended the session. If it did not
+  (a server error or no connection), you stay signed in and an error says the sign-out didn't complete,
+  instead of showing the front page while the session lives on.
 
 ### Security
 
