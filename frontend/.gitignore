@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# End-to-end build, API log, results and report (npm run e2e)
+e2e-output
 *.local
 
 # Editor directories and files

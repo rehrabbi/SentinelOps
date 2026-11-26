@@ -111,6 +111,73 @@ jobs:
       - name: Type check and build
         run: npm run build
 
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Its own throwaway Postgres, the same version as Compose and production. The run drops and
+    # recreates the sentinelops_e2e database on it; the password is a fixed CI-only value.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: ci-only-not-secret
+          POSTGRES_DB: sentinelops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinelops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      E2E_DATABASE_URL: postgres://sentinel:ci-only-not-secret@localhost:5432/sentinelops_e2e?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The tests build and run the API from this checkout.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Chromium and the system libraries it needs. Not cached: Playwright advises against it,
+      # since restoring the browser takes about as long as downloading it, and the system
+      # libraries have to be installed on every run anyway.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts does the rest: the global setup resets the database, builds the API,
+      # migrates and starts it; the web server builds the frontend as production does
+      # (VITE_API_URL empty) and serves it with /api on the same origin.
+      - name: Run the end-to-end tests
+        run: npm run e2e
+
+      # The HTML report, traces, screenshots and the API's log, only when something failed.
+      - name: Upload the report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            frontend/e2e-output/report/
+            frontend/e2e-output/results/
+            frontend/e2e-output/api.log
+          retention-days: 7
+
   infrastructure:
     name: Infrastructure (Terraform)
     runs-on: ubuntu-latest

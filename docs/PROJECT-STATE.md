@@ -330,8 +330,10 @@ Owner to-dos still open:
 
 ### After v1.1.0: candidates, none started
 
-1. **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
-   component tests exist now).
+1. ✅ **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
+   component tests exist now). Done 2026-11-26 on `feat/e2e-playwright`: `frontend/e2e/`, `npm run e2e`,
+   the `End-to-end (Playwright)` job in `ci.yml` (not yet a required check; how to run it is in
+   `CONTRIBUTING.md`).
 2. **Transactional audit for authentication events**, so a lost entry fails the login, like role
    changes.
 3. **Environments**, still deferred while every free Render service shares 750 hours.

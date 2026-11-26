@@ -14,6 +14,8 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ### Added
 
+- Browser-level end-to-end tests of accepting an invite, signing in and out, and resetting a password,
+  run with Playwright in Chromium against the real API and database, as a CI job (`npm run e2e` locally).
 - A `robots.txt`: search engines may crawl the landing, sign-in and privacy pages, and are asked to
   stay out of the API, the signed-in screens and the invite and reset links.
 - After a session ends mid-use, signing in again returns to the screen you were on (and its search
