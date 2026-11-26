@@ -111,6 +111,22 @@ describe('Account page', () => {
     expect(screen.getByLabelText('Current password').hasAttribute('aria-invalid')).toBe(false)
   })
 
+  it('stops marking the current password invalid when the next attempt is a mismatch', async () => {
+    const u = userEvent.setup()
+    changePassword.mockRejectedValue(new api.ApiError(403, 'current password is incorrect'))
+    renderPage()
+    await fill(u, 'wrong-password-1', 'brand-new-password', 'brand-new-password')
+    await u.click(screen.getByRole('button', { name: 'Change password' }))
+    await screen.findByText('current password is incorrect')
+    expect(screen.getByLabelText('Current password').getAttribute('aria-invalid')).toBe('true')
+
+    await u.type(screen.getByLabelText('Confirm new password'), 'x')
+    await u.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('The new passwords do not match')).toBeTruthy()
+    expect(screen.getByLabelText('Current password').hasAttribute('aria-invalid')).toBe(false)
+    expect(screen.getByLabelText('Confirm new password').getAttribute('aria-invalid')).toBe('true')
+  })
+
   it('logs out everywhere, tells the app, and leaves for the sign-in screen', async () => {
     const u = userEvent.setup()
     logoutEverywhere.mockResolvedValue(undefined)

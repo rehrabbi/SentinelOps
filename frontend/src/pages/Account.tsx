@@ -51,6 +51,8 @@ function ChangePasswordForm({ email }: { email: string }) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    // Each attempt starts with no field blamed; only this attempt's outcome may mark one.
+    setCurrentWrong(false)
     // A typo in a password nobody can see would lock its owner out, so the new one is typed
     // twice. The server does not need the copy.
     if (next !== confirm) {
@@ -59,7 +61,6 @@ function ChangePasswordForm({ email }: { email: string }) {
       return
     }
     setMismatch(false)
-    setCurrentWrong(false)
     setStatus({ kind: 'submitting' })
     try {
       await changePassword(current, next)

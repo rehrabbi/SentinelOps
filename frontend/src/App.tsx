@@ -149,6 +149,8 @@ function App({ firstSessionCheck }: AppProps) {
   );
 
   return (
+    // A new public or one-time-link route also belongs in NOT_RETURNABLE in returnTo.ts, or a
+    // session that ends there would bring the person back to it after signing in.
     <Routes>
       <Route
         path="/"
