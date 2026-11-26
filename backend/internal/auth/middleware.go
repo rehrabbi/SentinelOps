@@ -39,7 +39,7 @@ func (h *Handler) RequireAuth(next http.Handler) http.Handler {
 		}
 
 		// 3) Load the user this session belongs to.
-		u, err := h.users.GetByID(r.Context(), sess.UserID)
+		u, err := h.users.GetByID(r.Context(), h.db, sess.UserID)
 		if err != nil {
 			if errors.Is(err, user.ErrUserNotFound) {
 				http.Error(w, "authentication required", http.StatusUnauthorized)

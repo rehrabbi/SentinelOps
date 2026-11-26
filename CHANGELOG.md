@@ -26,6 +26,17 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 - The footer links are 24 px tall (WCAG 2.5.8), so they are easier to hit on touch screens.
 - The current-password field on the Account page is marked invalid only when the server says that
   password is wrong, not for a weak new password or too many attempts.
+- Log out signs you out of the browser only once the server has ended the session. If it did not
+  (a server error or no connection), you stay signed in and an error says the sign-out didn't complete,
+  instead of showing the front page while the session lives on.
+
+### Security
+
+- Signing in and signing out are now recorded in the audit log in the same transaction as the session
+  they create or end, as role changes, password changes, resets and invites already were. If the entry
+  cannot be written, the request fails with a 500 and nothing changes: no session and no cookie on a
+  sign-in, and the session stays on a sign-out. Failed sign-ins are still recorded on a best-effort
+  basis, so a broken audit log never stops the login limiter from counting wrong passwords.
 
 ### Security
 

@@ -4,6 +4,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
@@ -43,23 +44,34 @@ func init() {
 }
 
 type Handler struct {
+	db            *sql.DB
 	users         *user.Repository
 	sessions      *session.Repository
 	audit         *audit.Repository
 	secureCookies bool
 }
 
-// NewHandler builds an auth Handler. secureCookies controls the cookie's Secure
-// flag: false for local http development, true in production over HTTPS.
-func NewHandler(users *user.Repository, sessions *session.Repository, auditLog *audit.Repository, secureCookies bool) *Handler {
-	return &Handler{users: users, sessions: sessions, audit: auditLog, secureCookies: secureCookies}
+// NewHandler builds an auth Handler. It takes the pool itself because a
+// sign-in and a sign-out each commit their session change and its audit entry
+// in one transaction. secureCookies controls the cookie's Secure flag: false
+// for local http development, true in production over HTTPS.
+func NewHandler(db *sql.DB, users *user.Repository, sessions *session.Repository, auditLog *audit.Repository, secureCookies bool) *Handler {
+	return &Handler{db: db, users: users, sessions: sessions, audit: auditLog, secureCookies: secureCookies}
 }
 
-// record writes an audit entry, logging rather than failing when it cannot.
-// Authentication events have no surrounding transaction to join, so a lost
-// entry must not break the login itself. This is deliberately asymmetric with
-// privileged mutations, which use RecordTx and DO fail if the entry is lost.
-func (h *Handler) record(ctx context.Context, e audit.Entry) {
+// recordFailedLogin writes the entry for a failed sign-in, logging rather than
+// failing when it cannot. This is the one authentication event that stays best
+// effort, on purpose:
+//   - nothing changed, so there is nothing to roll back;
+//   - the login limiter counts only 401 responses, so turning a lost entry
+//     into a 500 would let password guesses go uncounted while the audit log
+//     is failing, which is exactly when nobody is watching;
+//   - the response must stay the same 401 whatever the reason, so it cannot
+//     carry the audit outcome anyway.
+//
+// Every sign-in that succeeds, and every sign-out, commits with its entry or
+// not at all (see Login and Logout).
+func (h *Handler) recordFailedLogin(ctx context.Context, e audit.Entry) {
 	if err := h.audit.Record(ctx, e); err != nil {
 		log.Printf("audit: %v", err)
 	}
@@ -95,7 +107,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			// The response hides which of the two failed; the audit entry does
 			// not, because an investigator needs the difference. This is why
 			// the audit log is more sensitive than the API surface.
-			h.record(r.Context(), audit.Entry{
+			h.recordFailedLogin(r.Context(), audit.Entry{
 				ActorEmail: in.Email,
 				Action:     audit.ActionLoginFailed,
 				Outcome:    audit.OutcomeFailure,
@@ -116,7 +128,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)); err != nil {
 		// Here we DO know who it was, so the entry names them. A run of these
 		// against one account is what a brute force attempt looks like.
-		h.record(r.Context(), audit.Entry{
+		h.recordFailedLogin(r.Context(), audit.Entry{
 			ActorID:    &u.ID,
 			ActorEmail: u.Email,
 			Action:     audit.ActionLoginFailed,
@@ -136,22 +148,47 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expiresAt := time.Now().Add(sessionTTL)
-	if _, err := h.sessions.Create(r.Context(), tokenHash, u.ID, expiresAt); err != nil {
+
+	// The session and its audit entry share one transaction, like a role
+	// change: a sign-in nobody can account for must not happen. The password
+	// check above stays outside it, so no transaction is open during bcrypt.
+	// The audit insert comes last, right before the commit, because the chain
+	// trigger takes a lock that every audit write waits on until this commits;
+	// ordering it last means the lock covers only the insert and the commit,
+	// the same window a role change holds it for, never the session insert.
+	tx, err := h.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		log.Printf("login: begin: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback() // no-op after Commit
+
+	if _, err := h.sessions.Create(r.Context(), tx, tokenHash, u.ID, expiresAt); err != nil {
 		log.Printf("login: create session: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	h.record(r.Context(), audit.Entry{
+	if err := h.audit.RecordTx(r.Context(), tx, audit.Entry{
 		ActorID:    &u.ID,
 		ActorEmail: u.Email,
 		Action:     audit.ActionLogin,
 		Outcome:    audit.OutcomeSuccess,
 		IP:         ip,
-	})
+	}); err != nil {
+		log.Printf("login: audit: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		log.Printf("login: commit: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 
-	// 4) Send the RAW token to the browser in a hardened cookie. The database
-	// holds only its hash, so this cookie is the only copy of the secret.
+	// 4) Send the RAW token to the browser in a hardened cookie, only now that
+	// the session is committed: a rolled-back sign-in never hands one out. The
+	// database holds only its hash, so this cookie is the only copy of the secret.
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    rawToken,
@@ -182,7 +219,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	// The context carries only the caller's id and role, so load the full row
 	// to answer with. One extra query, and the response reflects the database
 	// at response time rather than at middleware time.
-	u, err := h.users.GetByID(r.Context(), p.ID)
+	u, err := h.users.GetByID(r.Context(), h.db, p.ID)
 	if err != nil {
 		if errors.Is(err, user.ErrUserNotFound) {
 			http.Error(w, "authentication required", http.StatusUnauthorized)
@@ -200,39 +237,70 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles DELETE /api/sessions/current: revoke the current session and
-// clear the cookie. It is public and idempotent — a missing or already-invalid
-// cookie still yields a clean 204, and the cookie is always expired.
+// clear the cookie. It is public and idempotent — a missing cookie, or one
+// that matches no live session, still yields a clean 204 with the cookie
+// expired and no audit entry, since no sign-out happened. Any other failure
+// (a lookup error, a lost audit entry, a failed commit) answers 500, and then
+// the session and the cookie both stay, so the browser's state matches the
+// database's.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	// If a session cookie is present, delete its row so the token is truly
 	// revoked server-side — not merely forgotten by the browser.
 	if c, err := r.Cookie(cookieName); err == nil {
 		tokenHash := session.HashToken(c.Value)
 
-		// Identify the session's owner BEFORE deleting it, so the audit entry
-		// can name them. Costs two reads on a logout, which is a fair price for
-		// a complete session lifecycle in the trail. A cookie that matches no
-		// live session simply yields no entry: there is nobody to name.
-		var actor *user.User
-		if sess, err := h.sessions.GetByTokenHash(r.Context(), tokenHash); err == nil {
-			if u, err := h.users.GetByID(r.Context(), sess.UserID); err == nil {
-				actor = &u
-			}
-		}
-
-		if err := h.sessions.DeleteByTokenHash(r.Context(), tokenHash); err != nil {
-			log.Printf("logout: delete session: %v", err)
+		// The deletion, the lookup of whose session it was, and the audit
+		// entry share one transaction, like a role change: if any of them
+		// fails, the session is not ended and the request fails. The order
+		// keeps the lock order of every other audited change: the session's
+		// row lock first, the audit insert (and the chain lock it takes) last,
+		// right before the commit.
+		tx, err := h.db.BeginTx(r.Context(), nil)
+		if err != nil {
+			log.Printf("logout: begin: %v", err)
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
+		defer tx.Rollback() // no-op after Commit
 
-		if actor != nil {
-			h.record(r.Context(), audit.Entry{
+		// The owner comes back from the DELETE itself, so only the request
+		// that actually ended the session names them: a second sign-out with
+		// the same cookie finds nothing and writes no second entry.
+		userID, err := h.sessions.DeleteByTokenHash(r.Context(), tx, tokenHash)
+		switch {
+		case errors.Is(err, session.ErrSessionNotFound):
+			// No live session behind this cookie: nobody signed out, so
+			// there is nothing to record.
+		case err != nil:
+			log.Printf("logout: delete session: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		default:
+			// Any error here, not-found included, fails the sign-out: a
+			// session was ended, so it must not commit without its entry.
+			actor, err := h.users.GetByID(r.Context(), tx, userID)
+			if err != nil {
+				log.Printf("logout: get user: %v", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+			if err := h.audit.RecordTx(r.Context(), tx, audit.Entry{
 				ActorID:    &actor.ID,
 				ActorEmail: actor.Email,
 				Action:     audit.ActionLogout,
 				Outcome:    audit.OutcomeSuccess,
 				IP:         audit.ClientIP(r),
-			})
+			}); err != nil {
+				log.Printf("logout: audit: %v", err)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			log.Printf("logout: commit: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
 		}
 	}
 

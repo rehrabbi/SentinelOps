@@ -184,8 +184,11 @@ Listed openly, because a portfolio that hides its weak spots is not worth much.
   triggers and rebuild the whole hash chain. The scheduled anchor check catches any rebuild
   that reaches back before the last anchor, but entries written since the last run, at most
   about 6 hours, could still be rewritten undetected.
-- Authentication events are recorded on a best-effort basis, unlike role changes, which
-  are transactional. A failed audit write is logged but does not fail the login.
+- Failed sign-ins are recorded on a best-effort basis: a failed audit write is logged, and the
+  401 stands so the login limiter keeps counting. Everything that changes state (sign-in,
+  sign-out, password and role changes, invites, resets) commits with its audit entry or fails.
+  A sign-out that fails that way leaves the session alive, though the frontend still shows the
+  person as signed out.
 - The free API sleeps after 15 idle minutes, and the first request after that gets Render's
   502 page for up to a minute while it wakes.
 - There is no email, so an admin hands reset links over by hand. If the only admin forgets
@@ -409,6 +412,9 @@ brand and logo, a public landing page and privacy notice, every screen redone, a
 with charts, a light and dark theme, motion that respects reduced-motion settings, an accessibility
 and performance pass, and 292 frontend tests. The API, database and authentication rules are
 unchanged. Released on 2026-11-26.
+
+**Unreleased.** Sign-in and sign-out are audited in the same transaction as the session they create
+or end, so a lost audit entry fails the request instead of going unrecorded.
 
 Deferred: `dev`, `staging`, and `prod` environments. Every free Render service shares 750
 instance-hours a month and production already uses about 744, so a hosted staging environment would
