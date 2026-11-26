@@ -4,7 +4,7 @@
 > we collaborate), then this file (where we are + what's next). `docs/learning-log.md`
 > has the blow-by-blow history.
 >
-> **Last updated:** 2026-11-25 · **Current release:** ✅ **v1.1.0, the frontend redesign**, merged to `main`
+> **Last updated:** 2026-11-26 · **Current release:** ✅ **v1.1.0, the frontend redesign**, merged to `main`
 > and deployed to https://sentinelops.pages.dev, with all nine checks required (v1.0.0 was the first
 > hardened deployment). Next: the post-launch checks, then the v1.1.0 tag on the owner's word. Full
 > detail in §6.

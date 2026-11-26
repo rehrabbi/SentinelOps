@@ -12,7 +12,7 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
 
-## [1.1.0] - 2026-11-25
+## [1.1.0] - 2026-11-26
 
 Frontend redesign: a new look and identity for every screen. The API,
 the database and the authentication rules are unchanged, and the invite and reset links already issued
