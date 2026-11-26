@@ -20,6 +20,7 @@ import { Field } from '../ui/Field'
 import { Spinner } from '../ui/Spinner'
 import { toast } from '../ui/toast-store'
 import { OneTimeLink } from './OneTimeLink'
+import '../ui/Text.css'
 import './Users.css'
 
 // The load state for the user list: exactly one of these three.
@@ -119,7 +120,7 @@ export function UsersPage({ currentUserId }: { currentUserId: string }) {
   return (
     <div className="users-page">
       <div className="users-head">
-        <h1 className="users-h1">Users</h1>
+        <h1 className="ui-page-title">Users</h1>
         <p className="users-lede">
           Accounts exist only by invitation. There is no sign-up, and no email is sent.
         </p>
@@ -128,7 +129,7 @@ export function UsersPage({ currentUserId }: { currentUserId: string }) {
       <InviteForm />
 
       <section className="users-section" aria-labelledby="users-list-title">
-        <h2 id="users-list-title" className="users-h2">
+        <h2 id="users-list-title" className="ui-section-label">
           Everyone with an account
         </h2>
         {list.kind === 'loading' && (
@@ -139,7 +140,7 @@ export function UsersPage({ currentUserId }: { currentUserId: string }) {
         )}
         {list.kind === 'error' && (
           <div className="users-load-error">
-            <p className="users-error" role="alert">
+            <p className="ui-error-text" role="alert">
               {list.message}
             </p>
             <Button variant="secondary" onClick={load}>
@@ -298,7 +299,7 @@ function UserRow({
           </p>
         )}
         {error && (
-          <p id={errorId} className="users-error" role="alert">
+          <p id={errorId} className="ui-error-text" role="alert">
             {error}
           </p>
         )}
@@ -447,7 +448,7 @@ function InviteForm() {
         </div>
       </form>
       {status.kind === 'error' && (
-        <p id={errorId} className="users-error" role="alert">
+        <p id={errorId} className="ui-error-text" role="alert">
           {status.message}
         </p>
       )}

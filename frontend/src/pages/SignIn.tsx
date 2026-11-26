@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { login, ApiError, type User } from '../api'
+import { returnPathFrom } from '../returnTo'
 import { Button } from '../ui/Button'
 import { Field } from '../ui/Field'
 import { AuthError } from './auth/AuthError'
@@ -31,6 +32,8 @@ const UNREACHABLE = "Couldn't reach SentinelOps. Check your connection and try a
  */
 export function SignIn({ onLoggedIn, sessionEnded = false }: SignInProps) {
   const navigate = useNavigate()
+  // Set only when the session ended mid-use (App.tsx); a plain visit to /signin has none.
+  const returnTo = returnPathFrom(useLocation().state)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -65,7 +68,7 @@ export function SignIn({ onLoggedIn, sessionEnded = false }: SignInProps) {
     try {
       const user = await login(email, password)
       onLoggedIn(user)
-      navigate('/', { replace: true })
+      navigate(returnTo ?? '/', { replace: true })
     } catch (err) {
       // api.ts owns the wording: one message for a wrong email or password alike (it never says
       // which, so it cannot reveal whether an account exists), and the wait after too many tries.

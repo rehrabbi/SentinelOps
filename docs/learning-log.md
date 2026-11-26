@@ -1557,6 +1557,30 @@ idle animation that looped forever, a chart readable only by hover, lazy routes)
 *(Tasks 0 to 15a merged into `redesign`; documentation and screenshots in 15b. Release to follow the
 launch pull request.)*
 
+## Frontend follow-ups from the launch review (2026-11-26, branch `feat/launch-follow-ups`)
+
+- **robots.txt.** The SPA fallback had been answering `/robots.txt` with `index.html`. The routes to
+  disallow are the real ones in `App.tsx`: `/account` and `/admin` (the review said `/incidents` and
+  `/users`, which are not paths; the incident list is `/` once signed in), plus `/invite`, `/reset`
+  and `/api/`.
+- **24 px targets.** A 20 px text line plus 2 px padding each side makes the target, and an equal
+  negative margin keeps the footer's layout unchanged. Only the public shell has a footer. A link
+  inside a sentence is exempt from WCAG 2.5.8, so the credit's link was left alone.
+- **Returning after expiry.** The place rides in router location state (`history.state`), never
+  storage, and is validated on write and again on read (`src/returnTo.ts`). Lesson: signing in makes
+  the `/signin` route's "already signed in, go home" guard render before the page's own `navigate`
+  runs, so the guard had to honour the remembered place too; the first test caught it.
+- **Shared kit classes.** The three copies of each rule were byte-identical, so they moved to
+  `src/ui/Text.css` unchanged. Checked in a browser: 17 computed properties and the box height of the
+  h1, h2 and error text on all three pages were the same before and after.
+- **aria-invalid.** The API answers a wrong current password with 403; other failures (400, 429) say
+  nothing about that field.
+- **Built HTML test.** `build.test.ts` already built in memory, so it now builds once with
+  `VITE_API_URL` empty and checks the HTML against the CSP rules. Writing nothing to `dist` means it
+  cannot disturb anything using that folder.
+- **Dev server note.** The API's CORS allows only `http://localhost:8081`, and the Vite config has no
+  `/api` proxy, so a dev server on another port cannot sign in; use 8081 for browser checks.
+
 ---
 
 ## 2026-11-26: Transactional audit for sign-in and sign-out

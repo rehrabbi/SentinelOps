@@ -97,6 +97,29 @@ describe('SVG files are inert', () => {
   })
 })
 
+describe('robots.txt', () => {
+  const lines = readFileSync(join(frontend, 'public/robots.txt'), 'utf8')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'))
+
+  it('applies to every crawler and allows the public pages', () => {
+    expect(lines).toContain('User-agent: *')
+    expect(lines).toContain('Allow: /')
+    for (const path of ['/', '/privacy', '/signin']) expect(lines).not.toContain(`Disallow: ${path}`)
+  })
+
+  it('keeps crawlers off the API, the signed-in screens and the one-time-link pages', () => {
+    for (const path of ['/api/', '/account', '/admin', '/invite', '/reset']) {
+      expect(lines).toContain(`Disallow: ${path}`)
+    }
+  })
+
+  it('names no sitemap, because none exists', () => {
+    expect(lines.some((l) => /^sitemap:/i.test(l))).toBe(false)
+  })
+})
+
 describe('index.html', () => {
   const html = readFileSync(join(frontend, 'index.html'), 'utf8')
 
