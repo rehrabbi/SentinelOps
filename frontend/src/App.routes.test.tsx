@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, useLocation } from 'react-router'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, useLocation, type InitialEntry } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Role, User } from './api'
 
@@ -10,6 +11,7 @@ vi.mock('./api', async (importOriginal) => {
     getMe: vi.fn(),
     getIncidents: vi.fn().mockResolvedValue([]),
     getUsers: vi.fn().mockResolvedValue([]),
+    login: vi.fn(),
     logout: vi.fn().mockResolvedValue(undefined),
   }
 })
@@ -39,7 +41,7 @@ function Where() {
   return <p data-testid="where">{pathname}</p>
 }
 
-function renderAt(path: string) {
+function renderAt(path: InitialEntry) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <App />
@@ -245,5 +247,62 @@ describe('route changes', () => {
     await userEvent.click(screen.getAllByRole('link', { name: 'Privacy' })[0])
     const privacy = await heading('Privacy')
     await waitFor(() => expect(document.activeElement).toBe(privacy))
+  })
+})
+
+describe('returning to the page after the session ended', () => {
+  const expire = async () => {
+    // A real request that comes back 401 reaches the app's expiry handler.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })))
+    try {
+      await api.changePassword('current-fixture', 'new-fixture-password').catch(() => {})
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }
+
+  async function signInAgain() {
+    await userEvent.type(await screen.findByLabelText('Email'), 'm.santos@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'fixture-password')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+  }
+
+  it('returns to the admin screen, search included, after an expiry on it', async () => {
+    getMe.mockResolvedValue(user('admin'))
+    vi.mocked(api.login).mockResolvedValue(user('admin'))
+    renderAt('/admin?tab=invites')
+    await screen.findByRole('heading', { level: 1, name: 'Users' })
+    await expire()
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/signin'))
+    await signInAgain()
+    await screen.findByRole('heading', { level: 1, name: 'Users' })
+    expect(screen.getByTestId('where').textContent).toBe('/admin')
+  })
+
+  it('ignores a hostile remembered place and lands on the default route', async () => {
+    getMe.mockResolvedValue(null)
+    vi.mocked(api.login).mockResolvedValue(user('analyst'))
+    renderAt({ pathname: '/signin', state: { from: '//evil.example' } })
+    await signInAgain()
+    await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    expect(screen.getByTestId('where').textContent).toBe('/')
+  })
+
+  it('does not return to a public or token route', async () => {
+    getMe.mockResolvedValue(null)
+    vi.mocked(api.login).mockResolvedValue(user('analyst'))
+    renderAt({ pathname: '/signin', state: { from: '/reset?token=word' } })
+    await signInAgain()
+    await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    expect(screen.getByTestId('where').textContent).toBe('/')
+  })
+
+  it('keeps a plain sign-in going to the default route', async () => {
+    getMe.mockResolvedValue(null)
+    vi.mocked(api.login).mockResolvedValue(user('analyst'))
+    renderAt('/signin')
+    await signInAgain()
+    await screen.findByRole('heading', { level: 1, name: 'Incidents' })
+    expect(screen.getByTestId('where').textContent).toBe('/')
   })
 })
