@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
     "preview": "vite preview",
     "icons": "node scripts/render-icons.mjs",
     "board": "node scripts/brand-board/gen-html.mjs && node scripts/brand-board/gen-png.mjs"

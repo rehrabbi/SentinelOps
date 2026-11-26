@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import { loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -38,5 +38,7 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
+    // e2e/ holds the Playwright tests (npm run e2e), which need a real browser and API.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 }))
