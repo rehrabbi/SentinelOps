@@ -113,9 +113,12 @@ test('a reset link sets a new password and ends every other session', async ({ b
   await expect(other).toHaveURL(`${ORIGIN}/signin`)
   await expect(other.getByRole('alert')).toHaveText('Your session ended. Sign in again.')
 
-  // The new password works, here and in the other browser alike.
+  // The new password works, here and in the other browser alike. The other browser was on its way
+  // to Users when its session ended, so signing in again takes it back there, not to Incidents.
   await signIn(other, NEW_PASSWORD)
-  await expectIncidentsScreen(other)
+  await expect(other).toHaveURL(`${ORIGIN}/admin`)
+  await expect(other.getByRole('heading', { level: 1, name: 'Users' })).toBeVisible()
+  await expect(other).toHaveTitle('Users · SentinelOps')
 
   await page.getByRole('link', { name: 'Sign in with your new password' }).click()
   await expect(page).toHaveURL(`${ORIGIN}/signin`)
