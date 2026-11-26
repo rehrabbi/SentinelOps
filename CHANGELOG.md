@@ -12,6 +12,19 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
 
+### Added
+
+- A `robots.txt`: search engines may crawl the landing, sign-in and privacy pages, and are asked to
+  stay out of the API, the signed-in screens and the invite and reset links.
+- After a session ends mid-use, signing in again returns to the screen you were on (and its search
+  part), not always to the incident list. Nothing is stored in the browser for this.
+
+### Fixed
+
+- The footer links are 24 px tall (WCAG 2.5.8), so they are easier to hit on touch screens.
+- The current-password field on the Account page is marked invalid only when the server says that
+  password is wrong, not for a weak new password or too many attempts.
+
 ## [1.1.0] - 2026-11-26
 
 Frontend redesign: a new look and identity for every screen. The API,
