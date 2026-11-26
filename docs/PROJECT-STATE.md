@@ -5,9 +5,9 @@
 > has the blow-by-blow history.
 >
 > **Last updated:** 2026-11-26 · **Current release:** ✅ **v1.1.0, the frontend redesign**, tagged and live at
-> https://sentinelops.pages.dev, with all nine checks required (v1.0.0 was the first hardened
+> https://sentinelops.pages.dev, with all ten checks required (v1.0.0 was the first hardened
 > deployment). Since v1.1.0, `main` also has browser-level tests, transactional sign-in audit and the
-> launch follow-ups, all live (API `sha-3f4eac2`, deployed 2026-11-26). Next: §6.
+> launch follow-ups, all live (API `sha-71b9844`, deployed 2026-11-26). Next: §6.
 
 ---
 
@@ -305,8 +305,13 @@ The API image built from 3f4eac2 (sign-in and sign-out commit with their audit e
 -refresh-only`, after which `plan` said "No changes". Through the site, `/api/healthz` answers 200; the
 API refuses direct requests without the proxy secret (403).
 
+The same day, also at the owner's request, the image built from 71b9844 (#109: a wrong current
+password's audit entry is best effort, so the change limiter keeps counting) was deployed the same way,
+pinned in #110; `plan` again said "No changes". The owner's signed-in pass on the live site is done,
+and the Audit verify run after it found the chain intact at 11 entries. "End-to-end (Playwright)" is now
+a required check on `main`, the tenth.
+
 Owner to-dos still open:
-- Sign in on the live site and go through incidents, users, invites, resets and account security.
 - Turn on 2FA for Backblaze.
 
 **Locked decisions for this stage** (reasons in `docs/adr/0001-frontend-design-system.md`; values in
