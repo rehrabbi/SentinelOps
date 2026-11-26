@@ -1714,6 +1714,8 @@ origin. No production default changed.
 - ~~Since 2026-11-26 a sign-out can fail with a 500 when the audit log is broken, and the frontend's
   Log out then clears local state while the session survives~~ Resolved 2026-11-26 in PR #103: the
   person stays signed in and an error toast says the sign-out did not complete.
-- A wrong current password on `PUT /api/me/password` writes its failure entry strictly: a lost entry
+- ~~A wrong current password on `PUT /api/me/password` writes its failure entry strictly: a lost entry
   becomes a 500, which the change limiter (it counts 403s) does not count. Failed sign-ins were kept best
-  effort for exactly that reason. Should this failure entry follow them?
+  effort for exactly that reason. Should this failure entry follow them?~~ Resolved 2026-11-26: yes, at
+  the owner's request. The entry is best effort; `TestWrongCurrentPasswordsReachLimitWithoutAudit`
+  proves the 11th wrong guess still gets a 429 while the entries fail.

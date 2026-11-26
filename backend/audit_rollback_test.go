@@ -385,6 +385,25 @@ func TestChangePasswordRollsBackWithoutAudit(t *testing.T) {
 		map[string]string{"email": u.Email, "password": newTestPassword})
 }
 
+// A wrong current password changes nothing, so its entry is best effort, like a
+// failed sign-in: with the entries failing, each guess is still a 403, which
+// the change limiter counts, until the 11th is refused.
+func TestWrongCurrentPasswordsReachLimitWithoutAudit(t *testing.T) {
+	srv := newServer(t, serverConfig{})
+	c, u := signUp(t, srv, "change-limit-fault", "")
+	wrong := map[string]string{"currentPassword": "wrong-password-123", "newPassword": newTestPassword}
+
+	failAudit(t, audit.ActionPasswordChanged, u.Email)
+	for i := 0; i < 10; i++ {
+		c.expect(http.StatusForbidden, "PUT", "/api/me/password", wrong)
+	}
+	c.expect(http.StatusTooManyRequests, "PUT", "/api/me/password", wrong)
+	if n := countAudit(t, audit.ActionPasswordChanged, u.Email); n != 0 {
+		t.Errorf("%d password-change entries written through the fault, want 0", n)
+	}
+	requireIntactChain(t)
+}
+
 // An invite acceptance whose audit entry is lost creates no account and
 // leaves the invite usable.
 func TestInviteAcceptRollsBackWithoutAudit(t *testing.T) {
