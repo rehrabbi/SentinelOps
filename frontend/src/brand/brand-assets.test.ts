@@ -33,6 +33,25 @@ describe('rendered icons', () => {
       expect(pngSize(path)).toEqual({ width, height })
     })
   }
+
+  it('frontend/public/favicon.ico holds 16, 32 and 48 px PNG images', () => {
+    const buf = readFileSync(join(frontend, 'public/favicon.ico'))
+    expect(buf.readUInt16LE(0)).toBe(0)
+    expect(buf.readUInt16LE(2)).toBe(1)
+    const count = buf.readUInt16LE(4)
+    const sizes: number[] = []
+    for (let i = 0; i < count; i++) {
+      const entry = 6 + 16 * i
+      const length = buf.readUInt32LE(entry + 8)
+      const offset = buf.readUInt32LE(entry + 12)
+      const image = buf.subarray(offset, offset + length)
+      expect(image.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
+      const size = buf.readUInt8(entry)
+      expect({ width: image.readUInt32BE(16), height: image.readUInt32BE(20) }).toEqual({ width: size, height: size })
+      sizes.push(size)
+    }
+    expect(sizes).toEqual([16, 32, 48])
+  })
 })
 
 describe('site.webmanifest', () => {
