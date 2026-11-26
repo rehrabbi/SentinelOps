@@ -36,28 +36,30 @@ it('never inlines a font into the built CSS', () => {
 // The CSP (public/_headers) forbids inline <script>, <style> and style attributes in served HTML.
 describe('the built index.html', () => {
   const html = () => String(asset((name) => name === 'index.html')[0]?.source)
+  // Parsed as a browser would, so odd spellings like `</script >` cannot slip past a pattern.
+  const doc = () => new DOMParser().parseFromString(html(), 'text/html')
 
   it('is emitted', () => {
-    expect(html()).toContain('<div id="root">')
+    expect(doc().getElementById('root')).not.toBeNull()
   })
 
   it('has no inline script: every <script> has a src and is empty', () => {
-    const scripts = [...html().matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    const scripts = [...doc().querySelectorAll('script')]
     expect(scripts.length).toBeGreaterThan(0)
-    for (const [, attrs, body] of scripts) {
-      expect(attrs).toMatch(/\ssrc=/)
-      expect(body.trim()).toBe('')
+    for (const script of scripts) {
+      expect(script.getAttribute('src')).toBeTruthy()
+      expect(script.textContent?.trim()).toBe('')
     }
   })
 
   it('has no <style> element and no style attribute', () => {
-    expect(html()).not.toMatch(/<style\b/i)
-    expect(html()).not.toMatch(/\sstyle\s*=/i)
+    expect(doc().querySelectorAll('style')).toHaveLength(0)
+    expect(doc().querySelectorAll('[style]')).toHaveLength(0)
   })
 
   it('keeps the /api/me preload when VITE_API_URL is empty', () => {
-    expect(html()).toMatch(
-      /<link\b(?=[^>]*\srel="preload")(?=[^>]*\shref="\/api\/me")(?=[^>]*\sas="fetch")(?=[^>]*\scrossorigin="use-credentials")[^>]*>/,
-    )
+    const preload = doc().querySelector('link[rel="preload"][href="/api/me"]')
+    expect(preload?.getAttribute('as')).toBe('fetch')
+    expect(preload?.getAttribute('crossorigin')).toBe('use-credentials')
   })
 })
