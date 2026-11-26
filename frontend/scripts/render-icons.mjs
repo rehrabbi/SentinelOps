@@ -1,7 +1,8 @@
 // Writes every logo file and icon from the geometry in src/brand/geometry.ts:
 //   public/favicon.svg, public/mask-icon.svg, docs/brand/logo-{mark,wordmark,lockup}[-light].svg,
-//   and, rendered with @resvg/resvg-js, public/favicon-32.png, apple-touch-icon.png, icon-192.png,
-//   icon-512.png, og-image.png (1200x630) and docs/images/social-card.png (1280x640).
+//   and, rendered with @resvg/resvg-js, public/favicon-32.png, favicon.ico (16, 32 and 48 px),
+//   apple-touch-icon.png, icon-192.png, icon-512.png, og-image.png (1200x630) and
+//   docs/images/social-card.png (1280x640).
 // Run from frontend/ with `npm run icons`, then commit the results. The tests read the committed
 // files; nothing is generated during `npm test`.
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -95,6 +96,35 @@ function tile(size, share, radius = 0) {
 
 // 32 px: the 64-unit grid at exactly half scale, so every horizontal edge lands on a pixel.
 write(join(frontend, 'public/favicon-32.png'), png(tile(32, 1, 6)));
+
+/**
+ * An .ico file holding PNG images, one per size. Anything that asks for /favicon.ico by name
+ * (bookmarks, search results, older tools) otherwise gets the site's HTML page.
+ * Layout: a 6-byte header, a 16-byte directory entry per image, then the images.
+ */
+function ico(sizes) {
+  const images = sizes.map((size) => png(tile(size, 1, (size * 6) / 32)));
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // 1 = icon
+  header.writeUInt16LE(images.length, 4);
+  let offset = 6 + 16 * images.length;
+  const entries = images.map((image, i) => {
+    const entry = Buffer.alloc(16);
+    entry.writeUInt8(sizes[i] % 256, 0); // width; 0 means 256
+    entry.writeUInt8(sizes[i] % 256, 1); // height
+    entry.writeUInt8(0, 2); // no palette
+    entry.writeUInt8(0, 3); // reserved
+    entry.writeUInt16LE(1, 4); // colour planes
+    entry.writeUInt16LE(32, 6); // bits per pixel
+    entry.writeUInt32LE(image.length, 8);
+    entry.writeUInt32LE(offset, 12);
+    offset += image.length;
+    return entry;
+  });
+  return Buffer.concat([header, ...entries, ...images]);
+}
+write(join(frontend, 'public/favicon.ico'), ico([16, 32, 48]));
 // The mark's corners stay inside the central 80% circle, so the tiles also survive a round mask.
 write(join(frontend, 'public/apple-touch-icon.png'), png(tile(180, 0.6)));
 write(join(frontend, 'public/icon-192.png'), png(tile(192, 0.6)));
