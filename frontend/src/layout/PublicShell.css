@@ -63,6 +63,15 @@
   transition: text-decoration-color var(--dur-fast) ease;
 }
 
+/* WCAG 2.5.8: a stand-alone link needs a 24 px target; its text line is 20 px. The padding adds
+   the missing 4 px and the equal negative margin takes it back out of the layout, so the footer's
+   rhythm is unchanged. (The credit's link sits inside a sentence, which the rule exempts.) */
+.ui-public-footer-links a {
+  display: inline-block;
+  padding-block: 2px;
+  margin-block: -2px;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .ui-public-footer a:hover {
     text-decoration-color: currentColor;

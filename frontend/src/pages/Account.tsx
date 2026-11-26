@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { changePassword, logoutEverywhere, type User } from '../api'
+import { ApiError, changePassword, logoutEverywhere, type User } from '../api'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Field } from '../ui/Field'
 import { errorMessage, type FormStatus } from './formStatus'
+import '../ui/Text.css'
 import './Account.css'
 
 // AccountPage is where people keep control of their own account: change the password, or end
@@ -13,7 +14,7 @@ export function AccountPage({ user, onLoggedOut }: { user: User; onLoggedOut: ()
   return (
     <div className="account-page">
       <div className="account-head">
-        <h1 className="account-h1">Account</h1>
+        <h1 className="ui-page-title">Account</h1>
         <p className="account-lede">
           Signed in as <span className="account-mono">{user.email}</span>
         </p>
@@ -32,6 +33,9 @@ function ChangePasswordForm({ email }: { email: string }) {
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
   const [mismatch, setMismatch] = useState(false)
+  // The server refused the current password (403). Only then is that field the invalid one; a
+  // weak new password or too many attempts is not its fault.
+  const [currentWrong, setCurrentWrong] = useState(false)
   const [status, setStatus] = useState<FormStatus>({ kind: 'idle' })
 
   // The submit button is disabled while the request runs, which drops focus to the page. When the
@@ -47,6 +51,8 @@ function ChangePasswordForm({ email }: { email: string }) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    // Each attempt starts with no field blamed; only this attempt's outcome may mark one.
+    setCurrentWrong(false)
     // A typo in a password nobody can see would lock its owner out, so the new one is typed
     // twice. The server does not need the copy.
     if (next !== confirm) {
@@ -63,6 +69,7 @@ function ChangePasswordForm({ email }: { email: string }) {
       setConfirm('')
       setStatus({ kind: 'done' })
     } catch (err) {
+      setCurrentWrong(err instanceof ApiError && err.status === 403)
       setStatus({ kind: 'error', message: errorMessage(err, 'Something went wrong') })
     }
   }
@@ -85,7 +92,7 @@ function ChangePasswordForm({ email }: { email: string }) {
           required
           autoComplete="current-password"
           aria-describedby={status.kind === 'error' && !mismatch ? errorId : undefined}
-          aria-invalid={status.kind === 'error' && !mismatch ? true : undefined}
+          aria-invalid={status.kind === 'error' && currentWrong ? true : undefined}
         />
         <Field
           label="New password"
@@ -109,7 +116,7 @@ function ChangePasswordForm({ email }: { email: string }) {
           error={mismatch && status.kind === 'error' ? status.message : undefined}
         />
         {status.kind === 'error' && !mismatch && (
-          <p id={errorId} className="account-error" role="alert">
+          <p id={errorId} className="ui-error-text" role="alert">
             {status.message}
           </p>
         )}
@@ -161,7 +168,7 @@ function LogoutEverywhere({ onLoggedOut }: { onLoggedOut: () => void }) {
         lost or someone else may have your password.
       </p>
       {status.kind === 'error' && (
-        <p className="account-error" role="alert">
+        <p className="ui-error-text" role="alert">
           {status.message}
         </p>
       )}

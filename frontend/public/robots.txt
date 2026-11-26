@@ -1,0 +1,9 @@
+# The public pages (/, /privacy, /signin) may be crawled. The API, the signed-in
+# screens and the one-time-link pages are not for search engines.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /account
+Disallow: /admin
+Disallow: /invite
+Disallow: /reset

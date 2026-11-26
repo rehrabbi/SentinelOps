@@ -90,11 +90,41 @@ describe('Account page', () => {
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toBe('current password is incorrect')
     expect(screen.getByLabelText('Current password').getAttribute('aria-describedby')).toBe(alert.id)
+    expect(screen.getByLabelText('Current password').getAttribute('aria-invalid')).toBe('true')
     expect(onLoggedOut).not.toHaveBeenCalled()
     // Still on the Account page, fields kept so the person can correct the one that was wrong.
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeTruthy()
     expect((screen.getByLabelText('Current password') as HTMLInputElement).value).toBe('wrong-password-1')
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Change password' })))
+  })
+
+  it.each([
+    [400, 'password must be at least 12 characters'],
+    [429, 'Too many attempts. Try again later.'],
+  ])('does not mark the current password invalid for a %i error', async (status, message) => {
+    const u = userEvent.setup()
+    changePassword.mockRejectedValue(new api.ApiError(status, message))
+    renderPage()
+    await fill(u, 'right-password-1', 'brand-new-password', 'brand-new-password')
+    await u.click(screen.getByRole('button', { name: 'Change password' }))
+    expect((await screen.findByRole('alert')).textContent).toBe(message)
+    expect(screen.getByLabelText('Current password').hasAttribute('aria-invalid')).toBe(false)
+  })
+
+  it('stops marking the current password invalid when the next attempt is a mismatch', async () => {
+    const u = userEvent.setup()
+    changePassword.mockRejectedValue(new api.ApiError(403, 'current password is incorrect'))
+    renderPage()
+    await fill(u, 'wrong-password-1', 'brand-new-password', 'brand-new-password')
+    await u.click(screen.getByRole('button', { name: 'Change password' }))
+    await screen.findByText('current password is incorrect')
+    expect(screen.getByLabelText('Current password').getAttribute('aria-invalid')).toBe('true')
+
+    await u.type(screen.getByLabelText('Confirm new password'), 'x')
+    await u.click(screen.getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('The new passwords do not match')).toBeTruthy()
+    expect(screen.getByLabelText('Current password').hasAttribute('aria-invalid')).toBe(false)
+    expect(screen.getByLabelText('Confirm new password').getAttribute('aria-invalid')).toBe('true')
   })
 
   it('logs out everywhere, tells the app, and leaves for the sign-in screen', async () => {

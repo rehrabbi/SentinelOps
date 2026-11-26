@@ -11,6 +11,7 @@ import { Landing } from "./pages/Landing";
 import { Privacy } from "./pages/Privacy";
 import { ResetPassword } from "./pages/ResetPassword";
 import { SignIn } from "./pages/SignIn";
+import { returnPathFrom, returnState } from "./returnTo";
 import { clearToasts } from "./ui/toast-store";
 
 // The signed-in screens load on demand, as their own files, so the public pages (landing, sign
@@ -41,7 +42,8 @@ export interface AppProps {
 function App({ firstSessionCheck }: AppProps) {
   const [auth, setAuth] = useState<AuthState>({ kind: "loading" });
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
 
   // Titles every page and, after an in-app navigation, moves focus to the new page's heading.
   useRouteFocus(auth.kind === "loading" ? null : auth.kind === "authenticated");
@@ -51,6 +53,12 @@ function App({ firstSessionCheck }: AppProps) {
   useEffect(() => {
     authRef.current = auth;
   }, [auth]);
+
+  // Where the person is now, for the same handler: it is remembered on the way to /signin.
+  const locationRef = useRef(location);
+  useEffect(() => {
+    locationRef.current = location;
+  }, [location]);
 
   // A 401 from any working request means the session ended under us: sign the
   // app out and send the person to sign in again, once. Several requests can
@@ -70,7 +78,9 @@ function App({ firstSessionCheck }: AppProps) {
         clearToasts();
         startTransition(() => {
           setAuth(ended);
-          navigate("/signin", { replace: true });
+          // Pathname and search only, and only for a place worth returning to (see returnTo.ts).
+          // It rides in the router's location state, not in storage.
+          navigate("/signin", { replace: true, state: returnState(locationRef.current) });
         });
       }),
     [navigate]
@@ -139,6 +149,8 @@ function App({ firstSessionCheck }: AppProps) {
   );
 
   return (
+    // A new public or one-time-link route also belongs in NOT_RETURNABLE in returnTo.ts, or a
+    // session that ends there would bring the person back to it after signing in.
     <Routes>
       <Route
         path="/"
@@ -157,7 +169,9 @@ function App({ firstSessionCheck }: AppProps) {
         path="/signin"
         element={
           user ? (
-            <Navigate to="/" replace />
+            // Signing in makes this guard render before SignIn's own navigate lands, so the
+            // remembered place has to be honoured here too (it is revalidated on every read).
+            <Navigate to={returnPathFrom(location.state) ?? "/"} replace />
           ) : (
             pub(
               <SignIn
