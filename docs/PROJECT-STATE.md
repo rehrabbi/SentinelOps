@@ -330,11 +330,15 @@ Owner to-dos still open:
 
 ### After v1.1.0: candidates
 
-1. **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
-   component tests exist now).
-2. **Environments**, still deferred while every free Render service shares 750 hours.
-3. **Return API deploys to Terraform** once render-oss/terraform-provider-render#105 ships.
-4. ~~**Frontend follow-ups from the launch review:** shared page-title, section-label and error-text
+1. ✅ **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
+   component tests exist now). Done 2026-11-26 on `feat/e2e-playwright`: `frontend/e2e/`, `npm run e2e`,
+   the `End-to-end (Playwright)` job in `ci.yml` (not yet a required check; how to run it is in
+   `CONTRIBUTING.md`).
+2. ✅ **Transactional audit for authentication events**, so a lost entry fails the login, like role
+   changes. Done 2026-11-26 in PR #103 (see the learning log).
+3. **Environments**, still deferred while every free Render service shares 750 hours.
+4. **Return API deploys to Terraform** once render-oss/terraform-provider-render#105 ships.
+5. ~~**Frontend follow-ups from the launch review:** shared page-title, section-label and error-text
    classes in the kit; a real `robots.txt`; footer links at least 24 px tall (WCAG 2.5.8); returning to
    the page someone was on after their session expires; `aria-invalid` on the current-password field
    only when that field is wrong; and a test that checks the built `index.html` for inline code.~~ Done 2026-11-26 on

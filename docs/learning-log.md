@@ -1583,6 +1583,7 @@ launch pull request.)*
 
 ---
 
+<<<<<<< HEAD
 ## 2026-11-26: Transactional audit for sign-in and sign-out
 
 **Decision:** a successful sign-in and a sign-out now commit their session change and its audit entry in
@@ -1651,6 +1652,48 @@ was expected) and pass now; the full backend suite, `go vet` and `govulncheck` a
 - A test proves wrong passwords still reach the limiter's 429 while their audit entries fail.
 
 *(Committed on `feat/transactional-auth-audit`.)*
+=======
+## 2026-11-26 — Browser-level end-to-end tests (Playwright)
+
+**Decision:** add a small Playwright suite (`frontend/e2e/`) that drives accepting an invite, signing
+out and in, and a password reset in real Chromium, against the real API and a real database, as a
+separate CI job. The one new package is `@playwright/test`, as a development dependency.
+
+**Why, when there are already 293 component tests:** the Vitest tests render one component in jsdom
+with the API mocked. They prove a page reacts correctly to the answers it is given, but not that those
+answers really come: that the cookie is set and sent back, that the CSP lets every script and font load,
+that `/api/me` is preloaded and used, that a reset really ends another browser's session. jsdom has no
+network, no cookie jar shared with a server, no CSP and no layout. An end-to-end test has all of them,
+at the price of being slower and coarser, so there are only a few, each covering a whole journey.
+
+**Topology:** production is one origin. Pages serves the site and its Function forwards `/api` to the
+API, so the session cookie is first-party and `SameSite=Lax` holds. Local development is two origins
+(Vite on 5173, the API on 8080, CORS in between), which would test something production never does. The
+e2e run copies production instead: the app is built the way the deploy workflow builds it
+(`VITE_API_URL` empty, which also adds the `/api/me` preload), and `vite preview` serves it with an
+e2e-only config (`frontend/e2e/vite.config.ts`) that proxies `/api` to the API and sends the headers from
+`public/_headers`, CSP included. The API runs as local development already does, using environment
+variables that already exist: plain http with `SECURE_COOKIES=false`, `PROXY_SECRET` unset (no proxy
+check, and the connection's own address as the client IP), and `FRONTEND_ORIGIN` set to the preview's
+origin. No production default changed.
+
+**Seeding through the real tools:** the run drops and recreates its own database (`*_e2e` on
+`localhost` only, refused otherwise), runs `migrate`, and makes the first admin with
+`invite --role admin`, the same way a fresh deployment does, so the CLI is tested too.
+
+**What I learned:**
+- **Make the guard fail before trusting it.** Each test fails on a CSP violation, an uncaught error or
+  an unexpected console error. A throwaway spec injected an inline script, logged an error and caused an
+  unlisted 401, and all three failed, before the guard was trusted. Expected 401s (`/api/me` when signed
+  out, a wrong password, the request that finds a session ended) are allowed per test, by path.
+- **Accessible locators double as accessibility checks.** Finding fields by label and buttons by role
+  means a lost label fails the test. The focus checks (back to the password after a wrong one, to the
+  `h1` after signing in) are things jsdom could only approximate.
+- **A fixed port is a shared resource.** The API always listens on 8080, so the run refuses to start if
+  anything already answers there, rather than quietly testing the wrong API.
+- **Serial tests that build on each other cannot be retried one by one**, so retries are off and the
+  suite is kept short.
+>>>>>>> origin/main
 
 ---
 

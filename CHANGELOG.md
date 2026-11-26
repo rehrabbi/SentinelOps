@@ -14,6 +14,8 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ### Added
 
+- Browser-level end-to-end tests of accepting an invite, signing in and out, and resetting a password,
+  run with Playwright in Chromium against the real API and database, as a CI job (`npm run e2e` locally).
 - A `robots.txt`: search engines may crawl the landing, sign-in and privacy pages, and are asked to
   stay out of the API, the signed-in screens and the invite and reset links.
 - After a session ends mid-use, signing in again returns to the screen you were on (and its search
@@ -35,6 +37,11 @@ usage), a **minor** version for new features, and a **patch** for fixes.
   cannot be written, the request fails with a 500 and nothing changes: no session and no cookie on a
   sign-in, and the session stays on a sign-out. Failed sign-ins are still recorded on a best-effort
   basis, so a broken audit log never stops the login limiter from counting wrong passwords.
+
+### Security
+
+- `golang.org/x/crypto` is updated from 0.55.0 to 0.59.0, which fixes CVE-2026-56855 and
+  CVE-2026-78662. `govulncheck` found neither reachable from SentinelOps' code.
 
 ## [1.1.0] - 2026-11-26
 
