@@ -359,9 +359,8 @@ were already transactional. Failed sign-ins stay best effort on purpose, because
 only 401s (reason in `recordFailedLogin`, `backend/internal/auth/handler.go`). `backend/audit_rollback_test.go`
 proves every one of these paths, and the role change, rolls back when its entry fails. The frontend's Log
 out now signs the browser out only after a 204 or a 401; on any other answer the person stays signed in
-and sees an error. One question for the owner remains, in `docs/learning-log.md` under "Questions to
-revisit later": a wrong current password's failure entry is still strict, so a lost one is a 500 the
-change limiter does not count.
+and sees an error. A wrong current password's failure entry is best effort too (owner's call,
+2026-11-26), so a broken audit log cannot stop the change limiter counting guesses.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly (also on a copy from Backblaze now
 and then); follow `docs/RUNBOOK.md` for any alert.
