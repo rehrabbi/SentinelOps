@@ -328,18 +328,27 @@ Owner to-dos still open:
 - Known smaller item, deferred: with two status saves in flight, focus goes to whichever row finishes
   first.
 
-### After v1.1.0: candidates, none started
+### After v1.1.0: candidates
 
 1. **A browser-level test** of the login and reset flows in CI, to sit above the jsdom tests (the
    component tests exist now).
-2. **Transactional audit for authentication events**, so a lost entry fails the login, like role
-   changes.
-3. **Environments**, still deferred while every free Render service shares 750 hours.
-4. **Return API deploys to Terraform** once render-oss/terraform-provider-render#105 ships.
-5. **Frontend follow-ups from the launch review:** shared page-title, section-label and error-text
+2. **Environments**, still deferred while every free Render service shares 750 hours.
+3. **Return API deploys to Terraform** once render-oss/terraform-provider-render#105 ships.
+4. **Frontend follow-ups from the launch review:** shared page-title, section-label and error-text
    classes in the kit; a real `robots.txt`; footer links at least 24 px tall (WCAG 2.5.8); returning to
    the page someone was on after their session expires; `aria-invalid` on the current-password field
    only when that field is wrong; and a test that checks the built `index.html` for inline code.
+
+**✅ Done 2026-11-26, on `feat/transactional-auth-audit` (not yet in `main` or a release): transactional
+audit for authentication events.** A successful sign-in and a sign-out now commit their session change
+with its audit entry, or answer 500 and change nothing; a rolled-back sign-in sets no cookie. Password
+change, log out everywhere, invites, resets and the `invite` and `reset-password` subcommands were
+already transactional. Failed sign-ins stay best effort on purpose, because the login limiter counts only
+401s (reason in `recordFailedLogin`, `backend/internal/auth/handler.go`). `backend/audit_rollback_test.go`
+proves every one of these paths, and the role change, rolls back when its entry fails. Two questions for
+the owner came out of it, recorded in `docs/learning-log.md` under "Questions to revisit later": the
+frontend's Log out clears local state even when the server's sign-out failed, and a wrong current
+password's failure entry is still strict, so a lost one is a 500 the change limiter does not count.
 
 Operating routines: run `infra/restore-drill.sh` at least monthly (also on a copy from Backblaze now
 and then); follow `docs/RUNBOOK.md` for any alert.

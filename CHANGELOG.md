@@ -12,6 +12,14 @@ usage), a **minor** version for new features, and a **patch** for fixes.
 
 ## [Unreleased]
 
+### Security
+
+- Signing in and signing out are now recorded in the audit log in the same transaction as the session
+  they create or end, as role changes, password changes, resets and invites already were. If the entry
+  cannot be written, the request fails with a 500 and nothing changes: no session and no cookie on a
+  sign-in, and the session stays on a sign-out. Failed sign-ins are still recorded on a best-effort
+  basis, so a broken audit log never stops the login limiter from counting wrong passwords.
+
 ## [1.1.0] - 2026-11-26
 
 Frontend redesign: a new look and identity for every screen. The API,

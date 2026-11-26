@@ -1559,6 +1559,60 @@ launch pull request.)*
 
 ---
 
+## 2026-11-26: Transactional audit for sign-in and sign-out
+
+**Decision:** a successful sign-in and a sign-out now commit their session change and its audit entry in
+one transaction, the rule role changes have followed since the audit stage. If the entry cannot be
+written, the request answers 500 and nothing changes: a sign-in creates no session and sets no cookie,
+and a sign-out leaves the session and the cookie in place. Failed sign-ins stay best effort.
+
+**Why it was asymmetric before:** at the audit stage, login and logout had no transaction to join, so
+they wrote their entry on its own connection and only logged a failure. That left a gap: with the audit
+insert failing (a full disk, a broken trigger, a revoked grant), people could sign in and out with no
+record at all, which is the one thing an audit trail must never allow.
+
+**What was already transactional:** the stage's other events had been built that way from the start:
+password change, log out everywhere, invite issued and accepted, reset issued and used, and the
+`invite` and `reset-password` subcommands, which call the same functions. They had no automated proof,
+though; the role change had only been fault-injected by hand.
+
+**Why failed sign-ins stay best effort:**
+- Nothing changed, so there is nothing to roll back.
+- The login limiter counts only 401 responses. If a lost entry turned a failed sign-in into a 500,
+  wrong guesses would stop counting exactly while the audit log is broken, which is when nobody is
+  watching.
+- The response has to be the same 401 whatever the reason, so it cannot carry the audit outcome anyway.
+
+**Concepts learned:**
+- **A shared fate needs a shared transaction.** Two writes on two connections can each succeed or fail
+  alone. `BeginTx`, both writes on the same `*sql.Tx`, then `Commit`, and a deferred `Rollback` for
+  every early return, is what makes them one unit.
+- **Pass the transaction in, not the pool.** `session.Create` and `DeleteByTokenHash` now take a
+  `rowQuerier` or `execer`, the same small interfaces the user and audit packages already use, so the
+  caller decides which transaction they join.
+- **Side effects outside the database come after the commit.** The cookie is the sign-in's only
+  effect the database cannot undo, so it is set only once the commit has succeeded.
+- **Order statements to keep lock time short.** The audit trigger takes a transaction-scoped advisory
+  lock that every audit insert waits on until commit. Running the audit insert last, right before the
+  commit, and keeping bcrypt and the read-only lookups outside the transaction, means the lock covers
+  only the insert and the commit, the same window a role change holds it for.
+- **Fault injection with a narrow trigger.** The tests install a test-only `BEFORE INSERT` trigger on
+  `audit_log` that fails only entries matching one action and one actor or target. Revoking `INSERT`
+  would have failed every audit write in the shared test database. The chain verification test runs
+  after these tests and still finds the chain intact, because a rolled-back insert leaves no row.
+
+**Verified:** the new tests for sign-in and sign-out failed against the old code (200 and 204 where 500
+was expected) and pass now; the full backend suite, `go vet` and `govulncheck` are clean.
+
+**Known side effect:** the frontend's Log out ignores a failed call and clears its own state anyway
+(`frontend/src/App.tsx`, `handleLogout`). With the audit log broken, a person would see the front door
+while their session and HttpOnly cookie survive, so reloading signs them back in. Left for the owner to
+decide; see the questions below.
+
+*(Committed on `feat/transactional-auth-audit`.)*
+
+---
+
 ## Questions to revisit later
 - ~~Revisit if the Go learning curve slows the security/cloud learning too much~~ Settled at 1.0.0: the
   whole backend is Go, and it did not.
@@ -1575,3 +1629,9 @@ launch pull request.)*
 - ~~Backups live 90 days as GitHub artifacts, all under one GitHub account~~ Resolved 2026-11-25: a
   second copy goes to Backblaze B2, locked for 90 days. Lesson for the stage entry: Backblaze's "Write
   Only" key preset includes `deleteFiles`; read a key's actual capabilities, not its preset's name.
+- Since 2026-11-26 a sign-out can fail with a 500 when the audit log is broken, and the frontend's Log
+  out then clears local state while the session survives. Should it tell the person the sign-out did not
+  complete instead?
+- A wrong current password on `PUT /api/me/password` writes its failure entry strictly: a lost entry
+  becomes a 500, which the change limiter (it counts 403s) does not count. Failed sign-ins were kept best
+  effort for exactly that reason. Should this failure entry follow them?
